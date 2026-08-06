@@ -1,0 +1,514 @@
+// Wrapped in an IIFE so this file can be safely re-executed by
+// live-preview/hot-reload tools without "already been declared" errors.
+(function () {
+
+// Supabase client comes from auth.js (loaded before this file)
+let supabaseClient = null;
+if (window.getSupabaseClient) {
+  supabaseClient = window.getSupabaseClient();
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+
+  let currentUserId = null;
+
+  // DOM Elements
+  const winningsDisplay = document.getElementById("val-winnings");
+  const referralDisplay = document.getElementById("val-referral");
+  const userDisplayName = document.querySelector(".user-greeting h1");
+  const userAvatarImg = document.getElementById("user-avatar");
+  
+  // Navigation & Action Buttons
+  const navItems = document.querySelectorAll(".bottom-navbar .nav-item");
+  const fabDeposit = document.getElementById("fab-deposit");
+  const btnDeposit = document.getElementById("btn-deposit");
+  const btnWithdraw = document.getElementById("btn-withdraw");
+
+  // Modal Elements
+  const modalOverlay = document.getElementById("wallet-modal-overlay");
+  const modalIconCircle = document.getElementById("modal-icon-circle");
+  const modalIcon = document.getElementById("modal-icon");
+  const modalTitle = document.getElementById("modal-title");
+  const modalSubtitle = document.getElementById("modal-subtitle");
+  const modalAmountInput = document.getElementById("modal-amount-input");
+  const modalBalanceHint = document.getElementById("modal-balance-hint");
+  const modalError = document.getElementById("modal-error");
+  const modalCloseBtn = document.getElementById("modal-close-btn");
+  const modalCancelBtn = document.getElementById("modal-cancel-btn");
+  const modalConfirmBtn = document.getElementById("modal-confirm-btn");
+  const modalConfirmLabel = document.getElementById("modal-confirm-label");
+  const quickAmounts = document.getElementById("quick-amounts");
+  const chipButtons = document.querySelectorAll(".chip-amount");
+
+  // Toast Elements
+  const toast = document.getElementById("toast");
+  const toastIcon = document.getElementById("toast-icon");
+  const toastMessage = document.getElementById("toast-message");
+
+  let modalMode = null; // 'deposit' | 'withdraw' | 'referral-withdraw'
+  let toastTimer = null;
+
+  // Activity Grid Elements
+  const totalRefsEl = document.querySelector(".act-purple strong");
+  const activeRefsEl = document.querySelector(".act-mint strong");
+  const ticketsTodayEl = document.querySelector(".act-amber strong");
+  const totalWinningsEl = document.querySelector(".act-blue strong");
+
+  // Referral wallet card elements
+  const referralUnlockBtn = document.getElementById("btn-referral-unlock");
+  const referralWithdrawBtn = document.getElementById("btn-referral-withdraw");
+  const referralLockIcon = document.getElementById("referral-lock-icon");
+  const referralProgressFill = document.getElementById("referral-progress-fill");
+  const referralProgressTooltip = document.getElementById("referral-progress-tooltip");
+  const referralProgressLabel = document.getElementById("referral-progress-label");
+  const referralProgressTarget = document.getElementById("referral-progress-target");
+  const referralRemainingText = document.getElementById("referral-remaining-text");
+
+  // Quick Actions
+  const qaBuyTicket = document.getElementById("qa-buy-ticket");
+  const qaReferrals = document.getElementById("qa-referrals");
+  const qaWinners = document.getElementById("qa-winners");
+  const qaTxns = document.getElementById("qa-txns");
+
+  const fmt = (n) => Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
+  let ticketPrice = 100;
+  let referralThreshold = 3000;
+  let referralBalance = 0;
+  let winningsBalance = 0;
+  let myReferralCode = null;
+
+  // --- 1. LOAD CONFIG (ticket price, referral unlock threshold) ---
+  async function loadConfig() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient.from('app_config').select('key, value');
+    if (error || !data) return;
+    data.forEach(row => {
+      if (row.key === 'ticket_price') ticketPrice = Number(row.value);
+      if (row.key === 'referral_unlock_threshold') referralThreshold = Number(row.value);
+    });
+  }
+
+  // --- 2. FETCH USER PROFILE & WALLET DATA ---
+  async function loadUserData() {
+    if (!supabaseClient) {
+      showToast("Backend unavailable. Check your connection.", "error");
+      hideAppLoadingOverlay();
+      return;
+    }
+    try {
+      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+
+      if (authError || !user) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      currentUserId = user.id;
+
+      const { data: profile, error } = await supabaseClient
+        .from('profiles')
+        .select(`
+          full_name,
+          avatar_url,
+          referral_code,
+          winnings_balance,
+          referral_balance,
+          total_referrals,
+          active_referrals,
+          total_winnings
+        `)
+        .eq('id', currentUserId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error.message);
+        showToast("Couldn't load your wallet data. Pull to refresh.", "error");
+        hideAppLoadingOverlay();
+        return;
+      }
+
+      // Tickets bought today — computed live, not a stale stored counter
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const { count: ticketsToday } = await supabaseClient
+        .from('tickets')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', currentUserId)
+        .gte('purchased_at', startOfToday.toISOString());
+
+      if (profile) {
+        winningsBalance = Number(profile.winnings_balance || 0);
+        referralBalance = Number(profile.referral_balance || 0);
+        myReferralCode = profile.referral_code || null;
+
+        if (userDisplayName && profile.full_name) {
+          userDisplayName.innerHTML = `${profile.full_name} <span class="wave">👋</span>`;
+        }
+
+        if (userAvatarImg && profile.avatar_url) {
+          userAvatarImg.src = profile.avatar_url;
+        }
+
+        if (winningsDisplay) winningsDisplay.textContent = fmt(winningsBalance);
+        if (referralDisplay) referralDisplay.textContent = fmt(referralBalance);
+
+        if (totalRefsEl) totalRefsEl.textContent = profile.total_referrals || 0;
+        if (activeRefsEl) activeRefsEl.textContent = profile.active_referrals || 0;
+        if (ticketsTodayEl) ticketsTodayEl.textContent = ticketsToday || 0;
+        if (totalWinningsEl) totalWinningsEl.textContent = profile.total_winnings || 0;
+
+        updateReferralProgressUI();
+      }
+
+      hideAppLoadingOverlay();
+
+    } catch (err) {
+      console.error("Error loading data:", err);
+      showToast("Something went wrong loading your data.", "error");
+      hideAppLoadingOverlay();
+    }
+  }
+
+  function hideAppLoadingOverlay() {
+    const overlay = document.getElementById("app-loading-overlay");
+    if (overlay) {
+      overlay.classList.add("fade-out");
+      setTimeout(() => overlay.remove(), 350);
+    }
+  }
+
+  // --- 3. REFERRAL WALLET UNLOCK UI ---
+  function updateReferralProgressUI() {
+    const pct = Math.min(100, Math.round((referralBalance / referralThreshold) * 100));
+    const unlocked = referralBalance >= referralThreshold;
+
+    if (referralProgressFill) referralProgressFill.style.width = pct + "%";
+    if (referralProgressTooltip) referralProgressTooltip.textContent = `₦${fmt(referralBalance)}`;
+    if (referralProgressLabel) referralProgressLabel.textContent = `₦${fmt(referralBalance)} (${pct}%)`;
+    if (referralProgressTarget) referralProgressTarget.textContent = `₦${fmt(referralThreshold)}`;
+
+    if (unlocked) {
+      if (referralLockIcon) referralLockIcon.style.display = "none";
+      if (referralUnlockBtn) {
+        referralUnlockBtn.textContent = "Withdraw Referral Bonus";
+        referralUnlockBtn.disabled = false;
+      }
+      if (referralWithdrawBtn) {
+        referralWithdrawBtn.disabled = false;
+        referralWithdrawBtn.innerHTML = `<i class="fa-solid fa-circle-arrow-down"></i> WITHDRAW`;
+      }
+      if (referralRemainingText) referralRemainingText.textContent = "Your referral bonus is unlocked!";
+    } else {
+      const remaining = referralThreshold - referralBalance;
+      if (referralLockIcon) referralLockIcon.style.display = "inline";
+      if (referralUnlockBtn) {
+        referralUnlockBtn.textContent = `Unlock at ₦${fmt(referralThreshold)}`;
+        referralUnlockBtn.disabled = true;
+      }
+      if (referralWithdrawBtn) {
+        referralWithdrawBtn.disabled = true;
+        referralWithdrawBtn.innerHTML = `<i class="fa-solid fa-lock"></i> WITHDRAW`;
+      }
+      if (referralRemainingText) referralRemainingText.textContent = `You need ₦${fmt(remaining)} more to unlock your bonus`;
+    }
+  }
+
+  // --- 2. TOAST HELPER ---
+  function showToast(message, type = "success") {
+    clearTimeout(toastTimer);
+    toastMessage.textContent = message;
+    toast.classList.remove("error");
+    toastIcon.className = "fa-solid toast-icon " + (type === "error" ? "fa-circle-exclamation" : "fa-circle-check");
+    if (type === "error") toast.classList.add("error");
+    toast.classList.add("show");
+    toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+  }
+
+  // --- 3. MODAL HELPERS ---
+  function openModal(mode) {
+    modalMode = mode;
+    modalAmountInput.value = "";
+    modalError.textContent = "";
+    chipButtons.forEach(c => c.classList.remove("selected"));
+
+    if (mode === "deposit") {
+      modalIconCircle.classList.remove("withdraw-mode");
+      modalIcon.className = "fa-solid fa-circle-plus";
+      modalTitle.textContent = "Deposit Funds";
+      modalSubtitle.textContent = "Add money to your Winnings Wallet";
+      modalConfirmLabel.textContent = "Deposit";
+      modalBalanceHint.textContent = "";
+    } else if (mode === "withdraw") {
+      modalIconCircle.classList.add("withdraw-mode");
+      modalIcon.className = "fa-solid fa-circle-arrow-down";
+      modalTitle.textContent = "Withdraw Funds";
+      modalSubtitle.textContent = "Move money out of your Winnings Wallet";
+      modalConfirmLabel.textContent = "Withdraw";
+      modalBalanceHint.textContent = `Available: ₦${fmt(winningsBalance)}`;
+    } else {
+      modalIconCircle.classList.add("withdraw-mode");
+      modalIcon.className = "fa-solid fa-circle-arrow-down";
+      modalTitle.textContent = "Withdraw Referral Bonus";
+      modalSubtitle.textContent = "Move money out of your Referral Wallet";
+      modalConfirmLabel.textContent = "Withdraw";
+      modalBalanceHint.textContent = `Available: ₦${fmt(referralBalance)}`;
+    }
+
+    modalOverlay.classList.add("open");
+    setTimeout(() => modalAmountInput.focus(), 150);
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove("open");
+    modalMode = null;
+  }
+
+  function setModalLoading(isLoading) {
+    modalConfirmBtn.disabled = isLoading;
+    modalCancelBtn.disabled = isLoading;
+    modalConfirmBtn.classList.toggle("loading", isLoading);
+  }
+
+  chipButtons.forEach(chip => {
+    chip.addEventListener("click", () => {
+      chipButtons.forEach(c => c.classList.remove("selected"));
+      chip.classList.add("selected");
+      modalAmountInput.value = chip.dataset.amount;
+      modalError.textContent = "";
+    });
+  });
+
+  modalAmountInput.addEventListener("input", () => {
+    chipButtons.forEach(c => c.classList.remove("selected"));
+    modalError.textContent = "";
+  });
+
+  modalCloseBtn.addEventListener("click", closeModal);
+  modalCancelBtn.addEventListener("click", closeModal);
+  modalOverlay.addEventListener("click", (e) => {
+    if (e.target === modalOverlay) closeModal();
+  });
+
+  modalConfirmBtn.addEventListener("click", async () => {
+    const amount = parseFloat(modalAmountInput.value);
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      modalError.textContent = "Enter a valid amount.";
+      return;
+    }
+
+    if (!supabaseClient) {
+      modalError.textContent = "Backend unavailable right now. Try again shortly.";
+      return;
+    }
+
+    if (!currentUserId) {
+      modalError.textContent = "Please log in to continue.";
+      return;
+    }
+
+    setModalLoading(true);
+    try {
+      if (modalMode === "deposit") {
+        await handleDeposit(amount);
+      } else if (modalMode === "withdraw") {
+        await handleWithdraw(amount, "winnings");
+      } else {
+        await handleWithdraw(amount, "referral");
+      }
+      closeModal();
+    } catch (err) {
+      modalError.textContent = err.message || "Something went wrong.";
+    } finally {
+      setModalLoading(false);
+    }
+  });
+
+  // --- 4. DEPOSIT LOGIC — via secure RPC (server validates & mutates the balance) ---
+  async function handleDeposit(amount) {
+    const { error } = await supabaseClient.rpc('deposit_funds', { p_amount: amount });
+    if (error) throw error;
+
+    showToast(`Successfully deposited ₦${amount.toLocaleString()}!`);
+    loadUserData();
+  }
+
+  // --- 5. WITHDRAW LOGIC — via secure RPC ---
+  async function handleWithdraw(amount, wallet) {
+    const { error } = await supabaseClient.rpc('withdraw_funds', {
+      p_amount: amount,
+      p_wallet: wallet
+    });
+    if (error) throw error;
+
+    showToast(`Withdrawal request of ₦${amount.toLocaleString()} submitted!`);
+    loadUserData();
+  }
+
+  // --- 6. BUY TICKET — now a dedicated page (buy-ticket.html) with
+  // tier selection, since a single flat-price ticket no longer applies.
+
+  // --- 7. EVENT LISTENERS ---
+  if (fabDeposit) fabDeposit.addEventListener("click", () => openModal("deposit"));
+  if (btnDeposit) btnDeposit.addEventListener("click", () => openModal("deposit"));
+  if (btnWithdraw) btnWithdraw.addEventListener("click", () => openModal("withdraw"));
+
+  if (referralUnlockBtn) referralUnlockBtn.addEventListener("click", () => {
+    if (!referralUnlockBtn.disabled) openModal("referral-withdraw");
+  });
+  if (referralWithdrawBtn) referralWithdrawBtn.addEventListener("click", () => {
+    if (!referralWithdrawBtn.disabled) openModal("referral-withdraw");
+  });
+
+  if (qaBuyTicket) qaBuyTicket.addEventListener("click", () => { window.location.href = 'buy-ticket.html'; });
+  if (qaReferrals) qaReferrals.addEventListener("click", async () => {
+    if (!myReferralCode) {
+      showToast("Referral code not ready yet — try again in a moment.", "error");
+      return;
+    }
+    const link = `${window.location.origin}${window.location.pathname.replace('index.html', '')}signup.html?ref=${myReferralCode}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast("Referral link copied to clipboard!");
+    } catch {
+      showToast(link, "success");
+    }
+  });
+  if (qaWinners) qaWinners.addEventListener("click", () => { window.location.href = 'winners.html'; });
+  if (qaTxns) qaTxns.addEventListener("click", () => { window.location.href = 'transactions.html'; });
+
+  // --- HEADER: notifications dropdown ---
+  const notificationBtn = document.getElementById("notification-btn");
+  const notificationPanel = document.getElementById("notification-panel");
+  const notificationList = document.getElementById("notification-list");
+  const notificationEmpty = document.getElementById("notification-empty");
+  const notificationDot = document.getElementById("notification-dot");
+
+  const NOTIF_META = {
+    deposit: { icon: "fa-circle-plus", color: "#00b894", text: (t) => `Deposit of ₦${fmt(t.amount)} confirmed` },
+    withdrawal: { icon: "fa-circle-arrow-down", color: "#ff7675", text: (t) => `Withdrawal of ₦${fmt(t.amount)} requested` },
+    ticket_purchase: { icon: "fa-ticket", color: "#6c5ce7", text: (t) => `Ticket purchased for ₦${fmt(t.amount)}` },
+    referral_bonus: { icon: "fa-users", color: "#00b894", text: (t) => `Referral bonus of ₦${fmt(t.amount)} earned` },
+    win_payout: { icon: "fa-trophy", color: "#f59f00", text: (t) => `You won ₦${fmt(t.amount)}! 🎉` },
+    signup_bonus: { icon: "fa-gift", color: "#f59f00", text: (t) => `₦${fmt(t.amount)} signup credit added` },
+  };
+
+  async function loadNotifications() {
+    if (!supabaseClient || !currentUserId) return;
+    const { data, error } = await supabaseClient
+      .from('transactions')
+      .select('id, type, amount, status, created_at')
+      .eq('user_id', currentUserId)
+      .order('created_at', { ascending: false })
+      .limit(8);
+
+    if (error || !data || data.length === 0) {
+      notificationEmpty.style.display = "block";
+      notificationList.innerHTML = "";
+      return;
+    }
+
+    notificationEmpty.style.display = "none";
+    notificationList.innerHTML = data.map(t => {
+      const meta = NOTIF_META[t.type] || { icon: "fa-circle", color: "#636e72", text: () => t.type };
+      const timeAgo = new Date(t.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="notif-item">
+          <div class="notif-icon" style="background:${meta.color}1a; color:${meta.color};">
+            <i class="fa-solid ${meta.icon}"></i>
+          </div>
+          <div class="notif-text">
+            <strong>${meta.text(t)}</strong>
+            <small>${timeAgo}</small>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // Show the unread dot if the newest transaction is from the last hour
+    const newest = new Date(data[0].created_at);
+    if (Date.now() - newest.getTime() < 60 * 60 * 1000) {
+      notificationDot.style.display = "block";
+    }
+  }
+
+  if (notificationBtn) {
+    notificationBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menuPanel.classList.remove("open");
+      notificationPanel.classList.toggle("open");
+      notificationDot.style.display = "none";
+      if (notificationPanel.classList.contains("open")) loadNotifications();
+    });
+  }
+
+  // --- HEADER: menu dropdown ---
+  const menuBtn = document.getElementById("menu-btn");
+  const menuPanel = document.getElementById("menu-panel");
+  const menuAdminLink = document.getElementById("menu-admin-link");
+  const menuLogoutBtn = document.getElementById("menu-logout-btn");
+
+  if (menuBtn) {
+    menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      notificationPanel.classList.remove("open");
+      menuPanel.classList.toggle("open");
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!notificationPanel.contains(e.target) && e.target !== notificationBtn) {
+      notificationPanel.classList.remove("open");
+    }
+    if (!menuPanel.contains(e.target) && e.target !== menuBtn) {
+      menuPanel.classList.remove("open");
+    }
+  });
+
+  if (menuLogoutBtn) {
+    menuLogoutBtn.addEventListener("click", async () => {
+      if (supabaseClient) await supabaseClient.auth.signOut();
+      window.location.href = 'login.html';
+    });
+  }
+
+  // --- BOTTOM NAV ---
+  navItems.forEach(item => {
+    item.addEventListener("click", function () {
+      const target = this.dataset.target;
+      if (this.id === "nav-wallets") {
+        document.querySelector(".wallets-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        navItems.forEach(n => n.classList.remove("active"));
+        this.classList.add("active");
+        return;
+      }
+      if (target && target !== 'index.html') {
+        window.location.href = target;
+        return;
+      }
+      navItems.forEach(n => n.classList.remove("active"));
+      this.classList.add("active");
+    });
+  });
+
+  await loadConfig();
+  loadUserData();
+
+  // Check admin status separately (doesn't block the main dashboard load)
+  if (supabaseClient) {
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (user) {
+      const { data: adminCheck } = await supabaseClient
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .single();
+      if (adminCheck?.is_admin && menuAdminLink) {
+        menuAdminLink.style.display = "flex";
+      }
+    }
+  }
+});
+
+})();

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Winners — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">WINNERS</span>
+          <span class="brand-sub">Recent Draws</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="telegram-banner" style="background: linear-gradient(135deg, #e17055, #fdcb6e);">
+        <div class="banner-content">
+          <span class="live-tag"><span class="green-dot"></span> DAILY DRAW</span>
+          <h2>Recent Winners</h2>
+          <p>See who's won so far</p>
+        </div>
+        <div class="banner-trophy">
+          <i class="fa-solid fa-trophy trophy-glow"></i>
+        </div>
+      </div>
+
+      <div id="winners-list" class="winners-list"></div>
+      <div id="winners-empty" class="winners-empty" style="display:none;">
+        <i class="fa-solid fa-trophy"></i>
+        <p>No draws have been completed yet. Check back soon!</p>
+      </div>
+      <div id="winners-loading" class="winners-empty">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Loading winners...</p>
+      </div>
+    </main>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      async function loadWinners() {
+        const client = window.getSupabaseClient();
+        if (!client) return;
+
+        const { data, error } = await client.rpc('get_recent_winners', { p_limit: 30 });
+        const listEl = document.getElementById('winners-list');
+        const emptyEl = document.getElementById('winners-empty');
+        document.getElementById('winners-loading').style.display = 'none';
+
+        if (error) {
+          console.error('Error loading winners:', error.message);
+          emptyEl.style.display = 'flex';
+          emptyEl.querySelector('p').textContent = "Couldn't load winners right now.";
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          emptyEl.style.display = 'flex';
+          return;
+        }
+
+        listEl.innerHTML = data.map(w => `
+          <div class="winner-row">
+            <div class="winner-avatar"><i class="fa-solid fa-trophy"></i></div>
+            <div class="winner-info">
+              <strong>${escapeHtml(w.display_name || 'A Winner')}</strong>
+              <small>${new Date(w.draw_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</small>
+            </div>
+            <div class="winner-prize">&#8358;${Number(w.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+          </div>
+        `).join('');
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      loadWinners();
+    })();
+  </script>
+</body>
+</html>

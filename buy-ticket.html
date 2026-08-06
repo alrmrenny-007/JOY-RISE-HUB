@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Buy Ticket — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">BUY TICKET</span>
+          <span class="brand-sub">Pick a Tier</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <div class="balance-summary" id="balance-summary">
+        <span>Available: <strong id="available-total">&#8358;0.00</strong></span>
+      </div>
+
+      <div id="tier-grid" class="tier-grid"></div>
+      <div id="tier-loading" class="winners-empty">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        <p>Loading ticket tiers...</p>
+      </div>
+
+      <div class="section-heading">
+        <h3>Recent Session Results</h3>
+      </div>
+      <div id="results-list" class="winners-list"></div>
+      <div id="results-empty" class="winners-empty" style="display:none;">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <p>No draws completed yet.</p>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- CONFIRM PURCHASE MODAL -->
+  <div class="modal-overlay" id="confirm-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-circle" id="confirm-icon-circle">
+          <i class="fa-solid fa-ticket"></i>
+        </div>
+        <div>
+          <h3 id="confirm-tier-name">Buy Ticket</h3>
+          <p>Confirm your purchase</p>
+        </div>
+        <button class="modal-close-btn" id="confirm-close-btn">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="ticket-price-row">
+          <span>Ticket Price</span>
+          <strong id="confirm-price">&#8358;0.00</strong>
+        </div>
+        <div class="ticket-price-row">
+          <span>Possible Prize</span>
+          <strong id="confirm-prize" style="color:#00b894;">&#8358;0.00</strong>
+        </div>
+        <div class="modal-error" id="confirm-error"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="confirm-cancel-btn">Cancel</button>
+        <button class="btn-modal-primary" id="confirm-buy-btn">
+          <span id="confirm-buy-label">Confirm Purchase</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="confirm-spinner"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check toast-icon" id="toast-icon"></i>
+    <span id="toast-message"></span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      let currentUserId = null;
+      let winningsBalance = 0;
+      let referralBalance = 0;
+      let selectedTier = null;
+      let toastTimer = null;
+
+      const toast = document.getElementById('toast');
+      const toastIcon = document.getElementById('toast-icon');
+      const toastMessage = document.getElementById('toast-message');
+
+      function showToast(message, type = 'success') {
+        clearTimeout(toastTimer);
+        toastMessage.textContent = message;
+        toast.classList.remove('error');
+        toastIcon.className = 'fa-solid toast-icon ' + (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check');
+        if (type === 'error') toast.classList.add('error');
+        toast.classList.add('show');
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+      }
+
+      function fmt(n) {
+        return Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      async function init() {
+        const client = window.getSupabaseClient();
+        if (!client) return;
+
+        const { data: { user }, error: authError } = await client.auth.getUser();
+        if (authError || !user) {
+          window.location.href = 'login.html';
+          return;
+        }
+        currentUserId = user.id;
+
+        const { data: profile } = await client
+          .from('profiles')
+          .select('winnings_balance, referral_balance')
+          .eq('id', currentUserId)
+          .single();
+
+        if (profile) {
+          winningsBalance = Number(profile.winnings_balance || 0);
+          referralBalance = Number(profile.referral_balance || 0);
+          document.getElementById('available-total').textContent =
+            `₦${fmt(winningsBalance + referralBalance)}`;
+        }
+
+        loadTiers(client);
+        loadResults(client);
+        wireModal(client);
+      }
+
+      async function loadTiers(client) {
+        const { data, error } = await client
+          .from('ticket_tiers')
+          .select('id, name, price, prize_amount')
+          .eq('is_active', true)
+          .order('sort_order');
+
+        document.getElementById('tier-loading').style.display = 'none';
+        const grid = document.getElementById('tier-grid');
+
+        if (error || !data || data.length === 0) {
+          grid.innerHTML = `<p style="font-size:12px;color:#636e72;">No ticket tiers available right now.</p>`;
+          return;
+        }
+
+        const colors = ['#6c5ce7', '#00b894', '#e17055', '#0984e3', '#e84393', '#fdcb6e'];
+
+        grid.innerHTML = data.map((tier, i) => `
+          <div class="tier-card" data-tier-id="${tier.id}" style="--tier-color:${colors[i % colors.length]};">
+            <div class="tier-card-icon"><i class="fa-solid fa-ticket"></i></div>
+            <div class="tier-card-name">${escapeHtml(tier.name)}</div>
+            <div class="tier-card-price">₦${fmt(tier.price)}</div>
+            <button class="tier-card-btn" data-tier-id="${tier.id}" data-name="${escapeHtml(tier.name)}"
+              data-price="${tier.price}" data-prize="${tier.prize_amount}">
+              Buy Ticket
+            </button>
+          </div>
+        `).join('');
+
+        grid.querySelectorAll('.tier-card-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            selectedTier = {
+              id: btn.dataset.tierId,
+              name: btn.dataset.name,
+              price: Number(btn.dataset.price),
+              prize: Number(btn.dataset.prize)
+            };
+            openConfirmModal();
+          });
+        });
+      }
+
+      async function loadResults(client) {
+        const { data, error } = await client.rpc('get_recent_winners', { p_limit: 15 });
+        const listEl = document.getElementById('results-list');
+        const emptyEl = document.getElementById('results-empty');
+
+        if (error || !data || data.length === 0) {
+          emptyEl.style.display = 'flex';
+          return;
+        }
+
+        listEl.innerHTML = data.map(w => `
+          <div class="winner-row">
+            <div class="winner-avatar"><i class="fa-solid fa-trophy"></i></div>
+            <div class="winner-info">
+              <strong>${escapeHtml(w.display_name || 'A Winner')} <small style="font-weight:600;color:#636e72;">&middot; ${escapeHtml(w.tier_name || '')}</small></strong>
+              <small>${new Date(w.draw_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</small>
+            </div>
+            <div class="winner-prize">₦${fmt(w.prize_amount)}</div>
+          </div>
+        `).join('');
+      }
+
+      function openConfirmModal() {
+        document.getElementById('confirm-error').textContent = '';
+        document.getElementById('confirm-tier-name').textContent = `Buy ${selectedTier.name} Ticket`;
+        document.getElementById('confirm-price').textContent = `₦${fmt(selectedTier.price)}`;
+        document.getElementById('confirm-prize').textContent = `₦${fmt(selectedTier.prize)}`;
+        document.getElementById('confirm-modal-overlay').classList.add('open');
+      }
+
+      function closeConfirmModal() {
+        document.getElementById('confirm-modal-overlay').classList.remove('open');
+      }
+
+      function wireModal(client) {
+        document.getElementById('confirm-close-btn').addEventListener('click', closeConfirmModal);
+        document.getElementById('confirm-cancel-btn').addEventListener('click', closeConfirmModal);
+        document.getElementById('confirm-modal-overlay').addEventListener('click', (e) => {
+          if (e.target.id === 'confirm-modal-overlay') closeConfirmModal();
+        });
+
+        document.getElementById('confirm-buy-btn').addEventListener('click', async () => {
+          const errorEl = document.getElementById('confirm-error');
+          const btn = document.getElementById('confirm-buy-btn');
+
+          if (!selectedTier) return;
+          if (winningsBalance + referralBalance < selectedTier.price) {
+            errorEl.textContent = 'Insufficient balance for this ticket.';
+            return;
+          }
+
+          btn.disabled = true;
+          btn.classList.add('loading');
+
+          try {
+            const { error } = await client.rpc('buy_ticket', { p_tier_id: selectedTier.id });
+            if (error) throw error;
+
+            showToast(`${selectedTier.name} ticket purchased for ₦${fmt(selectedTier.price)}! Good luck 🎟️`);
+            closeConfirmModal();
+            init(); // refresh balances + results
+          } catch (err) {
+            errorEl.textContent = err.message || 'Purchase failed.';
+          } finally {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+          }
+        });
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

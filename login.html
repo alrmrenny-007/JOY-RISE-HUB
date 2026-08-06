@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Log In — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container auth-container">
+
+    <div class="auth-header">
+      <div class="logo-box">
+        <div class="logo-badge">JR</div>
+        <div class="logo-text">
+          <span class="brand-name">JOY-RISE</span>
+          <span class="brand-sub">HUB</span>
+        </div>
+      </div>
+      <h1>Welcome back</h1>
+      <p>Log in to your wallet</p>
+    </div>
+
+    <form class="auth-form" id="login-form">
+      <label class="auth-label">Email</label>
+      <input type="email" class="auth-input" id="login-email" placeholder="you@example.com" required />
+
+      <label class="auth-label">Password</label>
+      <input type="password" class="auth-input" id="login-password" placeholder="Your password" required />
+      <a href="forgot-password.html" style="font-size:11px; color:#6c5ce7; font-weight:700; text-decoration:none; margin-top:8px; align-self:flex-end;">Forgot password?</a>
+
+      <div class="auth-error" id="login-error"></div>
+
+      <button type="submit" class="btn-auth-primary" id="login-submit-btn">
+        <span id="login-submit-label">Log In</span>
+        <i class="fa-solid fa-spinner fa-spin modal-spinner" id="login-spinner"></i>
+      </button>
+    </form>
+
+    <p class="auth-switch">Don't have an account? <a href="signup.html" id="signup-link">Sign up</a></p>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        document.getElementById('signup-link').href = `signup.html?ref=${encodeURIComponent(ref)}`;
+      }
+
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById('login-error');
+        const btn = document.getElementById('login-submit-btn');
+        errorEl.textContent = '';
+
+        const email = document.getElementById('login-email').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!email || !password) {
+          errorEl.textContent = 'Enter your email and password.';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        try {
+          const client = window.getSupabaseClient();
+          const { error } = await client.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+          window.location.href = 'index.html';
+        } catch (err) {
+          console.error('Login error (full object):', err);
+          errorEl.textContent = err?.message || err?.error_description || err?.msg
+            || 'Login failed. Open the browser console for details.';
+          btn.disabled = false;
+          btn.classList.remove('loading');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

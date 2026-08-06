@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Edit Profile — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">EDIT PROFILE</span>
+          <span class="brand-sub">Name & Avatar</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <div class="profile-preview">
+        <img id="preview-avatar" class="profile-preview-avatar" src="" alt="Avatar" />
+        <div id="preview-name" class="profile-preview-name">Loading...</div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-user"></i> Display Name</h3>
+        <input type="text" class="auth-input" id="name-input" placeholder="Your name" style="margin-top:10px;" />
+        <div class="modal-error" id="name-error"></div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-images"></i> Choose an Avatar</h3>
+        <div id="avatar-grid" class="avatar-grid"></div>
+      </div>
+
+      <button class="btn-auth-primary" id="save-btn" style="margin-top:4px;">
+        <span id="save-label">Save Changes</span>
+        <i class="fa-solid fa-spinner fa-spin modal-spinner" id="save-spinner"></i>
+      </button>
+
+    </main>
+
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check toast-icon" id="toast-icon"></i>
+    <span id="toast-message"></span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      const AVATAR_SEEDS = ['Felix', 'Aneka', 'Milo', 'Zoe', 'Leo', 'Mia', 'Kai', 'Nora', 'Theo', 'Ivy', 'Max', 'Ruby'];
+      const avatarUrl = (seed) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+
+      let currentUserId = null;
+      let selectedAvatarSeed = AVATAR_SEEDS[0];
+      let toastTimer = null;
+
+      const toast = document.getElementById('toast');
+      const toastIcon = document.getElementById('toast-icon');
+      const toastMessage = document.getElementById('toast-message');
+
+      function showToast(message, type = 'success') {
+        clearTimeout(toastTimer);
+        toastMessage.textContent = message;
+        toast.classList.remove('error');
+        toastIcon.className = 'fa-solid toast-icon ' + (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check');
+        if (type === 'error') toast.classList.add('error');
+        toast.classList.add('show');
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+      }
+
+      function seedFromUrl(url) {
+        if (!url) return AVATAR_SEEDS[0];
+        const match = url.match(/seed=([^&]+)/);
+        return match ? decodeURIComponent(match[1]) : AVATAR_SEEDS[0];
+      }
+
+      function renderAvatarGrid() {
+        const grid = document.getElementById('avatar-grid');
+        grid.innerHTML = AVATAR_SEEDS.map(seed => `
+          <button class="avatar-option ${seed === selectedAvatarSeed ? 'selected' : ''}" data-seed="${seed}">
+            <img src="${avatarUrl(seed)}" alt="${seed}" />
+          </button>
+        `).join('');
+
+        grid.querySelectorAll('.avatar-option').forEach(btn => {
+          btn.addEventListener('click', () => {
+            selectedAvatarSeed = btn.dataset.seed;
+            grid.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            updatePreview();
+          });
+        });
+      }
+
+      function updatePreview() {
+        document.getElementById('preview-avatar').src = avatarUrl(selectedAvatarSeed);
+        document.getElementById('preview-name').textContent = document.getElementById('name-input').value || 'Your Name';
+      }
+
+      async function init() {
+        const client = window.getSupabaseClient();
+        if (!client) return;
+
+        const { data: { user }, error: authError } = await client.auth.getUser();
+        if (authError || !user) {
+          window.location.href = 'login.html';
+          return;
+        }
+        currentUserId = user.id;
+
+        const { data: profile, error } = await client
+          .from('profiles')
+          .select('full_name, avatar_url')
+          .eq('id', currentUserId)
+          .single();
+
+        if (error) {
+          showToast("Couldn't load your profile.", 'error');
+          return;
+        }
+
+        document.getElementById('name-input').value = profile.full_name || '';
+        selectedAvatarSeed = seedFromUrl(profile.avatar_url);
+
+        renderAvatarGrid();
+        updatePreview();
+
+        document.getElementById('name-input').addEventListener('input', updatePreview);
+      }
+
+      document.getElementById('save-btn').addEventListener('click', async () => {
+        const client = window.getSupabaseClient();
+        const nameInput = document.getElementById('name-input');
+        const errorEl = document.getElementById('name-error');
+        const btn = document.getElementById('save-btn');
+        errorEl.textContent = '';
+
+        const name = nameInput.value.trim();
+        if (!name) {
+          errorEl.textContent = 'Please enter a name.';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        try {
+          const { error } = await client
+            .from('profiles')
+            .update({ full_name: name, avatar_url: avatarUrl(selectedAvatarSeed) })
+            .eq('id', currentUserId);
+
+          if (error) throw error;
+
+          showToast('Profile updated!');
+          setTimeout(() => { window.location.href = 'index.html'; }, 900);
+        } catch (err) {
+          errorEl.textContent = err.message || 'Failed to save changes.';
+        } finally {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+        }
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>

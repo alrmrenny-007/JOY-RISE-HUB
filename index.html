@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <div class="app-loading-overlay" id="app-loading-overlay">
+      <i class="fa-solid fa-spinner fa-spin"></i>
+    </div>
+
+    
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="logo-box">
+        <div class="logo-badge">JR</div>
+        <div class="logo-text">
+          <span class="brand-name">JOY-RISE</span>
+          <span class="brand-sub">HUB</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn" id="notification-btn">
+          <i class="fa-regular fa-bell"></i>
+          <span class="badge-dot" id="notification-dot" style="display:none;"></span>
+        </button>
+        <button class="icon-btn" id="menu-btn">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- NOTIFICATIONS DROPDOWN -->
+    <div class="dropdown-panel" id="notification-panel">
+      <div class="dropdown-panel-title">Recent Activity</div>
+      <div id="notification-list" class="dropdown-panel-list"></div>
+      <div id="notification-empty" class="dropdown-panel-empty" style="display:none;">No recent activity yet.</div>
+    </div>
+
+    <!-- MENU DROPDOWN -->
+    <div class="dropdown-panel" id="menu-panel">
+      <a href="buy-ticket.html" class="dropdown-panel-item"><i class="fa-solid fa-ticket"></i> Buy Ticket</a>
+      <a href="profile.html" class="dropdown-panel-item"><i class="fa-solid fa-user"></i> Edit Profile</a>
+      <a href="transactions.html" class="dropdown-panel-item"><i class="fa-solid fa-receipt"></i> Transactions</a>
+      <a href="winners.html" class="dropdown-panel-item"><i class="fa-solid fa-trophy"></i> Winners</a>
+      <a href="help.html" class="dropdown-panel-item"><i class="fa-regular fa-circle-question"></i> Help & Support</a>
+      <a href="admin.html" class="dropdown-panel-item" id="menu-admin-link" style="display:none;"><i class="fa-solid fa-user-shield"></i> Admin Panel</a>
+      <div class="dropdown-panel-divider"></div>
+      <button class="dropdown-panel-item dropdown-panel-danger" id="menu-logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Log Out</button>
+    </div>
+
+    <!-- MAIN APP CONTENT -->
+    <main class="main-content">
+      
+      <!-- USER PROFILE WELCOME -->
+      <div class="user-profile-header">
+        <a href="profile.html">
+          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar" class="avatar-img" id="user-avatar" />
+        </a>
+        <div class="user-greeting">
+          <h2>Welcome back,</h2>
+          <h1>Alrm <span class="wave">👋</span></h1>
+          <p>Let's rise together 🚀</p>
+        </div>
+      </div>
+
+      <!-- WALLETS GRID -->
+      <div class="wallets-grid">
+        <!-- WINNINGS WALLET -->
+        <div class="wallet-card wallet-purple">
+          <div class="wallet-top">
+            <div class="wallet-icon-circle">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+            <span class="wallet-title">Winnings Wallet <i class="fa-regular fa-circle-question info-icon"></i></span>
+          </div>
+          <div class="wallet-balance">&#8358;<span id="val-winnings">2,450.00</span></div>
+          <div class="wallet-actions">
+            <button class="btn-wallet-action" id="btn-deposit"><i class="fa-solid fa-circle-plus"></i> Deposit</button>
+            <button class="btn-wallet-action" id="btn-withdraw"><i class="fa-solid fa-circle-arrow-down"></i> Withdraw</button>
+          </div>
+        </div>
+
+        <!-- REFERRAL WALLET -->
+        <div class="wallet-card wallet-green">
+          <div class="wallet-top">
+            <div class="wallet-icon-circle">
+              <i class="fa-solid fa-users"></i>
+            </div>
+            <span class="wallet-title">Referral Wallet <i class="fa-regular fa-circle-question info-icon"></i></span>
+          </div>
+          <div class="wallet-balance">&#8358;<span id="val-referral">1,000.00</span> <i class="fa-solid fa-lock lock-inline" id="referral-lock-icon"></i></div>
+          <button class="btn-unlock-badge" id="btn-referral-unlock">Unlock at &#8358;3,000</button>
+        </div>
+      </div>
+
+      <!-- UNLOCK REFERRAL BONUS CARD -->
+      <div class="card referral-progress-card">
+        <div class="card-header-flex">
+          <div class="gift-icon-box">
+            <i class="fa-solid fa-gift"></i>
+          </div>
+          <div class="referral-text">
+            <h3>Unlock Your Referral Bonus</h3>
+            <p>Your ₦1,000 signup credit lives here — refer friends to unlock it</p>
+          </div>
+          <a href="#" class="link-details">View Details &gt;</a>
+        </div>
+
+        <!-- PROGRESS BAR -->
+        <div class="progress-section">
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar-fill" id="referral-progress-fill" style="width: 33%;">
+              <span class="progress-tooltip" id="referral-progress-tooltip">&#8358;1,000</span>
+            </div>
+          </div>
+          <div class="progress-labels">
+            <span id="referral-progress-label">&#8358;1,000 (33%)</span>
+            <span id="referral-progress-target">&#8358;3,000</span>
+          </div>
+        </div>
+
+        <div class="card-footer-flex">
+          <span class="remaining-text" id="referral-remaining-text">You need &#8358;2,000 more to unlock your bonus</span>
+          <button class="btn-disabled-withdraw" id="btn-referral-withdraw" disabled>
+            <i class="fa-solid fa-lock"></i> WITHDRAW
+          </button>
+        </div>
+      </div>
+
+      <!-- QUICK ACTIONS GRID -->
+      <div class="quick-actions-grid">
+        <div class="qa-item" id="qa-buy-ticket">
+          <div class="qa-icon icon-purple">
+            <i class="fa-solid fa-ticket"></i>
+          </div>
+          <strong>Buy Ticket</strong>
+          <small>Join today's draw</small>
+        </div>
+
+        <div class="qa-item" id="qa-referrals">
+          <div class="qa-icon icon-blue">
+            <i class="fa-solid fa-user-group"></i>
+          </div>
+          <strong>My Referrals</strong>
+          <small>Invite & earn</small>
+        </div>
+
+        <div class="qa-item" id="qa-winners">
+          <div class="qa-icon icon-orange">
+            <i class="fa-solid fa-trophy"></i>
+          </div>
+          <strong>Winners</strong>
+          <small>Recent winners</small>
+        </div>
+
+        <div class="qa-item" id="qa-txns">
+          <div class="qa-icon icon-teal">
+            <i class="fa-solid fa-wallet"></i>
+          </div>
+          <strong>Transactions</strong>
+          <small>View history</small>
+        </div>
+      </div>
+
+      <!-- TELEGRAM BANNER -->
+      <div class="telegram-banner">
+        <div class="banner-content">
+          <span class="live-tag"><span class="green-dot"></span> LIVE DRAW</span>
+          <h2>Daily Telegram Draw</h2>
+          <p>Join our live draw session on Telegram</p>
+          <div class="banner-bottom">
+            <span class="time-badge"><i class="fa-regular fa-clock"></i> 8:00PM Daily</span>
+            <a href="https://t.me" target="_blank" class="btn-telegram">Join Telegram <i class="fa-solid fa-paper-plane"></i></a>
+          </div>
+        </div>
+        <div class="banner-trophy">
+          <i class="fa-solid fa-trophy trophy-glow"></i>
+        </div>
+      </div>
+
+      <!-- YOUR ACTIVITY -->
+      <div class="activity-section">
+        <div class="section-title-flex">
+          <h3>Your Activity</h3>
+          <a href="#" class="link-view-all">View All &gt;</a>
+        </div>
+
+        <div class="activity-grid">
+          <div class="act-card act-purple">
+            <div class="act-icon"><i class="fa-solid fa-users"></i></div>
+            <div class="act-details">
+              <strong>12</strong>
+              <small>Total Referrals</small>
+            </div>
+          </div>
+
+          <div class="act-card act-mint">
+            <div class="act-icon"><i class="fa-solid fa-circle-check"></i></div>
+            <div class="act-details">
+              <strong>6</strong>
+              <small>Active Referrals</small>
+            </div>
+          </div>
+
+          <div class="act-card act-amber">
+            <div class="act-icon"><i class="fa-solid fa-ticket"></i></div>
+            <div class="act-details">
+              <strong>8</strong>
+              <small>Tickets Today</small>
+            </div>
+          </div>
+
+          <div class="act-card act-blue">
+            <div class="act-icon"><i class="fa-solid fa-trophy"></i></div>
+            <div class="act-details">
+              <strong>2</strong>
+              <small>Total Winnings</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION BAR -->
+    <nav class="bottom-navbar">
+      <button class="nav-item active" id="nav-home" data-target="index.html">
+        <i class="fa-solid fa-house"></i>
+        <span>Home</span>
+      </button>
+
+      <button class="nav-item" id="nav-tickets" data-target="buy-ticket.html">
+        <i class="fa-solid fa-ticket"></i>
+        <span>Tickets</span>
+      </button>
+
+      <!-- CENTER FLOATING DEPOSIT BUTTON -->
+      <div class="fab-wrapper">
+        <button class="fab-btn" id="fab-deposit">
+          <i class="fa-solid fa-plus"></i>
+        </button>
+        <span class="fab-label">Deposit</span>
+      </div>
+
+      <button class="nav-item" id="nav-wallets">
+        <i class="fa-solid fa-wallet"></i>
+        <span>Wallets</span>
+      </button>
+
+      <button class="nav-item" id="nav-help" data-target="help.html">
+        <i class="fa-regular fa-circle-question"></i>
+        <span>Help</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- DEPOSIT / WITHDRAW MODAL -->
+  <div class="modal-overlay" id="wallet-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-circle" id="modal-icon-circle">
+          <i class="fa-solid fa-circle-plus" id="modal-icon"></i>
+        </div>
+        <div>
+          <h3 id="modal-title">Deposit Funds</h3>
+          <p id="modal-subtitle">Add money to your Winnings Wallet</p>
+        </div>
+        <button class="modal-close-btn" id="modal-close-btn">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <label class="amount-label">Amount (&#8358;)</label>
+        <div class="amount-input-group">
+          <span class="amount-prefix">&#8358;</span>
+          <input type="number" id="modal-amount-input" placeholder="0.00" inputmode="decimal" />
+        </div>
+        <div class="modal-balance-hint" id="modal-balance-hint"></div>
+
+        <div class="quick-amounts" id="quick-amounts">
+          <button class="chip-amount" data-amount="500">&#8358;500</button>
+          <button class="chip-amount" data-amount="1000">&#8358;1,000</button>
+          <button class="chip-amount" data-amount="2000">&#8358;2,000</button>
+          <button class="chip-amount" data-amount="5000">&#8358;5,000</button>
+        </div>
+
+        <div class="modal-error" id="modal-error"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="modal-cancel-btn">Cancel</button>
+        <button class="btn-modal-primary" id="modal-confirm-btn">
+          <span id="modal-confirm-label">Deposit</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="modal-spinner"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check toast-icon" id="toast-icon"></i>
+    <span id="toast-message"></span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

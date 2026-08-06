@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Sign Up — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container auth-container">
+
+    <div class="auth-header">
+      <div class="logo-box">
+        <div class="logo-badge">JR</div>
+        <div class="logo-text">
+          <span class="brand-name">JOY-RISE</span>
+          <span class="brand-sub">HUB</span>
+        </div>
+      </div>
+      <h1>Create your account</h1>
+      <p>Start earning, referring, and winning</p>
+    </div>
+
+    <div class="referral-banner" id="referral-banner" style="display:none;">
+      <i class="fa-solid fa-gift"></i>
+      <span>Referred by <strong id="referral-banner-code"></strong> — you're both in line for a bonus!</span>
+    </div>
+
+    <form class="auth-form" id="signup-form">
+      <label class="auth-label">Full Name</label>
+      <input type="text" class="auth-input" id="signup-name" placeholder="e.g. Ada Obi" required />
+
+      <label class="auth-label">Phone Number</label>
+      <input type="tel" class="auth-input" id="signup-phone" placeholder="e.g. 08012345678" required />
+
+      <label class="auth-label">Email</label>
+      <input type="email" class="auth-input" id="signup-email" placeholder="you@example.com" required />
+
+      <label class="auth-label">Password</label>
+      <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" required minlength="6" />
+
+      <div class="cf-turnstile" id="turnstile-widget"
+           data-sitekey="1x00000000000000000000AA"
+           data-callback="onTurnstileVerified"
+           data-expired-callback="onTurnstileExpired"
+           style="margin-top:14px;"></div>
+
+      <div class="auth-error" id="signup-error"></div>
+
+      <button type="submit" class="btn-auth-primary" id="signup-submit-btn">
+        <span id="signup-submit-label">Create Account</span>
+        <i class="fa-solid fa-spinner fa-spin modal-spinner" id="signup-spinner"></i>
+      </button>
+    </form>
+
+    <p class="auth-switch">Already have an account? <a href="login.html" id="login-link">Log in</a></p>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <script src="auth.js"></script>
+  <script>
+    let captchaToken = null;
+    window.onTurnstileVerified = function (token) { captchaToken = token; };
+    window.onTurnstileExpired = function () { captchaToken = null; };
+
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      const loginLink = document.getElementById('login-link');
+
+      if (ref) {
+        document.getElementById('referral-banner').style.display = 'flex';
+        document.getElementById('referral-banner-code').textContent = ref.toUpperCase();
+        // carry the ref code through to the login page too, in case they already have an account
+        loginLink.href = `login.html?ref=${encodeURIComponent(ref)}`;
+      }
+
+      document.getElementById('signup-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById('signup-error');
+        const btn = document.getElementById('signup-submit-btn');
+        errorEl.textContent = '';
+
+        const name = document.getElementById('signup-name').value.trim();
+        const phone = document.getElementById('signup-phone').value.trim();
+        const email = document.getElementById('signup-email').value.trim();
+        const password = document.getElementById('signup-password').value;
+
+        if (!name || !phone || !email || password.length < 6) {
+          errorEl.textContent = 'Please fill in every field correctly.';
+          return;
+        }
+
+        if (!captchaToken) {
+          errorEl.textContent = 'Please complete the verification check above.';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        try {
+          const client = window.getSupabaseClient();
+          const { data, error } = await client.auth.signUp({
+            email,
+            password,
+            options: {
+              captchaToken: captchaToken,
+              data: {
+                full_name: name,
+                phone_number: phone,
+                referral_code_used: ref || null
+              }
+            }
+          });
+
+          if (error) throw error;
+
+          if (data.session) {
+            window.location.href = 'index.html';
+          } else {
+            errorEl.style.color = '#00b894';
+            errorEl.textContent = 'Account created! Check your email to confirm, then log in.';
+            btn.disabled = false;
+            btn.classList.remove('loading');
+          }
+        } catch (err) {
+          console.error('Signup error (full object):', err);
+          errorEl.style.color = '#ff4757';
+          errorEl.textContent = err?.message || err?.error_description || err?.msg
+            || 'Signup failed. Open the browser console for details.';
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          // Turnstile tokens are single-use — reset the widget so they can retry
+          if (window.turnstile) window.turnstile.reset();
+          captchaToken = null;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

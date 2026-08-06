@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Admin — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">ADMIN</span>
+          <span class="brand-sub">Panel</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content" id="admin-main" style="display:none;">
+
+      <!-- DRAW CONTROL -->
+      <section class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draw</h3>
+        <button class="btn-auth-primary" id="run-draw-btn" style="margin-top:8px;">
+          <span id="run-draw-label">Run Today's Draw</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="run-draw-spinner"></i>
+        </button>
+        <div class="admin-result" id="draw-result"></div>
+      </section>
+
+      <!-- PENDING WITHDRAWALS -->
+      <section class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-money-bill-transfer"></i> Pending Withdrawals <span id="withdrawal-count-badge" class="count-badge" style="display:none;"></span></h3>
+        <div id="withdrawals-list" class="withdrawals-list" style="margin-top:10px;"></div>
+        <div id="withdrawals-empty" style="font-size:12px; color:#636e72; margin-top:8px; display:none;">No pending withdrawals right now.</div>
+      </section>
+
+      <!-- CONFIG -->
+      <section class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-sliders"></i> Config</h3>
+        <div id="config-list" class="config-list"></div>
+      </section>
+
+      <!-- TICKET TIERS -->
+      <section class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-ticket"></i> Ticket Tiers</h3>
+        <div id="tiers-list" class="tiers-admin-list"></div>
+      </section>
+
+      <!-- USERS -->
+      <section class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-users"></i> Users</h3>
+        <input type="text" class="auth-input" id="user-search" placeholder="Search by name or phone..." style="margin-bottom:12px;" />
+        <div id="users-list" class="winners-list"></div>
+      </section>
+
+    </main>
+
+    <div id="admin-denied" class="winners-empty" style="display:none;">
+      <i class="fa-solid fa-lock"></i>
+      <p>You don't have admin access.</p>
+    </div>
+    <div id="admin-loading" class="winners-empty">
+      <i class="fa-solid fa-spinner fa-spin"></i>
+      <p>Checking access...</p>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      const CONFIG_LABELS = {
+        ticket_price: 'Ticket Price (₦)',
+        referral_bonus_percent: 'Referral Bonus (%)',
+        referral_unlock_threshold: 'Referral Unlock Threshold (₦)',
+        daily_prize_amount: 'Daily Prize Amount (₦)'
+      };
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      async function init() {
+        const client = window.getSupabaseClient();
+        if (!client) return;
+
+        const { data: { user }, error: authError } = await client.auth.getUser();
+        if (authError || !user) {
+          window.location.href = 'login.html';
+          return;
+        }
+
+        const { data: profile } = await client
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single();
+
+        document.getElementById('admin-loading').style.display = 'none';
+
+        if (!profile || !profile.is_admin) {
+          document.getElementById('admin-denied').style.display = 'flex';
+          return;
+        }
+
+        document.getElementById('admin-main').style.display = 'block';
+        loadConfig(client);
+        loadWithdrawals(client);
+        loadTiers(client);
+        loadUsers(client, '');
+        wireDrawButton(client);
+        wireUserSearch(client);
+      }
+
+      function wireDrawButton(client) {
+        const btn = document.getElementById('run-draw-btn');
+        const resultEl = document.getElementById('draw-result');
+
+        btn.addEventListener('click', async () => {
+          resultEl.textContent = '';
+          btn.disabled = true;
+          btn.classList.add('loading');
+
+          try {
+            const { data, error } = await client.rpc('admin_run_draw');
+            if (error) throw error;
+            const winner = data && data[0];
+            if (winner) {
+              resultEl.style.color = '#00b894';
+              resultEl.textContent = `🎉 ${winner.winner_name} won ₦${Number(winner.prize).toLocaleString()}!`;
+            }
+            loadUsers(client, document.getElementById('user-search').value.trim());
+          } catch (err) {
+            resultEl.style.color = '#ff4757';
+            resultEl.textContent = err.message || 'Draw failed.';
+          } finally {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+          }
+        });
+      }
+
+      async function loadTiers(client) {
+        const { data, error } = await client.rpc('admin_list_tiers');
+        const listEl = document.getElementById('tiers-list');
+        if (error || !data) {
+          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error?.message || 'Failed to load tiers.')}</p>`;
+          return;
+        }
+
+        listEl.innerHTML = data.map(tier => `
+          <div class="tier-admin-row" data-tier-id="${tier.id}">
+            <div class="tier-admin-header">
+              <strong>${escapeHtml(tier.name)}</strong>
+              <label class="tier-active-toggle">
+                <input type="checkbox" class="tier-active-input" ${tier.is_active ? 'checked' : ''} />
+                Active
+              </label>
+            </div>
+            <div class="tier-admin-fields">
+              <div>
+                <label>Price (₦)</label>
+                <input type="number" step="0.01" class="auth-input tier-price-input" value="${tier.price}" />
+              </div>
+              <div>
+                <label>Prize (₦)</label>
+                <input type="number" step="0.01" class="auth-input tier-prize-input" value="${tier.prize_amount}" />
+              </div>
+              <button class="btn-config-save tier-save-btn"><i class="fa-solid fa-check"></i></button>
+            </div>
+          </div>
+        `).join('');
+
+        listEl.querySelectorAll('.tier-admin-row').forEach(row => {
+          const tierId = row.dataset.tierId;
+          const priceInput = row.querySelector('.tier-price-input');
+          const prizeInput = row.querySelector('.tier-prize-input');
+          const activeInput = row.querySelector('.tier-active-input');
+          const saveBtn = row.querySelector('.tier-save-btn');
+
+          saveBtn.addEventListener('click', async () => {
+            const price = parseFloat(priceInput.value);
+            const prize = parseFloat(prizeInput.value);
+            if (isNaN(price) || isNaN(prize)) return;
+
+            saveBtn.disabled = true;
+            try {
+              const { error } = await client.rpc('admin_update_tier', {
+                p_tier_id: tierId,
+                p_price: price,
+                p_prize_amount: prize,
+                p_is_active: activeInput.checked
+              });
+              if (error) throw error;
+              saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:#00b894;"></i>';
+              setTimeout(() => { saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>'; }, 1500);
+            } catch (err) {
+              alert(err.message || 'Save failed.');
+            } finally {
+              saveBtn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function loadWithdrawals(client) {
+        const { data, error } = await client.rpc('admin_list_pending_withdrawals');
+        const listEl = document.getElementById('withdrawals-list');
+        const emptyEl = document.getElementById('withdrawals-empty');
+        const badgeEl = document.getElementById('withdrawal-count-badge');
+
+        if (error) {
+          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          badgeEl.style.display = 'none';
+          return;
+        }
+
+        emptyEl.style.display = 'none';
+        badgeEl.style.display = 'inline-flex';
+        badgeEl.textContent = data.length;
+
+        listEl.innerHTML = data.map(w => `
+          <div class="withdrawal-row" data-txn-id="${w.transaction_id}">
+            <div class="withdrawal-info">
+              <strong>${escapeHtml(w.full_name || 'Unnamed')}</strong>
+              <small>${escapeHtml(w.phone_number || 'No phone')} &middot; ${escapeHtml(w.wallet)} wallet</small>
+              <small>${new Date(w.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+            </div>
+            <div class="withdrawal-amount">₦${Number(w.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+            <div class="withdrawal-actions">
+              <button class="btn-withdrawal-pay" data-action="pay">Mark Paid</button>
+              <button class="btn-withdrawal-reject" data-action="reject">Reject</button>
+            </div>
+          </div>
+        `).join('');
+
+        listEl.querySelectorAll('.withdrawal-row').forEach(row => {
+          const txnId = row.dataset.txnId;
+
+          row.querySelector('[data-action="pay"]').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            btn.disabled = true;
+            try {
+              const { error } = await client.rpc('admin_complete_withdrawal', { p_transaction_id: txnId });
+              if (error) throw error;
+              row.remove();
+              loadWithdrawals(client);
+            } catch (err) {
+              alert(err.message || 'Failed to mark as paid.');
+              btn.disabled = false;
+            }
+          });
+
+          row.querySelector('[data-action="reject"]').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            if (btn.dataset.confirmed !== 'true') {
+              btn.textContent = 'Confirm Reject?';
+              btn.dataset.confirmed = 'true';
+              setTimeout(() => {
+                btn.textContent = 'Reject';
+                btn.dataset.confirmed = 'false';
+              }, 3000);
+              return;
+            }
+
+            btn.disabled = true;
+            try {
+              const { error } = await client.rpc('admin_reject_withdrawal', { p_transaction_id: txnId });
+              if (error) throw error;
+              row.remove();
+              loadUsers(client, document.getElementById('user-search').value.trim());
+              loadWithdrawals(client);
+            } catch (err) {
+              alert(err.message || 'Failed to reject withdrawal.');
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function loadConfig(client) {
+        const { data, error } = await client.from('app_config').select('key, value').order('key');
+        const listEl = document.getElementById('config-list');
+        if (error || !data) return;
+
+        listEl.innerHTML = data.map(row => `
+          <div class="config-row" data-key="${escapeHtml(row.key)}">
+            <label>${CONFIG_LABELS[row.key] || escapeHtml(row.key)}</label>
+            <div class="config-row-input">
+              <input type="number" step="0.01" class="auth-input config-value-input" value="${row.value}" />
+              <button class="btn-config-save"><i class="fa-solid fa-check"></i></button>
+            </div>
+          </div>
+        `).join('');
+
+        listEl.querySelectorAll('.config-row').forEach(row => {
+          const key = row.dataset.key;
+          const input = row.querySelector('.config-value-input');
+          const saveBtn = row.querySelector('.btn-config-save');
+
+          saveBtn.addEventListener('click', async () => {
+            const value = parseFloat(input.value);
+            if (isNaN(value)) return;
+            saveBtn.disabled = true;
+            try {
+              const { error } = await client.rpc('admin_update_config', { p_key: key, p_value: value });
+              if (error) throw error;
+              saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:#00b894;"></i>';
+              setTimeout(() => { saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>'; }, 1500);
+            } catch (err) {
+              alert(err.message || 'Save failed.');
+            } finally {
+              saveBtn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function loadUsers(client, search) {
+        const { data, error } = await client.rpc('admin_list_users', { p_search: search || null });
+        const listEl = document.getElementById('users-list');
+        if (error) {
+          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          listEl.innerHTML = `<p style="font-size:12px;color:#636e72;">No users found.</p>`;
+          return;
+        }
+
+        listEl.innerHTML = data.map(u => `
+          <div class="winner-row">
+            <div class="winner-avatar" style="background:#f3f0ff; color:#6c5ce7;">
+              <i class="fa-solid ${u.is_admin ? 'fa-user-shield' : 'fa-user'}"></i>
+            </div>
+            <div class="winner-info">
+              <strong>${escapeHtml(u.full_name || 'Unnamed')}</strong>
+              <small>${escapeHtml(u.phone_number || 'No phone')} &middot; ${u.total_referrals} referrals (${u.active_referrals} active)</small>
+            </div>
+            <div class="winner-prize" style="font-size:12px;">₦${Number(u.winnings_balance).toLocaleString()}</div>
+          </div>
+        `).join('');
+      }
+
+      function wireUserSearch(client) {
+        let debounce;
+        document.getElementById('user-search').addEventListener('input', (e) => {
+          clearTimeout(debounce);
+          debounce = setTimeout(() => loadUsers(client, e.target.value.trim()), 300);
+        });
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
