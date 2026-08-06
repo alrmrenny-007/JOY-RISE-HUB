@@ -24,4 +24,35 @@
       });
     });
   }
+
+  // Auto-add a show/hide toggle to every password field on the page —
+  // works on login, signup, update-password, etc. with zero per-page setup.
+  function setupPasswordToggles() {
+    document.querySelectorAll('input[type="password"]').forEach((input) => {
+      const wrapper = document.createElement("div");
+      wrapper.className = "password-field-wrapper";
+      input.parentNode.insertBefore(wrapper, input);
+      wrapper.appendChild(input);
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "password-toggle-btn";
+      toggle.setAttribute("aria-label", "Show password");
+      toggle.innerHTML = '<i class="fa-regular fa-eye"></i>';
+      wrapper.appendChild(toggle);
+
+      toggle.addEventListener("click", () => {
+        const showing = input.type === "text";
+        input.type = showing ? "password" : "text";
+        toggle.innerHTML = showing ? '<i class="fa-regular fa-eye"></i>' : '<i class="fa-regular fa-eye-slash"></i>';
+        toggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+      });
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupPasswordToggles);
+  } else {
+    setupPasswordToggles();
+  }
 })();

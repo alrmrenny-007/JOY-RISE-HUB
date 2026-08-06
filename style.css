@@ -1597,6 +1597,135 @@ body {
   color: #ff4757;
 }
 
+/* ================= AUTH PAGES — FUN & ANIMATED ================= */
+
+.password-field-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field-wrapper .auth-input {
+  padding-right: 42px;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #b2bec3;
+  font-size: 15px;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.password-toggle-btn:hover {
+  color: #6c5ce7;
+}
+
+/* Floating decorative background — sits behind the form, doesn't
+   affect layout since it's absolutely positioned within the
+   already-position:relative .mobile-container */
+.auth-bg-decor {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auth-bg-decor span {
+  position: absolute;
+  font-size: 28px;
+  opacity: 0.12;
+  animation: authFloat 7s ease-in-out infinite;
+}
+
+.auth-bg-decor span:nth-child(1) { top: 8%;  left: 8%;  font-size: 34px; animation-delay: 0s; }
+.auth-bg-decor span:nth-child(2) { top: 18%; right: 10%; font-size: 24px; animation-delay: 1.2s; }
+.auth-bg-decor span:nth-child(3) { top: 55%; left: 5%;  font-size: 30px; animation-delay: 2.1s; }
+.auth-bg-decor span:nth-child(4) { top: 42%; right: 6%; font-size: 22px; animation-delay: 0.6s; }
+.auth-bg-decor span:nth-child(5) { top: 75%; left: 14%; font-size: 26px; animation-delay: 3s; }
+.auth-bg-decor span:nth-child(6) { top: 80%; right: 16%; font-size: 20px; animation-delay: 1.8s; }
+
+@keyframes authFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-16px) rotate(8deg); }
+}
+
+/* Content sits above the floating decor */
+.auth-container .auth-header,
+.auth-container .referral-banner,
+.auth-container .auth-form,
+.auth-container .auth-switch,
+.auth-container #link-invalid {
+  position: relative;
+  z-index: 1;
+}
+
+/* Staggered entrance animation */
+@keyframes authRise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.auth-container .auth-header {
+  animation: authRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.auth-container .auth-form {
+  animation: authRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.1s both;
+}
+
+.auth-container .auth-switch,
+.auth-container .referral-banner {
+  animation: authRise 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+}
+
+/* Logo badge — gentle idle pulse so the page feels alive */
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(108, 92, 231, 0.35); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(108, 92, 231, 0); }
+}
+
+.auth-header .logo-badge {
+  animation: logoPulse 2.4s ease-in-out infinite;
+}
+
+/* Input focus — a livelier glow instead of a flat border color swap */
+.auth-container .auth-input {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.auth-container .auth-input:focus {
+  box-shadow: 0 0 0 4px rgba(108, 92, 231, 0.12);
+  transform: translateY(-1px);
+}
+
+/* Button — subtle press feedback + hover lift */
+.btn-auth-primary {
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.btn-auth-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(108, 92, 231, 0.35);
+}
+
+.btn-auth-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Success/error message pop-in */
+.auth-error:not(:empty) {
+  animation: authRise 0.3s ease both;
+}
+
 /* ================= APP LOADING OVERLAY ================= */
 .app-loading-overlay {
   position: fixed;
