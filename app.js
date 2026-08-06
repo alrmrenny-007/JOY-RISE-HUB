@@ -72,6 +72,34 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const fmt = (n) => Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
+  let hasLoadedOnce = false;
+
+  function parseDisplayed(el) {
+    if (!el) return 0;
+    return parseFloat((el.textContent || '0').replace(/,/g, '')) || 0;
+  }
+
+  function animateNumber(el, from, to, duration = 700) {
+    if (!el) return;
+    // Skip the animation if the value didn't actually change, or if the
+    // browser prefers reduced motion
+    if (from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = fmt(to);
+      return;
+    }
+    const start = performance.now();
+    const diff = to - from;
+    function step(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+      el.textContent = fmt(from + diff * eased);
+      if (progress < 1) requestAnimationFrame(step);
+      else el.textContent = fmt(to);
+    }
+    requestAnimationFrame(step);
+  }
+
   let ticketPrice = 100;
   let referralThreshold = 3000;
   let referralBalance = 0;
@@ -150,8 +178,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           userAvatarImg.src = profile.avatar_url;
         }
 
-        if (winningsDisplay) winningsDisplay.textContent = fmt(winningsBalance);
-        if (referralDisplay) referralDisplay.textContent = fmt(referralBalance);
+        if (winningsDisplay) {
+          if (hasLoadedOnce) animateNumber(winningsDisplay, parseDisplayed(winningsDisplay), winningsBalance);
+          else winningsDisplay.textContent = fmt(winningsBalance);
+        }
+        if (referralDisplay) {
+          if (hasLoadedOnce) animateNumber(referralDisplay, parseDisplayed(referralDisplay), referralBalance);
+          else referralDisplay.textContent = fmt(referralBalance);
+        }
 
         if (totalRefsEl) totalRefsEl.textContent = profile.total_referrals || 0;
         if (activeRefsEl) activeRefsEl.textContent = profile.active_referrals || 0;
@@ -161,7 +195,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateReferralProgressUI();
       }
 
+      hasLoadedOnce = true;
       hideAppLoadingOverlay();
+      checkForCelebration();
 
     } catch (err) {
       console.error("Error loading data:", err);
@@ -179,6 +215,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // --- 3. REFERRAL WALLET UNLOCK UI ---
+  let referralWasUnlocked = false;
+
   function updateReferralProgressUI() {
     const pct = Math.min(100, Math.round((referralBalance / referralThreshold) * 100));
     const unlocked = referralBalance >= referralThreshold;
@@ -187,6 +225,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (referralProgressTooltip) referralProgressTooltip.textContent = `₦${fmt(referralBalance)}`;
     if (referralProgressLabel) referralProgressLabel.textContent = `₦${fmt(referralBalance)} (${pct}%)`;
     if (referralProgressTarget) referralProgressTarget.textContent = `₦${fmt(referralThreshold)}`;
+
+    // Celebrate the exact moment it crosses the threshold — not on
+    // every re-render, and not if it was already unlocked on page load
+    if (unlocked && !referralWasUnlocked && hasLoadedOnce) {
+      const card = document.querySelector(".referral-progress-card");
+      if (card) {
+        card.classList.add("referral-just-unlocked");
+        setTimeout(() => card.classList.remove("referral-just-unlocked"), 2200);
+      }
+    }
+    referralWasUnlocked = unlocked;
 
     if (unlocked) {
       if (referralLockIcon) referralLockIcon.style.display = "none";
@@ -473,7 +522,82 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function triggerConfetti() {
+    const colors = ['#6c5ce7', '#00b894', '#fdcb6e', '#e17055', '#0984e3', '#e84393'];
+    const container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+
+    for (let i = 0; i < 60; i++) {
+      const piece = document.createElement('span');
+      piece.className = 'confetti-piece';
+      piece.style.left = Math.random() * 100 + '%';
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDelay = (Math.random() * 0.4) + 's';
+      piece.style.animationDuration = (2.2 + Math.random() * 1.2) + 's';
+      piece.style.setProperty('--drift', (Math.random() * 160 - 80) + 'px');
+      piece.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+      container.appendChild(piece);
+    }
+
+    setTimeout(() => container.remove(), 3800);
+  }
+
+  // Celebrate a fresh win or referral commission — but only the first
+  // time we see it. Uses localStorage per-user so it doesn't refire
+  // every page load, and deliberately does NOT celebrate on the very
+  // first check for a given browser (avoids confetti-storming someone
+  // who already has old wins the first time this feature ships).
+  async function checkForCelebration() {
+    if (!supabaseClient || !currentUserId) return;
+    try {
+      const { data } = await supabaseClient
+        .from('transactions')
+        .select('id, type, amount, created_at')
+        .eq('user_id', currentUserId)
+        .in('type', ['win_payout', 'referral_bonus'])
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const latest = data && data[0];
+      if (!latest) return;
+
+      const seenKey = `joyrise_seen_celebration_${currentUserId}`;
+      const lastSeenId = localStorage.getItem(seenKey);
+
+      if (latest.id !== lastSeenId) {
+        const isFirstCheckEver = lastSeenId === null;
+        localStorage.setItem(seenKey, latest.id);
+
+        if (!isFirstCheckEver) {
+          triggerConfetti();
+          if (latest.type === 'win_payout') {
+            showToast(`🎉 You won ₦${fmt(latest.amount)}! Congratulations!`);
+          } else {
+            showToast(`🎉 Referral bonus of ₦${fmt(latest.amount)} unlocked!`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Celebration check skipped:", err);
+    }
+  }
+
   // --- BOTTOM NAV ---
+  const navPill = document.getElementById("nav-pill");
+  const bottomNavbar = document.querySelector(".bottom-navbar");
+
+  function movePillToActiveNav() {
+    if (!navPill || !bottomNavbar) return;
+    const active = document.querySelector(".nav-item.active");
+    if (!active) return;
+    const navRect = bottomNavbar.getBoundingClientRect();
+    const itemRect = active.getBoundingClientRect();
+    navPill.style.left = (itemRect.left - navRect.left) + "px";
+    navPill.style.width = itemRect.width + "px";
+    navPill.classList.add("ready");
+  }
+
   navItems.forEach(item => {
     item.addEventListener("click", function () {
       const target = this.dataset.target;
@@ -481,6 +605,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.querySelector(".wallets-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
         navItems.forEach(n => n.classList.remove("active"));
         this.classList.add("active");
+        movePillToActiveNav();
         return;
       }
       if (target && target !== 'index.html') {
@@ -489,8 +614,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       navItems.forEach(n => n.classList.remove("active"));
       this.classList.add("active");
+      movePillToActiveNav();
     });
   });
+
+  // Position the pill once layout has settled (fonts/icons loaded),
+  // and again if the phone is rotated or resized
+  window.addEventListener("load", movePillToActiveNav);
+  window.addEventListener("resize", movePillToActiveNav);
+  setTimeout(movePillToActiveNav, 50);
 
   await loadConfig();
   loadUserData();
