@@ -1784,6 +1784,119 @@ body {
   animation: authRise 0.3s ease both;
 }
 
+/* ================= MY REFERRALS PAGE ================= */
+.referral-share-card {
+  background: linear-gradient(135deg, #6c5ce7, #4a3fc7);
+  border-radius: 20px;
+  padding: 22px 18px;
+  text-align: center;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.referral-share-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  margin: 0 auto 12px;
+}
+
+.referral-share-card h2 {
+  font-size: 17px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.referral-share-card p {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.referral-link-box {
+  background: rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 11px;
+  color: #fff;
+  word-break: break-all;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.referral-share-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.referral-share-actions .btn-auth-primary {
+  flex: 1;
+  background: #fff;
+  color: #6c5ce7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-share-native {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  border: none;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.referral-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.referral-stat-box {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px 8px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+}
+
+.referral-stat-box strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 900;
+  color: #1e1e24;
+}
+
+.referral-stat-box span {
+  font-size: 9px;
+  font-weight: 700;
+  color: #636e72;
+  text-transform: uppercase;
+}
+
+.referral-status-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 8px;
+  text-transform: uppercase;
+}
+
 /* ================= APP LOADING OVERLAY ================= */
 .app-loading-overlay {
   position: fixed;

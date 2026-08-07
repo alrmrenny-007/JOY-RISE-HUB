@@ -411,19 +411,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   if (qaBuyTicket) qaBuyTicket.addEventListener("click", () => { window.location.href = 'buy-ticket.html'; });
-  if (qaReferrals) qaReferrals.addEventListener("click", async () => {
-    if (!myReferralCode) {
-      showToast("Referral code not ready yet — try again in a moment.", "error");
-      return;
-    }
-    const link = `${window.location.origin}${window.location.pathname.replace('index.html', '')}signup.html?ref=${myReferralCode}`;
-    try {
-      await navigator.clipboard.writeText(link);
-      showToast("Referral link copied to clipboard!");
-    } catch {
-      showToast(link, "success");
-    }
-  });
+  if (qaReferrals) qaReferrals.addEventListener("click", () => { window.location.href = 'referrals.html'; });
   if (qaWinners) qaWinners.addEventListener("click", () => { window.location.href = 'winners.html'; });
   if (qaTxns) qaTxns.addEventListener("click", () => { window.location.href = 'transactions.html'; });
 
