@@ -1225,6 +1225,33 @@ body {
   text-align: center;
   box-shadow: 0 4px 15px rgba(0,0,0,0.04);
   border-top: 3px solid var(--tier-color, #6c5ce7);
+  position: relative;
+  transition: transform 0.15s ease;
+}
+
+.tier-popular-badge {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  background: #ff7675;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 3px 7px;
+  border-radius: 8px;
+  transform: rotate(8deg);
+  box-shadow: 0 3px 8px rgba(255, 118, 117, 0.4);
+  z-index: 1;
+}
+
+@keyframes tierTapPulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tier-color, #6c5ce7) 45%, transparent); }
+  70%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--tier-color, #6c5ce7) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.tier-card.tapped {
+  animation: tierTapPulse 0.5s ease-out;
 }
 
 .tier-card-icon {
@@ -1895,6 +1922,50 @@ body {
   padding: 3px 8px;
   border-radius: 8px;
   text-transform: uppercase;
+}
+
+/* ================= SKELETON LOADERS ================= */
+.skeleton {
+  background: linear-gradient(90deg, #eceef2 25%, #e0e2ea 37%, #eceef2 63%);
+  background-size: 400% 100%;
+  animation: skeletonShimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.skeleton-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-tier-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 16px 12px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.04);
 }
 
 /* ================= APP LOADING OVERLAY ================= */

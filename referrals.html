@@ -74,10 +74,6 @@
         <i class="fa-solid fa-users"></i>
         <p>No referrals yet. Share your link above to start earning!</p>
       </div>
-      <div id="referrals-loading" class="winners-empty">
-        <i class="fa-solid fa-spinner fa-spin"></i>
-        <p>Loading your referrals...</p>
-      </div>
 
     </main>
 
@@ -159,11 +155,25 @@
         loadReferralsList(client);
       }
 
+      function skeletonRows(count) {
+        return Array.from({ length: count }).map(() => `
+          <div class="skeleton-row">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton" style="width:55%; height:11px;"></div>
+              <div class="skeleton" style="width:35%; height:9px;"></div>
+            </div>
+            <div class="skeleton" style="width:44px; height:14px;"></div>
+          </div>
+        `).join('');
+      }
+
       async function loadReferralsList(client) {
-        const { data, error } = await client.rpc('get_my_referrals');
         const listEl = document.getElementById('referrals-list');
         const emptyEl = document.getElementById('referrals-empty');
-        document.getElementById('referrals-loading').style.display = 'none';
+        listEl.innerHTML = skeletonRows(3);
+
+        const { data, error } = await client.rpc('get_my_referrals');
 
         if (error) {
           listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error.message)}</p>`;
@@ -171,6 +181,7 @@
         }
 
         if (!data || data.length === 0) {
+          listEl.innerHTML = '';
           emptyEl.style.display = 'flex';
           return;
         }

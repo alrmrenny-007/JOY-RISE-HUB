@@ -44,10 +44,6 @@
         <i class="fa-solid fa-trophy"></i>
         <p>No draws have been completed yet. Check back soon!</p>
       </div>
-      <div id="winners-loading" class="winners-empty">
-        <i class="fa-solid fa-spinner fa-spin"></i>
-        <p>Loading winners...</p>
-      </div>
     </main>
 
   </div>
@@ -60,23 +56,39 @@
         window.location.href = 'index.html';
       });
 
+      function skeletonRows(count) {
+        return Array.from({ length: count }).map(() => `
+          <div class="skeleton-row">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton" style="width:55%; height:11px;"></div>
+              <div class="skeleton" style="width:35%; height:9px;"></div>
+            </div>
+            <div class="skeleton" style="width:44px; height:14px;"></div>
+          </div>
+        `).join('');
+      }
+
       async function loadWinners() {
         const client = window.getSupabaseClient();
         if (!client) return;
 
-        const { data, error } = await client.rpc('get_recent_winners', { p_limit: 30 });
         const listEl = document.getElementById('winners-list');
         const emptyEl = document.getElementById('winners-empty');
-        document.getElementById('winners-loading').style.display = 'none';
+        listEl.innerHTML = skeletonRows(5);
+
+        const { data, error } = await client.rpc('get_recent_winners', { p_limit: 30 });
 
         if (error) {
           console.error('Error loading winners:', error.message);
+          listEl.innerHTML = '';
           emptyEl.style.display = 'flex';
           emptyEl.querySelector('p').textContent = "Couldn't load winners right now.";
           return;
         }
 
         if (!data || data.length === 0) {
+          listEl.innerHTML = '';
           emptyEl.style.display = 'flex';
           return;
         }

@@ -42,10 +42,6 @@
         <i class="fa-solid fa-receipt"></i>
         <p>No transactions yet. Once you deposit, buy a ticket, or refer someone, it'll show up here.</p>
       </div>
-      <div id="txn-loading" class="winners-empty">
-        <i class="fa-solid fa-spinner fa-spin"></i>
-        <p>Loading your transactions...</p>
-      </div>
     </main>
 
   </div>
@@ -111,6 +107,19 @@
         }).join('');
       }
 
+      function skeletonRows(count) {
+        return Array.from({ length: count }).map(() => `
+          <div class="skeleton-row">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton" style="width:50%; height:11px;"></div>
+              <div class="skeleton" style="width:30%; height:9px;"></div>
+            </div>
+            <div class="skeleton" style="width:44px; height:14px;"></div>
+          </div>
+        `).join('');
+      }
+
       async function loadTransactions() {
         const client = window.getSupabaseClient();
         if (!client) return;
@@ -121,6 +130,8 @@
           return;
         }
 
+        document.getElementById('txn-list').innerHTML = skeletonRows(6);
+
         const { data, error } = await client
           .from('transactions')
           .select('id, type, wallet, amount, status, created_at')
@@ -128,10 +139,9 @@
           .order('created_at', { ascending: false })
           .limit(100);
 
-        document.getElementById('txn-loading').style.display = 'none';
-
         if (error) {
           console.error('Error loading transactions:', error.message);
+          document.getElementById('txn-list').innerHTML = '';
           document.getElementById('txn-empty').style.display = 'flex';
           return;
         }
