@@ -32,8 +32,8 @@
       <!-- SHARE CARD -->
       <div class="referral-share-card">
         <div class="referral-share-icon"><i class="fa-solid fa-gift"></i></div>
-        <h2>Earn 50% commission</h2>
-        <p>When someone you refer buys ₦500+ in tickets, you earn 50% of their spend — straight into your Referral Wallet.</p>
+        <h2>Earn up to ₦1,000 per referral</h2>
+        <p>Once your referral buys their first ticket, you earn 10% commission on every ticket they buy for the next 90 days — up to ₦1,000 total, straight into your Referral Wallet.</p>
 
         <div class="referral-link-box">
           <span id="referral-link-text">Loading your link...</span>
@@ -193,6 +193,18 @@
         listEl.innerHTML = data.map(r => {
           const meta = STATUS_META[r.status] || STATUS_META.pending;
           const joined = new Date(r.joined_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+
+          let subtext = `Joined ${joined}`;
+          if (r.status === 'active') {
+            if (r.window_expired) {
+              subtext += ' · Earning window closed';
+            } else if (Number(r.cap_remaining) <= 0) {
+              subtext += ' · ₦1,000 cap reached';
+            } else {
+              subtext += ` · ₦${fmt(r.cap_remaining)} left to earn`;
+            }
+          }
+
           return `
             <div class="winner-row">
               <div class="winner-avatar" style="background:${meta.bg}; color:${meta.color};">
@@ -200,7 +212,7 @@
               </div>
               <div class="winner-info">
                 <strong>${escapeHtml(r.display_name || 'A Friend')}</strong>
-                <small>Joined ${joined}</small>
+                <small>${subtext}</small>
               </div>
               <div style="text-align:right;">
                 <span class="referral-status-badge" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
