@@ -1,17 +1,26 @@
-const CACHE_NAME = "joyrise-shell-v1";
+const CACHE_NAME = "joyrise-shell-v2";
 
 const SHELL_FILES = [
   "index.html",
   "login.html",
   "signup.html",
+  "forgot-password.html",
+  "update-password.html",
   "winners.html",
   "transactions.html",
+  "buy-ticket.html",
+  "profile.html",
+  "help.html",
   "admin.html",
   "offline.html",
   "style.css",
   "app.js",
   "auth.js",
   "manifest.json",
+  "favicon.ico",
+  "icons/favicon-32.png",
+  "icons/favicon-16.png",
+  "icons/apple-touch-icon.png",
   "icons/icon-192.png",
   "icons/icon-512.png"
 ];
