@@ -140,10 +140,10 @@
           try {
             const { data, error } = await client.rpc('admin_run_draw');
             if (error) throw error;
-            const winner = data && data[0];
-            if (winner) {
+            if (data && data.length > 0) {
               resultEl.style.color = '#00b894';
-              resultEl.textContent = `🎉 ${winner.winner_name} won ₦${Number(winner.prize).toLocaleString()}!`;
+              const lines = data.map(w => `🎉 ${w.winner_name} won ₦${Number(w.prize).toLocaleString()}`);
+              resultEl.innerHTML = `<strong>${data.length} winner${data.length > 1 ? 's' : ''} this draw:</strong><br>` + lines.join('<br>');
             }
             loadUsers(client, document.getElementById('user-search').value.trim());
           } catch (err) {
