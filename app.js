@@ -357,11 +357,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    if (modalMode === "deposit") {
+      // Hand off to Flutterwave's own checkout popup — close our modal
+      // first so there's no stuck spinner behind it while the user
+      // takes their time entering payment details.
+      closeModal();
+      initiateFlutterwaveDeposit(amount);
+      return;
+    }
+
     setModalLoading(true);
     try {
-      if (modalMode === "deposit") {
-        await handleDeposit(amount);
-      } else if (modalMode === "withdraw") {
+      if (modalMode === "withdraw") {
         await handleWithdraw(amount, "winnings");
       } else {
         await handleWithdraw(amount, "referral");
@@ -374,13 +381,77 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
-  // --- 4. DEPOSIT LOGIC — via secure RPC (server validates & mutates the balance) ---
-  async function handleDeposit(amount) {
-    const { error } = await supabaseClient.rpc('deposit_funds', { p_amount: amount });
-    if (error) throw error;
+  // --- 4. DEPOSIT LOGIC — real payment via Flutterwave, verified
+  // server-side before anything is ever credited ---
+  const FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-2f31ffe1c4a7361ecfa6e5d4c86c6af2-X";
+  const VERIFY_DEPOSIT_URL = "https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/verify-flutterwave-payment";
 
-    showToast(`Successfully deposited ₦${amount.toLocaleString()}!`);
-    loadUserData();
+  async function initiateFlutterwaveDeposit(amount) {
+    if (typeof FlutterwaveCheckout !== "function") {
+      showToast("Payment system failed to load. Please refresh and try again.", "error");
+      return;
+    }
+
+    const { data: { user } } = await supabaseClient.auth.getUser();
+    if (!user) {
+      showToast("Please log in again.", "error");
+      return;
+    }
+
+    const { data: txRef, error: refError } = await supabaseClient.rpc(
+      'create_pending_flutterwave_payment', { p_amount: amount }
+    );
+    if (refError) {
+      showToast(refError.message || "Couldn't start payment.", "error");
+      return;
+    }
+
+    let settled = false;
+
+    FlutterwaveCheckout({
+      public_key: FLUTTERWAVE_PUBLIC_KEY,
+      tx_ref: txRef,
+      amount: amount,
+      currency: "NGN",
+      payment_options: "card, banktransfer, ussd",
+      customer: {
+        email: user.email,
+        name: (userDisplayName?.textContent || "Joy-Rise User").replace('👋', '').trim(),
+      },
+      customizations: {
+        title: "Joy-Rise Hub",
+        description: "Wallet deposit",
+      },
+      callback: async (response) => {
+        settled = true;
+        try {
+          const res = await fetch(VERIFY_DEPOSIT_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tx_ref: response.tx_ref,
+              transaction_id: response.transaction_id,
+            }),
+          });
+          const result = await res.json();
+
+          if (result.success) {
+            showToast(`Successfully deposited ₦${amount.toLocaleString()}!`);
+            loadUserData();
+          } else {
+            showToast(result.error || "Payment verification failed.", "error");
+          }
+        } catch (err) {
+          console.error("Deposit verification error:", err);
+          showToast("Couldn't verify payment. Contact support if you were charged.", "error");
+        }
+      },
+      onclose: () => {
+        if (!settled) {
+          showToast("Deposit cancelled.", "error");
+        }
+      },
+    });
   }
 
   // --- 5. WITHDRAW LOGIC — via secure RPC ---
