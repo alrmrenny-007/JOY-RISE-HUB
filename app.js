@@ -285,14 +285,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       modalIconCircle.classList.remove("withdraw-mode");
       modalIcon.className = "fa-solid fa-circle-plus";
       modalTitle.textContent = "Deposit Funds";
-      modalSubtitle.textContent = "Add money to your Winnings Wallet";
+      modalSubtitle.textContent = "Add money to your Main Wallet";
       modalConfirmLabel.textContent = "Deposit";
       modalBalanceHint.textContent = "";
     } else if (mode === "withdraw") {
       modalIconCircle.classList.add("withdraw-mode");
       modalIcon.className = "fa-solid fa-circle-arrow-down";
       modalTitle.textContent = "Withdraw Funds";
-      modalSubtitle.textContent = "Move money out of your Winnings Wallet";
+      modalSubtitle.textContent = "Move money out of your Main Wallet";
       modalConfirmLabel.textContent = "Withdraw";
       modalBalanceHint.textContent = `Available: ₦${fmt(winningsBalance)}`;
     } else {
