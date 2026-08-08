@@ -9,6 +9,7 @@ const SHELL_FILES = [
   "winners.html",
   "transactions.html",
   "buy-ticket.html",
+  "my-tickets.html",
   "referrals.html",
   "profile.html",
   "help.html",

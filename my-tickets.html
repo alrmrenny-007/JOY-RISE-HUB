@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>My Tickets — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">MY TICKETS</span>
+          <span class="brand-sub">Your Purchase History</span>
+        </div>
+      </div>
+      <a href="buy-ticket.html" class="icon-btn" style="text-decoration:none;"><i class="fa-solid fa-plus"></i></a>
+    </header>
+
+    <main class="main-content">
+
+      <div class="txn-filter-row" id="ticket-filter-row">
+        <button class="txn-filter-chip active" data-filter="all">All</button>
+        <button class="txn-filter-chip" data-filter="active">In Today's Draw</button>
+        <button class="txn-filter-chip" data-filter="won">Won</button>
+        <button class="txn-filter-chip" data-filter="lost">Not This Time</button>
+      </div>
+
+      <div id="tickets-list" class="winners-list"></div>
+      <div id="tickets-empty" class="winners-empty" style="display:none;">
+        <i class="fa-solid fa-ticket"></i>
+        <p>No tickets yet. Buy your first ticket to join today's draw!</p>
+      </div>
+
+    </main>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      let allTickets = [];
+
+      const STATUS_META = {
+        active: { icon: 'fa-clock',        color: '#6c5ce7', bg: '#f3f0ff', label: "Today's Draw" },
+        won:    { icon: 'fa-trophy',        color: '#00b894', bg: '#d3f9e8', label: 'Won' },
+        lost:   { icon: 'fa-circle-xmark',  color: '#b2bec3', bg: '#f1f2f6', label: 'Not This Time' },
+      };
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      function fmt(n) {
+        return Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      }
+
+      function skeletonRows(count) {
+        return Array.from({ length: count }).map(() => `
+          <div class="skeleton-row">
+            <div class="skeleton skeleton-avatar"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton" style="width:50%; height:11px;"></div>
+              <div class="skeleton" style="width:30%; height:9px;"></div>
+            </div>
+            <div class="skeleton" style="width:44px; height:14px;"></div>
+          </div>
+        `).join('');
+      }
+
+      function render(filter) {
+        const listEl = document.getElementById('tickets-list');
+        const emptyEl = document.getElementById('tickets-empty');
+
+        const rows = filter === 'all' ? allTickets : allTickets.filter(t => t.status === filter);
+
+        if (rows.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'flex';
+          if (allTickets.length > 0) {
+            emptyEl.querySelector('p').textContent = 'No tickets match this filter.';
+          }
+          return;
+        }
+        emptyEl.style.display = 'none';
+
+        listEl.innerHTML = rows.map(t => {
+          const meta = STATUS_META[t.status] || STATUS_META.active;
+          const date = new Date(t.purchased_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+          const tierName = t.ticket_tiers?.name || 'Ticket';
+          return `
+            <div class="winner-row">
+              <div class="winner-avatar" style="background:${meta.bg}; color:${meta.color};">
+                <i class="fa-solid ${meta.icon}"></i>
+              </div>
+              <div class="winner-info">
+                <strong>${escapeHtml(tierName)} &middot; ₦${fmt(t.price)}</strong>
+                <small>${date}</small>
+              </div>
+              <div style="text-align:right;">
+                <span class="referral-status-badge" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
+                ${t.status === 'won' ? `<div class="winner-prize" style="font-size:12px; margin-top:4px;">+₦${fmt(t.prize_amount)}</div>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      async function loadTickets() {
+        const client = window.getSupabaseClient();
+        if (!client) return;
+
+        const { data: { user }, error: authError } = await client.auth.getUser();
+        if (authError || !user) {
+          window.location.href = 'login.html';
+          return;
+        }
+
+        document.getElementById('tickets-list').innerHTML = skeletonRows(6);
+
+        const { data, error } = await client
+          .from('tickets')
+          .select('id, price, prize_amount, status, purchased_at, ticket_tiers(name)')
+          .eq('user_id', user.id)
+          .order('purchased_at', { ascending: false })
+          .limit(100);
+
+        if (error) {
+          console.error('Error loading tickets:', error.message);
+          document.getElementById('tickets-list').innerHTML = '';
+          document.getElementById('tickets-empty').style.display = 'flex';
+          document.getElementById('tickets-empty').querySelector('p').textContent = "Couldn't load your tickets right now.";
+          return;
+        }
+
+        allTickets = data || [];
+        render('all');
+      }
+
+      document.getElementById('ticket-filter-row').addEventListener('click', (e) => {
+        const chip = e.target.closest('.txn-filter-chip');
+        if (!chip) return;
+        document.querySelectorAll('#ticket-filter-row .txn-filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        render(chip.dataset.filter);
+      });
+
+      loadTickets();
+    })();
+  </script>
+</body>
+</html>
