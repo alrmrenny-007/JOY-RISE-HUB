@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Privacy Policy — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">PRIVACY POLICY</span>
+          <span class="brand-sub">Joy-Rise Hub</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content legal-content">
+
+      <p class="legal-updated">Last updated: <span id="last-updated-date"></span></p>
+
+      <p>This Privacy Policy explains what information Joy-Rise Hub ("we," "us," "our") collects when you use our app, how we use it, and what rights you have over it. By creating an account, you agree to this policy.</p>
+
+      <h3>1. Information We Collect</h3>
+      <p>When you sign up and use Joy-Rise Hub, we collect:</p>
+      <ul>
+        <li><strong>Account information:</strong> your full name, phone number, and email address</li>
+        <li><strong>Financial activity:</strong> deposit, withdrawal, ticket purchase, and referral commission records — we do not store your card or bank details ourselves; payments are processed by our payment partner directly</li>
+        <li><strong>Referral data:</strong> your referral code and who you referred or were referred by</li>
+        <li><strong>Usage data:</strong> app activity such as login times, tickets purchased, and draw participation</li>
+        <li><strong>Device information:</strong> basic technical data (browser type, device type) used for security and fraud prevention</li>
+      </ul>
+
+      <h3>2. How We Use Your Information</h3>
+      <p>We use your information to:</p>
+      <ul>
+        <li>Create and manage your account</li>
+        <li>Process deposits, withdrawals, ticket purchases, and referral commissions</li>
+        <li>Run daily draws and determine winners fairly</li>
+        <li>Prevent fraud and abuse (for example, enforcing one signup bonus per phone number)</li>
+        <li>Provide customer support</li>
+        <li>Send you important account or transaction notifications</li>
+      </ul>
+      <p>We do not sell your personal information to anyone.</p>
+
+      <h3>3. Third-Party Services We Use</h3>
+      <p>Some of your data is processed by trusted third-party services that power parts of our app:</p>
+      <ul>
+        <li><strong>Supabase</strong> — stores your account data and secures it with row-level access controls, so only you (and authorized administrators, where necessary) can access your own data</li>
+        <li><strong>Flutterwave</strong> — processes deposits and withdrawals; your payment details are handled directly by Flutterwave under their own security standards, not stored on our servers</li>
+        <li><strong>Cloudflare</strong> — helps verify that signups come from real people, not bots</li>
+      </ul>
+      <p>Each of these providers has its own privacy practices governing the data they process on our behalf.</p>
+
+      <h3>4. Data Security</h3>
+      <p>We take reasonable technical measures to protect your data, including encrypted connections and database-level access rules that restrict who can read or modify your information. However, no system is 100% secure, and we cannot guarantee absolute security.</p>
+
+      <h3>5. Data Retention</h3>
+      <p>We retain your account and transaction data for as long as your account is active, and for a reasonable period afterward as required for legal, accounting, or fraud-prevention purposes.</p>
+
+      <h3>6. Your Rights</h3>
+      <p>You can:</p>
+      <ul>
+        <li>Request a copy of the personal data we hold about you</li>
+        <li>Ask us to correct inaccurate information</li>
+        <li>Request that we delete your account and associated data, subject to any legal or financial record-keeping requirements we must still meet</li>
+      </ul>
+      <p>To make any of these requests, contact us using the details below.</p>
+
+      <h3>7. Children's Privacy</h3>
+      <p>Joy-Rise Hub is not intended for anyone under 18 years old. We do not knowingly collect information from minors. If we learn that a minor has created an account, we will close it.</p>
+
+      <h3>8. Changes to This Policy</h3>
+      <p>We may update this Privacy Policy from time to time. If we make material changes, we'll update the "Last updated" date above and, where appropriate, notify you directly.</p>
+
+      <h3>9. Contact Us</h3>
+      <p>Questions about this policy or your data? Reach out:</p>
+      <ul>
+        <li>WhatsApp / Phone: <a href="tel:+2348055977558">0805 597 7558</a></li>
+      </ul>
+
+      <p style="margin-top:20px;"><a href="terms.html">View our Terms &amp; Conditions →</a></p>
+
+    </main>
+
+  </div>
+
+  <script>
+    document.getElementById('back-btn').addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
+    document.getElementById('last-updated-date').textContent = new Date().toLocaleDateString('en-NG', { year: 'numeric', month: 'long', day: 'numeric' });
+  </script>
+</body>
+</html>

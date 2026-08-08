@@ -12,6 +12,8 @@ const SHELL_FILES = [
   "referrals.html",
   "profile.html",
   "help.html",
+  "terms.html",
+  "privacy-policy.html",
   "admin.html",
   "offline.html",
   "style.css",

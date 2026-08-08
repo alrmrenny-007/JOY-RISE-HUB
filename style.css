@@ -1254,6 +1254,49 @@ body {
   animation: tierTapPulse 0.5s ease-out;
 }
 
+/* ================= LEGAL PAGES ================= */
+.legal-content {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #2d3436;
+}
+
+.legal-updated {
+  font-size: 11px;
+  color: #b2bec3;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.legal-content h3 {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1e1e24;
+  margin: 22px 0 8px;
+}
+
+.legal-content h3:first-of-type {
+  margin-top: 8px;
+}
+
+.legal-content p {
+  margin-bottom: 10px;
+}
+
+.legal-content ul {
+  padding-left: 18px;
+  margin-bottom: 10px;
+}
+
+.legal-content li {
+  margin-bottom: 6px;
+}
+
+.legal-content a {
+  color: #6c5ce7;
+  font-weight: 700;
+}
+
 .tier-card-icon {
   width: 40px;
   height: 40px;
