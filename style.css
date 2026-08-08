@@ -1745,6 +1745,57 @@ body {
   color: #ff4757;
 }
 
+/* ================= ADMIN — ANALYTICS ================= */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.analytics-stat-box {
+  background: #f9f9fc;
+  border-radius: 12px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.analytics-stat-box strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.analytics-stat-box span {
+  font-size: 9px;
+  font-weight: 700;
+  color: #636e72;
+  text-transform: uppercase;
+}
+
+.analytics-net-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #1e1e24;
+  border-radius: 12px;
+}
+
+.analytics-net-row span {
+  font-size: 10px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 700;
+  max-width: 60%;
+}
+
+.analytics-net-row strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
 /* ================= CONFETTI ================= */
 .confetti-container {
   position: fixed;

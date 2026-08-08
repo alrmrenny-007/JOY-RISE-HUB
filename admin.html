@@ -34,6 +34,13 @@
         <span>Customer support line: <strong>0805 597 7558</strong> (WhatsApp &amp; calls)</span>
       </div>
 
+      <!-- ANALYTICS -->
+      <section class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-chart-line"></i> Business Overview</h3>
+        <div id="analytics-grid" class="analytics-grid"></div>
+        <div id="analytics-net" class="analytics-net-row"></div>
+      </section>
+
       <!-- DRAW CONTROL -->
       <section class="admin-section">
         <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draw</h3>
@@ -128,6 +135,7 @@
         }
 
         document.getElementById('admin-main').style.display = 'block';
+        loadAnalytics(client);
         loadConfig(client);
         loadWithdrawals(client);
         loadTiers(client);
@@ -225,6 +233,48 @@
             }
           });
         });
+      }
+
+      async function loadAnalytics(client) {
+        const { data, error } = await client.rpc('admin_get_analytics');
+        const grid = document.getElementById('analytics-grid');
+        const netEl = document.getElementById('analytics-net');
+
+        if (error || !data || data.length === 0) {
+          grid.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error?.message || 'Failed to load analytics.')}</p>`;
+          return;
+        }
+
+        const a = data[0];
+        const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
+        const stats = [
+          { label: 'Total Users', value: a.total_users, color: '#6c5ce7' },
+          { label: 'Total Deposits', value: fmt(a.total_deposits), color: '#00b894' },
+          { label: 'Withdrawals Paid', value: fmt(a.total_withdrawals), color: '#ff7675' },
+          { label: 'Pending Withdrawals', value: fmt(a.total_pending_withdrawals), color: '#f59f00' },
+          { label: 'Tickets Sold', value: a.total_tickets_sold, color: '#0984e3' },
+          { label: 'Ticket Revenue', value: fmt(a.total_ticket_revenue), color: '#00b894' },
+          { label: 'Prizes Paid', value: fmt(a.total_prizes_paid), color: '#ff7675' },
+          { label: 'Referral Commissions', value: fmt(a.total_referral_commissions), color: '#e17055' },
+          { label: 'Signup Bonuses Granted', value: fmt(a.total_signup_bonuses), color: '#e17055' },
+        ];
+
+        grid.innerHTML = stats.map(s => `
+          <div class="analytics-stat-box">
+            <strong style="color:${s.color};">${s.value}</strong>
+            <span>${s.label}</span>
+          </div>
+        `).join('');
+
+        const netPosition = Number(a.total_ticket_revenue) - Number(a.total_prizes_paid)
+          - Number(a.total_referral_commissions) - Number(a.total_signup_bonuses);
+        const netColor = netPosition >= 0 ? '#00b894' : '#ff4757';
+
+        netEl.innerHTML = `
+          <span>Estimated Net (Tickets − Prizes − Commissions − Bonuses)</span>
+          <strong style="color:${netColor};">${fmt(netPosition)}</strong>
+        `;
       }
 
       async function loadWithdrawals(client) {
