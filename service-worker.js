@@ -14,6 +14,7 @@ const SHELL_FILES = [
   "help.html",
   "terms.html",
   "privacy-policy.html",
+  "cookies.html",
   "admin.html",
   "offline.html",
   "style.css",

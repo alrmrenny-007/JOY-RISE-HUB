@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cookie Policy — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">COOKIE POLICY</span>
+          <span class="brand-sub">Joy-Rise Hub</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content legal-content">
+
+      <p class="legal-updated">Last updated: <span id="last-updated-date"></span></p>
+
+      <p>This page explains what "cookies and similar technologies" Joy-Rise Hub actually uses. To be upfront: we don't use traditional tracking or advertising cookies. What we do use is browser storage (specifically, a technology called <strong>localStorage</strong>) to make the app work properly.</p>
+
+      <h3>1. What We Use It For</h3>
+      <ul>
+        <li><strong>Keeping you logged in.</strong> When you sign in, your session is stored in your browser so you don't have to log in every time you open the app</li>
+        <li><strong>Cookie preference.</strong> Once you dismiss the cookie notice, we remember that so it doesn't show again</li>
+        <li><strong>One-time celebration effects.</strong> We remember which wins or referral bonuses you've already seen celebrated with confetti, so it doesn't replay the same animation every time you open the app</li>
+      </ul>
+      <p>None of this is used to track you across other websites, build an advertising profile, or sell data to anyone.</p>
+
+      <h3>2. What We Don't Use</h3>
+      <ul>
+        <li>No advertising or marketing cookies</li>
+        <li>No cross-site tracking</li>
+        <li>No third-party analytics cookies at this time</li>
+      </ul>
+
+      <h3>3. Third-Party Storage</h3>
+      <p>When you make a deposit or withdrawal, you may be redirected to our payment partner Flutterwave's own checkout page, which operates on its own domain and may set its own cookies to process your payment securely. That's governed by Flutterwave's own cookie and privacy practices, not ours.</p>
+
+      <h3>4. Managing or Clearing This Data</h3>
+      <p>You can clear this stored data at any time through your browser's settings (usually under "Site Data" or "Storage" for this site). Doing so will log you out and reset any remembered preferences — it won't affect your account, balance, or transaction history, since those live securely on our servers, not in your browser.</p>
+
+      <h3>5. Changes to This Policy</h3>
+      <p>If what we store changes in the future (for example, if we add analytics), we'll update this page and the "Last updated" date above.</p>
+
+      <h3>6. Contact Us</h3>
+      <p>Questions about this policy?</p>
+      <ul>
+        <li>WhatsApp / Phone: <a href="tel:+2348055977558">0805 597 7558</a></li>
+      </ul>
+
+      <p style="margin-top:20px;"><a href="privacy-policy.html">View our Privacy Policy →</a></p>
+
+    </main>
+
+  </div>
+
+  <script src="auth.js"></script>
+  <script>
+    document.getElementById('back-btn').addEventListener('click', () => {
+      window.location.href = 'index.html';
+    });
+    document.getElementById('last-updated-date').textContent = new Date().toLocaleDateString('en-NG', { year: 'numeric', month: 'long', day: 'numeric' });
+  </script>
+</body>
+</html>

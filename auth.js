@@ -55,4 +55,34 @@
   } else {
     setupPasswordToggles();
   }
+
+  // Cookie consent banner — shows once per browser, on every page
+  function setupCookieBanner() {
+    if (localStorage.getItem("joyrise_cookie_consent")) return;
+
+    const navbar = document.querySelector(".bottom-navbar");
+    const bottomOffset = navbar ? navbar.offsetHeight : 0;
+
+    const banner = document.createElement("div");
+    banner.className = "cookie-banner";
+    banner.style.bottom = bottomOffset + "px";
+    banner.innerHTML = `
+      <p>We use essential browser storage to keep you logged in and remember a couple of preferences — no tracking or ad cookies. <a href="cookies.html">Learn more</a></p>
+      <button type="button" id="cookie-accept-btn">Got it</button>
+    `;
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add("show"));
+
+    document.getElementById("cookie-accept-btn").addEventListener("click", () => {
+      localStorage.setItem("joyrise_cookie_consent", "accepted");
+      banner.classList.remove("show");
+      setTimeout(() => banner.remove(), 350);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupCookieBanner);
+  } else {
+    setupCookieBanner();
+  }
 })();

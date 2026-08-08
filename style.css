@@ -1297,6 +1297,51 @@ body {
   font-weight: 700;
 }
 
+/* ================= COOKIE CONSENT BANNER ================= */
+.cookie-banner {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translate(-50%, 100%);
+  width: calc(100% - 24px);
+  max-width: 416px;
+  background: #1e1e24;
+  color: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 14px 16px;
+  z-index: 1500;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.cookie-banner.show {
+  transform: translate(-50%, 0);
+}
+
+.cookie-banner p {
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.cookie-banner a {
+  color: #a29bfe;
+  font-weight: 700;
+}
+
+.cookie-banner button {
+  width: 100%;
+  background: #6c5ce7;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .tier-card-icon {
   width: 40px;
   height: 40px;
