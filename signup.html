@@ -56,12 +56,6 @@
       <label class="auth-label">Password</label>
       <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" required minlength="6" />
 
-      <div class="cf-turnstile" id="turnstile-widget"
-           data-sitekey="1x00000000000000000000AA"
-           data-callback="onTurnstileVerified"
-           data-expired-callback="onTurnstileExpired"
-           style="margin-top:14px;"></div>
-
       <div class="auth-error" id="signup-error"></div>
 
       <button type="submit" class="btn-auth-primary" id="signup-submit-btn">
@@ -76,13 +70,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <script src="auth.js"></script>
   <script>
-    let captchaToken = null;
-    window.onTurnstileVerified = function (token) { captchaToken = token; };
-    window.onTurnstileExpired = function () { captchaToken = null; };
-
     (function () {
       const params = new URLSearchParams(window.location.search);
       const ref = params.get('ref');
@@ -111,11 +100,6 @@
           return;
         }
 
-        if (!captchaToken) {
-          errorEl.textContent = 'Please complete the verification check above.';
-          return;
-        }
-
         btn.disabled = true;
         btn.classList.add('loading');
 
@@ -125,7 +109,6 @@
             email,
             password,
             options: {
-              captchaToken: captchaToken,
               data: {
                 full_name: name,
                 phone_number: phone,
@@ -151,9 +134,6 @@
             || 'Signup failed. Open the browser console for details.';
           btn.disabled = false;
           btn.classList.remove('loading');
-          // Turnstile tokens are single-use — reset the widget so they can retry
-          if (window.turnstile) window.turnstile.reset();
-          captchaToken = null;
         }
       });
     })();
