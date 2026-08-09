@@ -383,7 +383,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- 4. DEPOSIT LOGIC — real payment via Flutterwave, verified
   // server-side before anything is ever credited ---
-  const FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK_TEST-2f31ffe1c4a7361ecfa6e5d4c86c6af2-X";
+  const FLUTTERWAVE_PUBLIC_KEY = "FLWPUBK-ca6a84e50a9a11b098198cc13e7f0c87-X";
   const VERIFY_DEPOSIT_URL = "https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/verify-flutterwave-payment";
 
   async function initiateFlutterwaveDeposit(amount) {
