@@ -72,6 +72,10 @@
         return div.innerHTML;
       }
 
+      function walletLabel(wallet) {
+        return wallet === 'winnings' ? 'main' : wallet;
+      }
+
       function render(filter) {
         const listEl = document.getElementById('txn-list');
         const emptyEl = document.getElementById('txn-empty');
@@ -97,7 +101,7 @@
               </div>
               <div class="winner-info">
                 <strong>${meta.label} ${statusBadge}</strong>
-                <small>${date} &middot; ${escapeHtml(t.wallet)} wallet</small>
+                <small>${date} &middot; ${walletLabel(t.wallet)} wallet</small>
               </div>
               <div class="winner-prize" style="color:${meta.sign === '-' ? '#ff7675' : '#00b894'};">
                 ${meta.sign}&#8358;${Number(t.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
