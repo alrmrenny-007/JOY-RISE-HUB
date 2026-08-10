@@ -105,6 +105,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let referralBalance = 0;
   let winningsBalance = 0;
   let myReferralCode = null;
+  let hasBankDetails = false;
 
   // --- 1. LOAD CONFIG (ticket price, referral unlock threshold) ---
   async function loadConfig() {
@@ -144,7 +145,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           referral_balance,
           total_referrals,
           active_referrals,
-          total_winnings
+          total_winnings,
+          account_number
         `)
         .eq('id', currentUserId)
         .single();
@@ -169,6 +171,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         winningsBalance = Number(profile.winnings_balance || 0);
         referralBalance = Number(profile.referral_balance || 0);
         myReferralCode = profile.referral_code || null;
+        hasBankDetails = !!profile.account_number;
 
         if (userDisplayName && profile.full_name) {
           userDisplayName.innerHTML = `${profile.full_name} <span class="wave">👋</span>`;
@@ -276,6 +279,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- 3. MODAL HELPERS ---
   function openModal(mode) {
+    if ((mode === "withdraw" || mode === "referral-withdraw") && !hasBankDetails) {
+      showToast("Add your bank details first so we know where to send your withdrawal.", "error");
+      setTimeout(() => { window.location.href = 'bank-details.html'; }, 1200);
+      return;
+    }
+
     modalMode = mode;
     modalAmountInput.value = "";
     modalError.textContent = "";

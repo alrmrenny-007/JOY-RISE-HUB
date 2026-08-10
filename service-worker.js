@@ -12,6 +12,7 @@ const SHELL_FILES = [
   "my-tickets.html",
   "referrals.html",
   "profile.html",
+  "bank-details.html",
   "help.html",
   "terms.html",
   "privacy-policy.html",

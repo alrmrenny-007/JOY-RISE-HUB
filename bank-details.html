@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Bank Details — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">BANK DETAILS</span>
+          <span class="brand-sub">For Withdrawals</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <div class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-building-columns"></i> Your Withdrawal Account</h3>
+        <p style="font-size:12px; color:#636e72; margin: 8px 0 14px;">
+          This is where your withdrawals will be sent. We verify the account name before saving — always double-check it matches you.
+        </p>
+
+        <label class="auth-label">Bank</label>
+        <select class="auth-input" id="bank-select" style="margin-bottom:14px;">
+          <option value="">Select your bank...</option>
+        </select>
+
+        <label class="auth-label">Account Number</label>
+        <input type="text" class="auth-input" id="account-number-input" placeholder="10-digit account number" inputmode="numeric" maxlength="10" style="margin-bottom:14px;" />
+
+        <div id="verify-result" style="display:none; background:#f3f0ff; border-radius:12px; padding:12px 14px; margin-bottom:14px;">
+          <div style="font-size:10px; color:#636e72; font-weight:700; text-transform:uppercase;">Account Name</div>
+          <div id="verified-name" style="font-size:15px; font-weight:800; color:#1e1e24; margin-top:2px;"></div>
+        </div>
+
+        <div class="modal-error" id="bank-error"></div>
+
+        <button class="btn-auth-primary" id="verify-btn" style="margin-top:6px;">
+          <span id="verify-label">Verify Account</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="verify-spinner"></i>
+        </button>
+
+        <button class="btn-auth-primary" id="save-btn" style="margin-top:10px; display:none;">
+          <span id="save-label">Save Bank Details</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="save-spinner"></i>
+        </button>
+      </div>
+
+      <div class="admin-section" id="current-details-section" style="display:none;">
+        <h3 class="admin-section-title"><i class="fa-solid fa-circle-check" style="color:#00b894;"></i> Currently Saved</h3>
+        <div id="current-details-body" style="font-size:13px; color:#2d3436; margin-top:8px; line-height:1.7;"></div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check toast-icon" id="toast-icon"></i>
+    <span id="toast-message"></span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      // Major Nigerian banks with their Flutterwave bank codes.
+      // This is static reference data (public, rarely changes) rather
+      // than a live API call, to avoid needing another round-trip.
+      const BANKS = [
+        { code: '044', name: 'Access Bank' },
+        { code: '063', name: 'Access Bank (Diamond)' },
+        { code: '023', name: 'Citibank Nigeria' },
+        { code: '050', name: 'Ecobank Nigeria' },
+        { code: '070', name: 'Fidelity Bank' },
+        { code: '011', name: 'First Bank of Nigeria' },
+        { code: '214', name: 'First City Monument Bank' },
+        { code: '058', name: 'Guaranty Trust Bank' },
+        { code: '030', name: 'Heritage Bank' },
+        { code: '301', name: 'Jaiz Bank' },
+        { code: '082', name: 'Keystone Bank' },
+        { code: '526', name: 'Parallex Bank' },
+        { code: '076', name: 'Polaris Bank' },
+        { code: '101', name: 'Providus Bank' },
+        { code: '221', name: 'Stanbic IBTC Bank' },
+        { code: '068', name: 'Standard Chartered Bank' },
+        { code: '232', name: 'Sterling Bank' },
+        { code: '100', name: 'Suntrust Bank' },
+        { code: '032', name: 'Union Bank of Nigeria' },
+        { code: '033', name: 'United Bank For Africa' },
+        { code: '215', name: 'Unity Bank' },
+        { code: '035', name: 'Wema Bank' },
+        { code: '057', name: 'Zenith Bank' },
+        { code: '50515', name: 'Moniepoint MFB' },
+        { code: '999992', name: 'Opay' },
+        { code: '999991', name: 'PalmPay' },
+        { code: '090267', name: 'Kuda Bank' },
+      ];
+
+      let verifiedAccountName = null;
+      let currentUserId = null;
+      let toastTimer = null;
+
+      const toast = document.getElementById('toast');
+      const toastIcon = document.getElementById('toast-icon');
+      const toastMessage = document.getElementById('toast-message');
+
+      function showToast(message, type = 'success') {
+        clearTimeout(toastTimer);
+        toastMessage.textContent = message;
+        toast.classList.remove('error');
+        toastIcon.className = 'fa-solid toast-icon ' + (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check');
+        if (type === 'error') toast.classList.add('error');
+        toast.classList.add('show');
+        toastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      function populateBanks() {
+        const select = document.getElementById('bank-select');
+        BANKS.forEach(bank => {
+          const opt = document.createElement('option');
+          opt.value = bank.code;
+          opt.textContent = bank.name;
+          select.appendChild(opt);
+        });
+      }
+
+      async function init() {
+        const client = window.getSupabaseClient();
+        if (!client) return;
+
+        const { data: { user }, error: authError } = await client.auth.getUser();
+        if (authError || !user) {
+          window.location.href = 'login.html';
+          return;
+        }
+        currentUserId = user.id;
+
+        populateBanks();
+
+        const { data: profile } = await client
+          .from('profiles')
+          .select('bank_code, bank_name, account_number, account_name')
+          .eq('id', currentUserId)
+          .single();
+
+        if (profile?.account_number) {
+          document.getElementById('current-details-section').style.display = 'block';
+          document.getElementById('current-details-body').innerHTML = `
+            <div><strong>${escapeHtml(profile.account_name)}</strong></div>
+            <div>${escapeHtml(profile.bank_name)}</div>
+            <div>${escapeHtml(profile.account_number)}</div>
+          `;
+        }
+      }
+
+      document.getElementById('verify-btn').addEventListener('click', async () => {
+        const errorEl = document.getElementById('bank-error');
+        const btn = document.getElementById('verify-btn');
+        errorEl.textContent = '';
+        verifiedAccountName = null;
+        document.getElementById('verify-result').style.display = 'none';
+        document.getElementById('save-btn').style.display = 'none';
+
+        const bankCode = document.getElementById('bank-select').value;
+        const accountNumber = document.getElementById('account-number-input').value.trim();
+
+        if (!bankCode) {
+          errorEl.textContent = 'Select your bank.';
+          return;
+        }
+        if (!/^\d{10}$/.test(accountNumber)) {
+          errorEl.textContent = 'Enter a valid 10-digit account number.';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        try {
+          const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/resolve-bank-account', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ account_number: accountNumber, account_bank: bankCode }),
+          });
+          const result = await res.json();
+
+          if (!result.success) {
+            errorEl.textContent = result.error || 'Could not verify this account.';
+            return;
+          }
+
+          verifiedAccountName = result.account_name;
+          document.getElementById('verified-name').textContent = verifiedAccountName;
+          document.getElementById('verify-result').style.display = 'block';
+          document.getElementById('save-btn').style.display = 'flex';
+        } catch (err) {
+          console.error('Verify error:', err);
+          errorEl.textContent = 'Could not reach the verification service. Try again.';
+        } finally {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+        }
+      });
+
+      document.getElementById('save-btn').addEventListener('click', async () => {
+        const client = window.getSupabaseClient();
+        const errorEl = document.getElementById('bank-error');
+        const btn = document.getElementById('save-btn');
+
+        if (!verifiedAccountName) {
+          errorEl.textContent = 'Please verify the account first.';
+          return;
+        }
+
+        const bankSelect = document.getElementById('bank-select');
+        const bankCode = bankSelect.value;
+        const bankName = bankSelect.options[bankSelect.selectedIndex].textContent;
+        const accountNumber = document.getElementById('account-number-input').value.trim();
+
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        try {
+          const { error } = await client
+            .from('profiles')
+            .update({
+              bank_code: bankCode,
+              bank_name: bankName,
+              account_number: accountNumber,
+              account_name: verifiedAccountName,
+            })
+            .eq('id', currentUserId);
+
+          if (error) throw error;
+
+          showToast('Bank details saved!');
+          setTimeout(() => { window.location.href = 'index.html'; }, 1000);
+        } catch (err) {
+          errorEl.textContent = err.message || 'Failed to save.';
+        } finally {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+        }
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>

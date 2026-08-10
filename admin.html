@@ -299,23 +299,64 @@
         badgeEl.style.display = 'inline-flex';
         badgeEl.textContent = data.length;
 
-        listEl.innerHTML = data.map(w => `
-          <div class="withdrawal-row" data-txn-id="${w.transaction_id}">
-            <div class="withdrawal-info">
-              <strong>${escapeHtml(w.full_name || 'Unnamed')}</strong>
-              <small>${escapeHtml(w.phone_number || 'No phone')} &middot; ${escapeHtml(w.wallet)} wallet</small>
-              <small>${new Date(w.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+        listEl.innerHTML = data.map(w => {
+          const hasBankDetails = !!(w.account_number && w.bank_name);
+          const bankInfo = hasBankDetails
+            ? `<small style="color:#00b894; font-weight:700;"><i class="fa-solid fa-building-columns"></i> ${escapeHtml(w.account_name)} &middot; ${escapeHtml(w.bank_name)} &middot; ${escapeHtml(w.account_number)}</small>`
+            : `<small style="color:#ff7675; font-weight:700;">No bank details saved yet</small>`;
+
+          return `
+            <div class="withdrawal-row" data-txn-id="${w.transaction_id}">
+              <div class="withdrawal-info">
+                <strong>${escapeHtml(w.full_name || 'Unnamed')}</strong>
+                <small>${escapeHtml(w.phone_number || 'No phone')} &middot; ${escapeHtml(w.wallet)} wallet</small>
+                <small>${new Date(w.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+                ${bankInfo}
+              </div>
+              <div class="withdrawal-amount">₦${Number(w.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+              <div class="withdrawal-actions">
+                <button class="btn-withdrawal-pay" data-action="flutterwave" ${hasBankDetails ? '' : 'disabled title="No verified bank details"'}>
+                  <i class="fa-solid fa-bolt"></i> Pay via Flutterwave
+                </button>
+                <button class="btn-withdrawal-pay" data-action="pay" style="background:#636e72;">Mark Paid Manually</button>
+                <button class="btn-withdrawal-reject" data-action="reject">Reject</button>
+              </div>
             </div>
-            <div class="withdrawal-amount">₦${Number(w.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
-            <div class="withdrawal-actions">
-              <button class="btn-withdrawal-pay" data-action="pay">Mark Paid</button>
-              <button class="btn-withdrawal-reject" data-action="reject">Reject</button>
-            </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
 
         listEl.querySelectorAll('.withdrawal-row').forEach(row => {
           const txnId = row.dataset.txnId;
+
+          const flutterwaveBtn = row.querySelector('[data-action="flutterwave"]');
+          if (flutterwaveBtn) {
+            flutterwaveBtn.addEventListener('click', async (e) => {
+              const btn = e.currentTarget;
+              btn.disabled = true;
+              btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
+              try {
+                const { data: { session } } = await client.auth.getSession();
+                const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/process-flutterwave-payout', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                  },
+                  body: JSON.stringify({ transaction_id: txnId }),
+                });
+                const result = await res.json();
+                if (!result.success) throw new Error(result.error || 'Payout failed');
+
+                row.remove();
+                loadWithdrawals(client);
+                loadAnalytics(client);
+              } catch (err) {
+                alert(err.message || 'Payout failed.');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Pay via Flutterwave';
+              }
+            });
+          }
 
           row.querySelector('[data-action="pay"]').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
