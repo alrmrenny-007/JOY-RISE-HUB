@@ -102,7 +102,14 @@
         ticket_price: 'Ticket Price (₦)',
         referral_bonus_percent: 'Referral Bonus (%)',
         referral_unlock_threshold: 'Referral Unlock Threshold (₦)',
-        daily_prize_amount: 'Daily Prize Amount (₦)'
+        daily_prize_amount: 'Daily Prize Amount (₦)',
+        ticket_prize_multiplier: 'Prize Multiplier (x Ticket Price)',
+        custom_ticket_min: 'Custom Ticket Min (₦)',
+        custom_ticket_max: 'Custom Ticket Max (₦)',
+        referral_commission_cap: 'Referral Commission Cap (₦)',
+        referral_commission_days: 'Referral Commission Window (days)',
+        referral_activation_spend: 'Referral Activation Spend (₦, legacy/unused)',
+        signup_bonus_amount: 'Signup Bonus Amount (₦)'
       };
 
       function escapeHtml(str) {
@@ -180,7 +187,11 @@
           return;
         }
 
-        listEl.innerHTML = data.map(tier => `
+        listEl.innerHTML = `
+          <p style="font-size:11px; color:#636e72; margin-bottom:10px;">
+            Prize is now computed automatically as price × the Prize Multiplier set in Config below — no longer set per tier.
+          </p>
+        ` + data.map(tier => `
           <div class="tier-admin-row" data-tier-id="${tier.id}">
             <div class="tier-admin-header">
               <strong>${escapeHtml(tier.name)}</strong>
@@ -194,10 +205,6 @@
                 <label>Price (₦)</label>
                 <input type="number" step="0.01" class="auth-input tier-price-input" value="${tier.price}" />
               </div>
-              <div>
-                <label>Prize (₦)</label>
-                <input type="number" step="0.01" class="auth-input tier-prize-input" value="${tier.prize_amount}" />
-              </div>
               <button class="btn-config-save tier-save-btn"><i class="fa-solid fa-check"></i></button>
             </div>
           </div>
@@ -206,21 +213,18 @@
         listEl.querySelectorAll('.tier-admin-row').forEach(row => {
           const tierId = row.dataset.tierId;
           const priceInput = row.querySelector('.tier-price-input');
-          const prizeInput = row.querySelector('.tier-prize-input');
           const activeInput = row.querySelector('.tier-active-input');
           const saveBtn = row.querySelector('.tier-save-btn');
 
           saveBtn.addEventListener('click', async () => {
             const price = parseFloat(priceInput.value);
-            const prize = parseFloat(prizeInput.value);
-            if (isNaN(price) || isNaN(prize)) return;
+            if (isNaN(price)) return;
 
             saveBtn.disabled = true;
             try {
               const { error } = await client.rpc('admin_update_tier', {
                 p_tier_id: tierId,
                 p_price: price,
-                p_prize_amount: prize,
                 p_is_active: activeInput.checked
               });
               if (error) throw error;

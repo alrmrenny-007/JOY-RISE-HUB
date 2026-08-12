@@ -66,13 +66,23 @@
       </div>
 
       <div class="modal-body">
-        <div class="ticket-price-row">
+        <div class="ticket-price-row" id="confirm-price-row">
           <span>Ticket Price</span>
           <strong id="confirm-price">&#8358;0.00</strong>
         </div>
+
+        <div id="custom-amount-row" style="display:none; margin: 10px 0;">
+          <label class="amount-label">Enter Amount (₦)</label>
+          <div class="amount-input-group">
+            <span class="amount-prefix">&#8358;</span>
+            <input type="number" id="custom-amount-input" placeholder="0.00" inputmode="decimal" />
+          </div>
+          <div id="custom-amount-hint" style="font-size:10px; color:#636e72; margin-top:6px;"></div>
+        </div>
+
         <div class="ticket-price-row">
-          <span>Possible Prize</span>
-          <strong id="confirm-prize" style="color:#00b894;">&#8358;0.00</strong>
+          <span>Win Potential</span>
+          <strong id="confirm-prize" style="color:#00b894;">Up to 10x Ticket Value</strong>
         </div>
         <div class="modal-error" id="confirm-error"></div>
       </div>
@@ -104,7 +114,10 @@
       let currentUserId = null;
       let winningsBalance = 0;
       let referralBalance = 0;
-      let selectedTier = null;
+      let selectedTier = null; // { id, name, price, isCustom }
+      let prizeMultiplier = 10;
+      let customMin = 100;
+      let customMax = 10000;
       let toastTimer = null;
 
       const toast = document.getElementById('toast');
@@ -155,9 +168,25 @@
             `₦${fmt(winningsBalance + referralBalance)}`;
         }
 
+        await loadConfig(client);
         loadTiers(client);
         loadResults(client);
         wireModal(client);
+      }
+
+      async function loadConfig(client) {
+        const { data } = await client
+          .from('app_config')
+          .select('key, value')
+          .in('key', ['ticket_prize_multiplier', 'custom_ticket_min', 'custom_ticket_max']);
+
+        if (data) {
+          data.forEach(row => {
+            if (row.key === 'ticket_prize_multiplier') prizeMultiplier = Number(row.value);
+            if (row.key === 'custom_ticket_min') customMin = Number(row.value);
+            if (row.key === 'custom_ticket_max') customMax = Number(row.value);
+          });
+        }
       }
 
       function skeletonTierCards(count) {
@@ -186,11 +215,11 @@
 
       async function loadTiers(client) {
         const grid = document.getElementById('tier-grid');
-        grid.innerHTML = skeletonTierCards(4);
+        grid.innerHTML = skeletonTierCards(5);
 
         const { data, error } = await client
           .from('ticket_tiers')
-          .select('id, name, price, prize_amount')
+          .select('id, name, price')
           .eq('is_active', true)
           .order('sort_order');
 
@@ -205,18 +234,31 @@
         // or reordered from the admin panel, no hardcoding by name.
         const popularIndex = Math.floor((data.length - 1) / 2);
 
-        grid.innerHTML = data.map((tier, i) => `
+        const tierCards = data.map((tier, i) => `
           <div class="tier-card" data-tier-id="${tier.id}" style="--tier-color:${colors[i % colors.length]};">
             ${i === popularIndex ? '<span class="tier-popular-badge">POPULAR</span>' : ''}
             <div class="tier-card-icon"><i class="fa-solid fa-ticket"></i></div>
             <div class="tier-card-name">${escapeHtml(tier.name)}</div>
             <div class="tier-card-price">₦${fmt(tier.price)}</div>
             <button class="tier-card-btn" data-tier-id="${tier.id}" data-name="${escapeHtml(tier.name)}"
-              data-price="${tier.price}" data-prize="${tier.prize_amount}">
+              data-price="${tier.price}">
               Buy Ticket
             </button>
           </div>
         `).join('');
+
+        const customCard = `
+          <div class="tier-card" data-tier-id="custom" style="--tier-color:#2d3436;">
+            <div class="tier-card-icon"><i class="fa-solid fa-sliders"></i></div>
+            <div class="tier-card-name">Custom</div>
+            <div class="tier-card-price">Any Amount</div>
+            <button class="tier-card-btn" data-tier-id="custom" data-name="Custom" data-price="">
+              Buy Ticket
+            </button>
+          </div>
+        `;
+
+        grid.innerHTML = tierCards + customCard;
 
         grid.querySelectorAll('.tier-card-btn').forEach(btn => {
           btn.addEventListener('click', () => {
@@ -224,12 +266,16 @@
             card.classList.add('tapped');
             setTimeout(() => card.classList.remove('tapped'), 500);
 
-            selectedTier = {
-              id: btn.dataset.tierId,
-              name: btn.dataset.name,
-              price: Number(btn.dataset.price),
-              prize: Number(btn.dataset.prize)
-            };
+            if (btn.dataset.tierId === 'custom') {
+              selectedTier = { id: null, name: 'Custom', price: null, isCustom: true };
+            } else {
+              selectedTier = {
+                id: btn.dataset.tierId,
+                name: btn.dataset.name,
+                price: Number(btn.dataset.price),
+                isCustom: false
+              };
+            }
             openConfirmModal();
           });
         });
@@ -262,9 +308,26 @@
 
       function openConfirmModal() {
         document.getElementById('confirm-error').textContent = '';
-        document.getElementById('confirm-tier-name').textContent = `Buy ${selectedTier.name} Ticket`;
-        document.getElementById('confirm-price').textContent = `₦${fmt(selectedTier.price)}`;
-        document.getElementById('confirm-prize').textContent = `₦${fmt(selectedTier.prize)}`;
+        document.getElementById('confirm-prize').textContent = `Up to ${prizeMultiplier}x Ticket Value`;
+
+        const customRow = document.getElementById('custom-amount-row');
+        const priceRow = document.getElementById('confirm-price-row');
+        const customInput = document.getElementById('custom-amount-input');
+
+        if (selectedTier.isCustom) {
+          document.getElementById('confirm-tier-name').textContent = 'Buy Custom Ticket';
+          priceRow.style.display = 'none';
+          customRow.style.display = 'block';
+          customInput.value = '';
+          document.getElementById('custom-amount-hint').textContent =
+            `Enter between ₦${fmt(customMin)} and ₦${fmt(customMax)}`;
+        } else {
+          document.getElementById('confirm-tier-name').textContent = `Buy ${selectedTier.name} Ticket`;
+          priceRow.style.display = 'flex';
+          customRow.style.display = 'none';
+          document.getElementById('confirm-price').textContent = `₦${fmt(selectedTier.price)}`;
+        }
+
         document.getElementById('confirm-modal-overlay').classList.add('open');
       }
 
@@ -284,7 +347,22 @@
           const btn = document.getElementById('confirm-buy-btn');
 
           if (!selectedTier) return;
-          if (winningsBalance + referralBalance < selectedTier.price) {
+
+          let purchaseAmount = selectedTier.price;
+
+          if (selectedTier.isCustom) {
+            purchaseAmount = parseFloat(document.getElementById('custom-amount-input').value);
+            if (!purchaseAmount || isNaN(purchaseAmount)) {
+              errorEl.textContent = 'Enter an amount.';
+              return;
+            }
+            if (purchaseAmount < customMin || purchaseAmount > customMax) {
+              errorEl.textContent = `Amount must be between ₦${fmt(customMin)} and ₦${fmt(customMax)}.`;
+              return;
+            }
+          }
+
+          if (winningsBalance + referralBalance < purchaseAmount) {
             errorEl.textContent = 'Insufficient balance for this ticket.';
             return;
           }
@@ -293,10 +371,14 @@
           btn.classList.add('loading');
 
           try {
-            const { error } = await client.rpc('buy_ticket', { p_tier_id: selectedTier.id });
+            const rpcParams = selectedTier.isCustom
+              ? { p_tier_id: null, p_custom_amount: purchaseAmount }
+              : { p_tier_id: selectedTier.id, p_custom_amount: null };
+
+            const { error } = await client.rpc('buy_ticket', rpcParams);
             if (error) throw error;
 
-            showToast(`${selectedTier.name} ticket purchased for ₦${fmt(selectedTier.price)}! Good luck 🎟️`);
+            showToast(`Ticket purchased for ₦${fmt(purchaseAmount)}! Good luck 🎟️`);
             closeConfirmModal();
             init(); // refresh balances + results
           } catch (err) {
