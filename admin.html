@@ -319,10 +319,7 @@
               </div>
               <div class="withdrawal-amount">₦${Number(w.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
               <div class="withdrawal-actions">
-                <button class="btn-withdrawal-pay" data-action="flutterwave" ${hasBankDetails ? '' : 'disabled title="No verified bank details"'}>
-                  <i class="fa-solid fa-bolt"></i> Pay via Flutterwave
-                </button>
-                <button class="btn-withdrawal-pay" data-action="pay" style="background:#636e72;">Mark Paid Manually</button>
+                <button class="btn-withdrawal-pay" data-action="pay">Mark Paid Manually</button>
                 <button class="btn-withdrawal-reject" data-action="reject">Reject</button>
               </div>
             </div>
@@ -331,36 +328,6 @@
 
         listEl.querySelectorAll('.withdrawal-row').forEach(row => {
           const txnId = row.dataset.txnId;
-
-          const flutterwaveBtn = row.querySelector('[data-action="flutterwave"]');
-          if (flutterwaveBtn) {
-            flutterwaveBtn.addEventListener('click', async (e) => {
-              const btn = e.currentTarget;
-              btn.disabled = true;
-              btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sending...';
-              try {
-                const { data: { session } } = await client.auth.getSession();
-                const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/process-flutterwave-payout', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                  },
-                  body: JSON.stringify({ transaction_id: txnId }),
-                });
-                const result = await res.json();
-                if (!result.success) throw new Error(result.error || 'Payout failed');
-
-                row.remove();
-                loadWithdrawals(client);
-                loadAnalytics(client);
-              } catch (err) {
-                alert(err.message || 'Payout failed.');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-bolt"></i> Pay via Flutterwave';
-              }
-            });
-          }
 
           row.querySelector('[data-action="pay"]').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
