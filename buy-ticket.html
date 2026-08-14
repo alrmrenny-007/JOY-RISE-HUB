@@ -92,8 +92,37 @@
           </span>
         </div>
 
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px;">
+          <span style="font-size:13px; color:#2d2d3f; font-weight:600;">Quantity</span>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button type="button" id="qty-decrement" class="qty-btn" aria-label="Decrease quantity">
+              <i class="fa-solid fa-minus"></i>
+            </button>
+            <span id="qty-value" style="min-width:24px; text-align:center; font-weight:700; font-size:15px;">1</span>
+            <button type="button" id="qty-increment" class="qty-btn" aria-label="Increase quantity">
+              <i class="fa-solid fa-plus"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="ticket-price-row" style="margin-top:10px;">
+          <span>Total</span>
+          <strong id="confirm-total-price">&#8358;0.00</strong>
+        </div>
+
         <div class="modal-error" id="confirm-error"></div>
       </div>
+
+      <style>
+        .qty-btn {
+          width: 30px; height: 30px; border-radius: 50%; border: none;
+          background: #f3f0ff; color: #6c5ce7; font-size: 12px;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer;
+        }
+        .qty-btn:active { background: #e4ddff; }
+        .qty-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+      </style>
 
       <div class="modal-footer">
         <button class="btn-modal-cancel" id="confirm-cancel-btn">Cancel</button>
@@ -156,6 +185,7 @@
       let winningsBalance = 0;
       let referralBalance = 0;
       let selectedTier = null; // { id, name, price, isCustom }
+      let ticketQuantity = 1;
       let prizeMultiplier = 10;
       let customMin = 100;
       let customMax = 10000;
@@ -382,6 +412,10 @@
         document.getElementById('confirm-error').textContent = '';
         document.getElementById('confirm-prize').textContent = `Up to ${prizeMultiplier}x Ticket Value`;
 
+        ticketQuantity = 1;
+        document.getElementById('qty-value').textContent = '1';
+        document.getElementById('qty-decrement').disabled = true;
+
         const customRow = document.getElementById('custom-amount-row');
         const priceRow = document.getElementById('confirm-price-row');
         const customInput = document.getElementById('custom-amount-input');
@@ -400,7 +434,19 @@
           document.getElementById('confirm-price').textContent = `₦${fmt(selectedTier.price)}`;
         }
 
+        updateConfirmTotal();
         document.getElementById('confirm-modal-overlay').classList.add('open');
+      }
+
+      function unitPrice() {
+        if (selectedTier?.isCustom) {
+          return parseFloat(document.getElementById('custom-amount-input').value) || 0;
+        }
+        return selectedTier?.price || 0;
+      }
+
+      function updateConfirmTotal() {
+        document.getElementById('confirm-total-price').textContent = `₦${fmt(unitPrice() * ticketQuantity)}`;
       }
 
       function closeConfirmModal() {
@@ -413,6 +459,22 @@
         document.getElementById('confirm-modal-overlay').addEventListener('click', (e) => {
           if (e.target.id === 'confirm-modal-overlay') closeConfirmModal();
         });
+
+        document.getElementById('qty-decrement').addEventListener('click', () => {
+          if (ticketQuantity <= 1) return;
+          ticketQuantity -= 1;
+          document.getElementById('qty-value').textContent = ticketQuantity;
+          document.getElementById('qty-decrement').disabled = ticketQuantity <= 1;
+          updateConfirmTotal();
+        });
+        document.getElementById('qty-increment').addEventListener('click', () => {
+          if (ticketQuantity >= 100) return;
+          ticketQuantity += 1;
+          document.getElementById('qty-value').textContent = ticketQuantity;
+          document.getElementById('qty-decrement').disabled = false;
+          updateConfirmTotal();
+        });
+        document.getElementById('custom-amount-input').addEventListener('input', updateConfirmTotal);
 
         document.getElementById('confirm-buy-btn').addEventListener('click', async () => {
           const errorEl = document.getElementById('confirm-error');
@@ -434,8 +496,8 @@
             }
           }
 
-          if (winningsBalance + referralBalance < purchaseAmount) {
-            errorEl.textContent = 'Insufficient balance for this ticket.';
+          if (winningsBalance + referralBalance < purchaseAmount * ticketQuantity) {
+            errorEl.textContent = `Insufficient balance for ${ticketQuantity} ticket${ticketQuantity > 1 ? 's' : ''}.`;
             return;
           }
 
@@ -444,15 +506,18 @@
 
           try {
             const rpcParams = selectedTier.isCustom
-              ? { p_tier_id: null, p_custom_amount: purchaseAmount }
-              : { p_tier_id: selectedTier.id, p_custom_amount: null };
+              ? { p_tier_id: null, p_custom_amount: purchaseAmount, p_quantity: ticketQuantity }
+              : { p_tier_id: selectedTier.id, p_custom_amount: null, p_quantity: ticketQuantity };
 
             const { data, error } = await client.rpc('buy_ticket', rpcParams);
             if (error) throw error;
 
-            lastPurchasedTicketId = data?.[0]?.ticket_id || null;
+            const ticketIds = data?.[0]?.ticket_ids || [];
+            lastPurchasedTicketId = ticketIds[0] || null;
+            const totalSpent = data?.[0]?.total_spent ?? (purchaseAmount * ticketQuantity);
 
-            showToast(`Ticket purchased for ₦${fmt(purchaseAmount)}! Good luck 🎟️`);
+            const label = ticketQuantity > 1 ? `${ticketQuantity} tickets` : 'Ticket';
+            showToast(`${label} purchased for ₦${fmt(totalSpent)}! Good luck 🎟️`);
             closeConfirmModal();
             openPlaceDrawModal();
             init(); // refresh balances + results
