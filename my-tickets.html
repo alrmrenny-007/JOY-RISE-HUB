@@ -57,6 +57,9 @@
 
       let allTickets = [];
 
+      // TODO: swap for the real channel once the live draw page exists
+      const TELEGRAM_DRAW_URL = 'https://t.me/Bracey0';
+
       const STATUS_META = {
         active: { icon: 'fa-clock',        color: '#6c5ce7', bg: '#f3f0ff', label: "Today's Draw" },
         won:    { icon: 'fa-trophy',        color: '#00b894', bg: '#d3f9e8', label: 'Won' },
@@ -118,11 +121,34 @@
               <div style="text-align:right;">
                 <span class="referral-status-badge" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
                 ${t.status === 'won' ? `<div class="winner-prize" style="font-size:12px; margin-top:4px;">+₦${fmt(t.prize_amount)}</div>` : ''}
+                ${t.status === 'active' && !t.placed_at ? `
+                  <button class="btn-modal-primary place-draw-btn" data-ticket-id="${t.id}"
+                    style="margin-top:6px; padding:6px 12px; font-size:11px;">
+                    Place Draw <i class="fa-brands fa-telegram" style="margin-left:4px;"></i>
+                  </button>` : ''}
               </div>
             </div>
           `;
         }).join('');
       }
+
+      document.getElementById('tickets-list').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.place-draw-btn');
+        if (!btn) return;
+        const ticketId = btn.dataset.ticketId;
+        btn.disabled = true;
+        try {
+          const client = window.getSupabaseClient();
+          await client.rpc('mark_ticket_placed', { p_ticket_id: ticketId });
+          const t = allTickets.find(x => x.id === ticketId);
+          if (t) t.placed_at = new Date().toISOString();
+        } catch (err) {
+          console.error('Could not mark ticket placed:', err.message);
+          // Non-fatal — the ticket is already entered either way, so
+          // still send them to the draw.
+        }
+        window.open(TELEGRAM_DRAW_URL, '_blank');
+      });
 
       async function loadTickets() {
         const client = window.getSupabaseClient();
@@ -138,7 +164,7 @@
 
         const { data, error } = await client
           .from('tickets')
-          .select('id, price, prize_amount, status, purchased_at, ticket_tiers(name)')
+          .select('id, price, prize_amount, status, purchased_at, placed_at, ticket_tiers(name)')
           .eq('user_id', user.id)
           .order('purchased_at', { ascending: false })
           .limit(100);

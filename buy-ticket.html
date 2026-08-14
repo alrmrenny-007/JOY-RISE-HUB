@@ -97,6 +97,39 @@
     </div>
   </div>
 
+  <!-- PLACE DRAW MODAL -->
+  <div class="modal-overlay" id="place-draw-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-circle" id="place-draw-icon-circle">
+          <i class="fa-solid fa-ticket"></i>
+        </div>
+        <div>
+          <h3>Ticket Purchased 🎟️</h3>
+          <p>Place it in today's draw</p>
+        </div>
+        <button class="modal-close-btn" id="place-draw-close-btn">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size:13px; color:#636e72; line-height:1.5;">
+          Your ticket is already entered — placing it just takes you to today's
+          live draw session so you can watch it happen.
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="place-draw-later-btn">Later</button>
+        <button class="btn-modal-primary" id="place-draw-now-btn">
+          <span>Place Draw Now</span>
+          <i class="fa-brands fa-telegram" style="margin-left:6px;"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST -->
   <div class="toast" id="toast">
     <i class="fa-solid fa-circle-check toast-icon" id="toast-icon"></i>
@@ -119,10 +152,41 @@
       let customMin = 100;
       let customMax = 10000;
       let toastTimer = null;
+      let lastPurchasedTicketId = null;
+
+      // TODO: swap for the real channel once the live draw page exists
+      const TELEGRAM_DRAW_URL = 'https://t.me/Bracey0';
 
       const toast = document.getElementById('toast');
       const toastIcon = document.getElementById('toast-icon');
       const toastMessage = document.getElementById('toast-message');
+
+      const placeDrawOverlay = document.getElementById('place-draw-modal-overlay');
+      function openPlaceDrawModal() {
+        placeDrawOverlay.classList.add('open');
+      }
+      function closePlaceDrawModal() {
+        placeDrawOverlay.classList.remove('open');
+      }
+      document.getElementById('place-draw-close-btn').addEventListener('click', closePlaceDrawModal);
+      document.getElementById('place-draw-later-btn').addEventListener('click', closePlaceDrawModal);
+      placeDrawOverlay.addEventListener('click', (e) => {
+        if (e.target.id === 'place-draw-modal-overlay') closePlaceDrawModal();
+      });
+      document.getElementById('place-draw-now-btn').addEventListener('click', async () => {
+        if (lastPurchasedTicketId) {
+          try {
+            const client = window.getSupabaseClient();
+            await client.rpc('mark_ticket_placed', { p_ticket_id: lastPurchasedTicketId });
+          } catch (err) {
+            console.error('Could not mark ticket placed:', err.message);
+            // Non-fatal — the ticket is already entered either way, so
+            // still send them to the draw.
+          }
+        }
+        closePlaceDrawModal();
+        window.open(TELEGRAM_DRAW_URL, '_blank');
+      });
 
       function showToast(message, type = 'success') {
         clearTimeout(toastTimer);
@@ -375,11 +439,14 @@
               ? { p_tier_id: null, p_custom_amount: purchaseAmount }
               : { p_tier_id: selectedTier.id, p_custom_amount: null };
 
-            const { error } = await client.rpc('buy_ticket', rpcParams);
+            const { data, error } = await client.rpc('buy_ticket', rpcParams);
             if (error) throw error;
+
+            lastPurchasedTicketId = data?.[0]?.ticket_id || null;
 
             showToast(`Ticket purchased for ₦${fmt(purchaseAmount)}! Good luck 🎟️`);
             closeConfirmModal();
+            openPlaceDrawModal();
             init(); // refresh balances + results
           } catch (err) {
             errorEl.textContent = err.message || 'Purchase failed.';
