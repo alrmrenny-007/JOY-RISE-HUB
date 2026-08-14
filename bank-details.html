@@ -84,39 +84,6 @@
         window.location.href = 'index.html';
       });
 
-      // Major Nigerian banks with their Flutterwave bank codes.
-      // This is static reference data (public, rarely changes) rather
-      // than a live API call, to avoid needing another round-trip.
-      const BANKS = [
-        { code: '044', name: 'Access Bank' },
-        { code: '063', name: 'Access Bank (Diamond)' },
-        { code: '023', name: 'Citibank Nigeria' },
-        { code: '050', name: 'Ecobank Nigeria' },
-        { code: '070', name: 'Fidelity Bank' },
-        { code: '011', name: 'First Bank of Nigeria' },
-        { code: '214', name: 'First City Monument Bank' },
-        { code: '058', name: 'Guaranty Trust Bank' },
-        { code: '030', name: 'Heritage Bank' },
-        { code: '301', name: 'Jaiz Bank' },
-        { code: '082', name: 'Keystone Bank' },
-        { code: '526', name: 'Parallex Bank' },
-        { code: '076', name: 'Polaris Bank' },
-        { code: '101', name: 'Providus Bank' },
-        { code: '221', name: 'Stanbic IBTC Bank' },
-        { code: '068', name: 'Standard Chartered Bank' },
-        { code: '232', name: 'Sterling Bank' },
-        { code: '100', name: 'Suntrust Bank' },
-        { code: '032', name: 'Union Bank of Nigeria' },
-        { code: '033', name: 'United Bank For Africa' },
-        { code: '215', name: 'Unity Bank' },
-        { code: '035', name: 'Wema Bank' },
-        { code: '057', name: 'Zenith Bank' },
-        { code: '50515', name: 'Moniepoint MFB' },
-        { code: '999992', name: 'Opay' },
-        { code: '999991', name: 'PalmPay' },
-        { code: '090267', name: 'Kuda Bank' },
-      ];
-
       let verifiedAccountName = null;
       let currentUserId = null;
       let toastTimer = null;
@@ -141,14 +108,31 @@
         return div.innerHTML;
       }
 
-      function populateBanks() {
+      // Pulls the real, current bank list (and correct codes) straight
+      // from Flutterwave — replaces a hardcoded guess, which is exactly
+      // what caused Moniepoint to fail verification.
+      async function populateBanks() {
         const select = document.getElementById('bank-select');
-        BANKS.forEach(bank => {
-          const opt = document.createElement('option');
-          opt.value = bank.code;
-          opt.textContent = bank.name;
-          select.appendChild(opt);
-        });
+        try {
+          const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/list-flutterwave-banks');
+          const result = await res.json();
+
+          if (!result.success || !result.banks) {
+            select.innerHTML = '<option value="">Could not load bank list — refresh to retry</option>';
+            return;
+          }
+
+          select.innerHTML = '<option value="">Select your bank...</option>';
+          result.banks.forEach(bank => {
+            const opt = document.createElement('option');
+            opt.value = bank.code;
+            opt.textContent = bank.name;
+            select.appendChild(opt);
+          });
+        } catch (err) {
+          console.error('Bank list error:', err);
+          select.innerHTML = '<option value="">Could not load bank list — refresh to retry</option>';
+        }
       }
 
       async function init() {
@@ -248,17 +232,23 @@
         btn.classList.add('loading');
 
         try {
-          const { error } = await client
-            .from('profiles')
-            .update({
-              bank_code: bankCode,
-              bank_name: bankName,
+          const { data: { session } } = await client.auth.getSession();
+          const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/resolve-bank-account', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
               account_number: accountNumber,
-              account_name: verifiedAccountName,
-            })
-            .eq('id', currentUserId);
+              account_bank: bankCode,
+              bank_name: bankName,
+              save: true,
+            }),
+          });
+          const result = await res.json();
 
-          if (error) throw error;
+          if (!result.success) throw new Error(result.error || 'Failed to save.');
 
           showToast('Bank details saved!');
           setTimeout(() => { window.location.href = 'index.html'; }, 1000);
