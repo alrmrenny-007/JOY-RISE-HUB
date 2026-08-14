@@ -106,6 +106,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   let winningsBalance = 0;
   let myReferralCode = null;
   let hasBankDetails = false;
+  let hasQualifyingDeposit = false;
+  let minWithdrawalAmount = 1000;
+  let minFirstDeposit = 500;
 
   // --- 1. LOAD CONFIG (ticket price, referral unlock threshold) ---
   async function loadConfig() {
@@ -115,6 +118,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     data.forEach(row => {
       if (row.key === 'ticket_price') ticketPrice = Number(row.value);
       if (row.key === 'referral_unlock_threshold') referralThreshold = Number(row.value);
+      if (row.key === 'min_withdrawal_amount') minWithdrawalAmount = Number(row.value);
+      if (row.key === 'min_first_deposit_to_unlock_withdrawal') minFirstDeposit = Number(row.value);
     });
   }
 
@@ -172,6 +177,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         referralBalance = Number(profile.referral_balance || 0);
         myReferralCode = profile.referral_code || null;
         hasBankDetails = !!profile.account_number;
+
+        const { count: qualifyingDepositCount } = await supabaseClient
+          .from('transactions')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', currentUserId)
+          .eq('type', 'deposit')
+          .eq('status', 'completed')
+          .gte('amount', minFirstDeposit);
+        hasQualifyingDeposit = (qualifyingDepositCount || 0) > 0;
 
         if (userDisplayName && profile.full_name) {
           userDisplayName.innerHTML = `${profile.full_name} <span class="wave">👋</span>`;
@@ -279,10 +293,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // --- 3. MODAL HELPERS ---
   function openModal(mode) {
-    if ((mode === "withdraw" || mode === "referral-withdraw") && !hasBankDetails) {
-      showToast("Add your bank details first so we know where to send your withdrawal.", "error");
-      setTimeout(() => { window.location.href = 'bank-details.html'; }, 1200);
-      return;
+    if (mode === "withdraw" || mode === "referral-withdraw") {
+      if (!hasBankDetails) {
+        showToast("Add your bank details first so we know where to send your withdrawal.", "error");
+        setTimeout(() => { window.location.href = 'bank-details.html'; }, 1200);
+        return;
+      }
+      if (!hasQualifyingDeposit) {
+        showToast(`Please make a one-time deposit of at least ₦${fmt(minFirstDeposit)} to activate bank withdrawals on your account.`, "error");
+        return;
+      }
+      const relevantBalance = mode === "withdraw" ? winningsBalance : referralBalance;
+      if (relevantBalance < minWithdrawalAmount) {
+        showToast(`Minimum withdrawal amount is ₦${fmt(minWithdrawalAmount)}`, "error");
+        return;
+      }
     }
 
     modalMode = mode;
@@ -353,6 +378,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (!amount || isNaN(amount) || amount <= 0) {
       modalError.textContent = "Enter a valid amount.";
+      return;
+    }
+
+    if ((modalMode === "withdraw" || modalMode === "referral-withdraw") && amount < minWithdrawalAmount) {
+      modalError.textContent = `Minimum withdrawal amount is ₦${fmt(minWithdrawalAmount)}`;
       return;
     }
 

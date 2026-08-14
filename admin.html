@@ -109,7 +109,10 @@
         referral_commission_cap: 'Referral Commission Cap (₦)',
         referral_commission_days: 'Referral Commission Window (days)',
         referral_activation_spend: 'Referral Activation Spend (₦, legacy/unused)',
-        signup_bonus_amount: 'Signup Bonus Amount (₦)'
+        signup_bonus_amount: 'Signup Bonus Amount (₦)',
+        min_first_deposit_to_unlock_withdrawal: 'Min First Deposit to Unlock Withdrawals (₦)',
+        withdrawal_fee_amount: 'Withdrawal Fee (₦)',
+        min_withdrawal_amount: 'Min Withdrawal Amount (₦)'
       };
 
       function escapeHtml(str) {
@@ -308,6 +311,7 @@
           const bankInfo = hasBankDetails
             ? `<small style="color:#00b894; font-weight:700;"><i class="fa-solid fa-building-columns"></i> ${escapeHtml(w.account_name)} &middot; ${escapeHtml(w.bank_name)} &middot; ${escapeHtml(w.account_number)}</small>`
             : `<small style="color:#ff7675; font-weight:700;">No bank details saved yet</small>`;
+          const fmtMoney = (n) => '₦' + Number(n).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
           return `
             <div class="withdrawal-row" data-txn-id="${w.transaction_id}">
@@ -315,9 +319,10 @@
                 <strong>${escapeHtml(w.full_name || 'Unnamed')}</strong>
                 <small>${escapeHtml(w.phone_number || 'No phone')} &middot; ${escapeHtml(w.wallet)} wallet</small>
                 <small>${new Date(w.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+                <small>Requested ${fmtMoney(w.amount)} &middot; Fee ${fmtMoney(w.fee)} &middot; <strong style="color:#1e1e24;">Send ${fmtMoney(w.net_amount)}</strong></small>
                 ${bankInfo}
               </div>
-              <div class="withdrawal-amount">₦${Number(w.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+              <div class="withdrawal-amount">${fmtMoney(w.net_amount)}</div>
               <div class="withdrawal-actions">
                 <button class="btn-withdrawal-pay" data-action="pay">Mark Paid Manually</button>
                 <button class="btn-withdrawal-reject" data-action="reject">Reject</button>
