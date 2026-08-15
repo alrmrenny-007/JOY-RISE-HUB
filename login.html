@@ -91,7 +91,11 @@
           if (error) throw error;
 
           // Non-fatal — never let logging failure block the actual login.
-          client.rpc('log_user_login').catch((e) => console.warn('log_user_login failed:', e));
+          try {
+            await client.rpc('log_user_login');
+          } catch (e) {
+            console.warn('log_user_login failed:', e);
+          }
 
           window.location.href = 'index.html';
         } catch (err) {
