@@ -94,6 +94,14 @@
           const date = new Date(t.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
           const statusBadge = t.status !== 'completed'
             ? `<span class="txn-status-badge txn-status-${escapeHtml(t.status)}">${escapeHtml(t.status)}</span>` : '';
+
+          let extraLine = '';
+          if (t.type === 'withdrawal' && t.status === 'completed' && t.payment_reference) {
+            extraLine = `<small style="color:#00b894;"><i class="fa-solid fa-receipt"></i> Ref: ${escapeHtml(t.payment_reference)}</small>`;
+          } else if (t.type === 'withdrawal' && t.status === 'failed' && t.rejection_reason) {
+            extraLine = `<small style="color:#ff4757;"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(t.rejection_reason)}</small>`;
+          }
+
           return `
             <div class="winner-row">
               <div class="winner-avatar" style="background:${meta.color}1a; color:${meta.color};">
@@ -102,6 +110,7 @@
               <div class="winner-info">
                 <strong>${meta.label} ${statusBadge}</strong>
                 <small>${date} &middot; ${walletLabel(t.wallet)} wallet</small>
+                ${extraLine}
               </div>
               <div class="winner-prize" style="color:${meta.sign === '-' ? '#ff7675' : '#00b894'};">
                 ${meta.sign}&#8358;${Number(t.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
@@ -138,7 +147,7 @@
 
         const { data, error } = await client
           .from('transactions')
-          .select('id, type, wallet, amount, status, created_at')
+          .select('id, type, wallet, amount, status, created_at, payment_reference, rejection_reason')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(100);

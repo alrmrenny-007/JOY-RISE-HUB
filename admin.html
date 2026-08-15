@@ -459,9 +459,19 @@
 
           row.querySelector('[data-action="pay"]').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
+            const reference = prompt('Bank transaction reference / session ID for this payout:\n\n(This is saved so any "I didn\'t receive it" dispute can be resolved instantly.)');
+            if (reference === null) return; // cancelled
+            if (!reference.trim()) {
+              alert('A reference is required to mark this as paid.');
+              return;
+            }
+
             btn.disabled = true;
             try {
-              const { error } = await client.rpc('admin_complete_withdrawal', { p_transaction_id: txnId });
+              const { error } = await client.rpc('admin_complete_withdrawal', {
+                p_transaction_id: txnId,
+                p_reference: reference.trim(),
+              });
               if (error) throw error;
               row.remove();
               loadWithdrawals(client);
@@ -473,19 +483,19 @@
 
           row.querySelector('[data-action="reject"]').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
-            if (btn.dataset.confirmed !== 'true') {
-              btn.textContent = 'Confirm Reject?';
-              btn.dataset.confirmed = 'true';
-              setTimeout(() => {
-                btn.textContent = 'Reject';
-                btn.dataset.confirmed = 'false';
-              }, 3000);
+            const reason = prompt('Reason for rejecting this withdrawal:\n\n(The user will see this. Funds are refunded to their wallet automatically.)');
+            if (reason === null) return; // cancelled
+            if (!reason.trim()) {
+              alert('A reason is required to reject this withdrawal.');
               return;
             }
 
             btn.disabled = true;
             try {
-              const { error } = await client.rpc('admin_reject_withdrawal', { p_transaction_id: txnId });
+              const { error } = await client.rpc('admin_reject_withdrawal', {
+                p_transaction_id: txnId,
+                p_reason: reason.trim(),
+              });
               if (error) throw error;
               row.remove();
               loadUsers(client, document.getElementById('user-search').value.trim());
