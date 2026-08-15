@@ -3,98 +3,448 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Admin — Joy-Rise Hub</title>
+  <title>Control Deck — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#6c5ce7" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <meta name="theme-color" content="#0B0815" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ============================================================
+       CONTROL DECK — design tokens
+       Dark command-center shell for the admin panel only. The
+       consumer-facing app keeps its light theme untouched; this
+       lives entirely inside admin.html's own stylesheet so nothing
+       shared gets affected.
+    ============================================================ */
+    .admin-shell {
+      --ink: #0B0815;
+      --surface: #16101F;
+      --surface-2: #1E1733;
+      --line: #2A2140;
+      --brand: #6C5CE7;
+      --brand-glow: #9B8CFF;
+      --money: #2DD4A7;
+      --alert: #FF6B81;
+      --gold: #F5B942;
+      --text: #F5F3FF;
+      --muted: #9089B0;
+      --faint: #6B6389;
+      --font-display: 'Space Grotesk', -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      background: var(--ink);
+      min-height: 100vh;
+    }
+    .admin-shell .mobile-container {
+      background: var(--ink);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .admin-shell * { box-sizing: border-box; }
+
+    /* ---------- Header ---------- */
+    .admin-header {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 18px 14px;
+      background: linear-gradient(180deg, rgba(11,8,21,0.98) 70%, rgba(11,8,21,0.85));
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+    .admin-shell .icon-btn#back-btn {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--surface-2); color: var(--text); border: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 120ms ease, background 120ms ease;
+    }
+    .admin-shell .icon-btn#back-btn:active { transform: scale(0.92); background: var(--line); }
+    .admin-title-block { flex: 1; }
+    .admin-title-block .eyebrow {
+      display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em;
+      color: var(--brand-glow); text-transform: uppercase; margin-bottom: 1px;
+    }
+    .admin-title-block h1 {
+      font-family: var(--font-display); font-size: 19px; font-weight: 700; margin: 0;
+      color: var(--text); letter-spacing: -0.01em;
+    }
+    .system-pulse {
+      display: flex; align-items: center; gap: 6px;
+      font-family: var(--font-mono); font-size: 10px; color: var(--money);
+      background: rgba(45,212,167,0.1); border: 1px solid rgba(45,212,167,0.25);
+      padding: 5px 10px; border-radius: 20px; white-space: nowrap;
+    }
+    .pulse-dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--money);
+      box-shadow: 0 0 0 0 rgba(45,212,167,0.6);
+      animation: pulse-ring 2s ease-out infinite;
+    }
+    @keyframes pulse-ring {
+      0%   { box-shadow: 0 0 0 0 rgba(45,212,167,0.55); }
+      70%  { box-shadow: 0 0 0 7px rgba(45,212,167,0); }
+      100% { box-shadow: 0 0 0 0 rgba(45,212,167,0); }
+    }
+
+    /* ---------- Tab strip ---------- */
+    .admin-tabs {
+      display: flex; gap: 6px; overflow-x: auto; padding: 12px 14px;
+      background: var(--ink); border-bottom: 1px solid var(--line);
+      position: sticky; top: 65px; z-index: 19;
+      scrollbar-width: none;
+    }
+    .admin-tabs::-webkit-scrollbar { display: none; }
+    .admin-tab-btn {
+      position: relative; flex-shrink: 0;
+      display: flex; align-items: center; gap: 6px;
+      padding: 9px 14px; border-radius: 12px; border: 1px solid var(--line);
+      background: var(--surface); color: var(--muted);
+      font-size: 12.5px; font-weight: 600; font-family: inherit;
+      transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 100ms ease;
+    }
+    .admin-tab-btn:active { transform: scale(0.96); }
+    .admin-tab-btn.active {
+      background: linear-gradient(135deg, var(--brand), #5B4BD6);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 4px 14px rgba(108,92,231,0.35);
+    }
+    .tab-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--alert);
+      box-shadow: 0 0 0 2px var(--surface);
+      display: none;
+    }
+    .admin-tab-btn.active .tab-dot { box-shadow: 0 0 0 2px var(--brand); }
+
+    /* ---------- Tab pages ---------- */
+    .admin-main { padding: 4px 16px 100px; }
+    .admin-tab-page { display: none; }
+    .admin-tab-page.active { display: block; animation: tab-in 340ms cubic-bezier(.2,.8,.2,1); }
+    @keyframes tab-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ---------- Section shell ---------- */
+    .admin-shell .admin-section {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
+      padding: 16px; margin: 14px 0; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    }
+    .admin-shell .admin-section-title {
+      font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; gap: 8px; margin: 0 0 4px;
+    }
+    .admin-shell .admin-section-title i { color: var(--brand-glow); font-size: 13px; }
+
+    .support-banner {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+      padding: 12px 14px; margin: 14px 0 0; font-size: 12px; color: var(--muted);
+    }
+    .support-banner i { color: var(--brand-glow); }
+    .support-banner strong { color: var(--text); }
+
+    /* ---------- Analytics ---------- */
+    .admin-shell .analytics-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;
+    }
+    .admin-shell .analytics-stat-box {
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px; opacity: 0; animation: stat-in 460ms ease forwards;
+    }
+    @keyframes stat-in {
+      from { opacity: 0; transform: translateY(8px) scale(0.98); }
+      to   { opacity: 1; transform: none; }
+    }
+    .admin-shell .analytics-stat-box strong {
+      display: block; font-family: var(--font-mono); font-size: 16px; font-weight: 500;
+      letter-spacing: -0.01em; margin-bottom: 3px;
+    }
+    .admin-shell .analytics-stat-box span { font-size: 10.5px; color: var(--muted); }
+
+    .admin-shell .analytics-net-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+      background: rgba(108,92,231,0.08); border: 1px solid rgba(108,92,231,0.2);
+      font-size: 11.5px; color: var(--muted);
+    }
+    .admin-shell .analytics-net-row strong { font-family: var(--font-mono); font-size: 15px; }
+
+    /* ---------- Draw control ---------- */
+    .draw-card { position: relative; overflow: visible; text-align: center; }
+    .admin-shell .btn-auth-primary#run-draw-btn {
+      width: 100%; margin-top: 10px; border: none; border-radius: 14px;
+      padding: 15px; font-family: var(--font-display); font-weight: 700; font-size: 14px;
+      color: #1a1220;
+      background: linear-gradient(135deg, var(--gold), #FFD97A);
+      box-shadow: 0 0 0 0 rgba(245,185,66,0.5);
+      animation: gold-breathe 2.6s ease-in-out infinite;
+      transition: transform 120ms ease;
+    }
+    .admin-shell .btn-auth-primary#run-draw-btn:active { transform: scale(0.98); }
+    .admin-shell .btn-auth-primary#run-draw-btn:disabled { animation: none; opacity: 0.7; }
+    @keyframes gold-breathe {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245,185,66,0.35); }
+      50%      { box-shadow: 0 0 22px 4px rgba(245,185,66,0.35); }
+    }
+    .admin-result { margin-top: 12px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .confetti-piece {
+      position: absolute; top: 50%; width: 6px; height: 10px; border-radius: 2px;
+      pointer-events: none; animation: confetti-fly 900ms ease-out forwards;
+    }
+    @keyframes confetti-fly {
+      to { transform: translate(var(--x), -140px) rotate(var(--rot)); opacity: 0; }
+    }
+
+    /* ---------- Activity feed ---------- */
+    .admin-shell #activity-filters { margin: 12px 0; }
+    .activity-filter-btn {
+      transition: transform 100ms ease, background 150ms ease, color 150ms ease;
+      font-family: inherit;
+    }
+    .activity-filter-btn:active { transform: scale(0.94); }
+
+    .admin-shell .winners-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .admin-shell .winner-row {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 13px;
+      padding: 11px 12px; transition: border-color 150ms ease, transform 100ms ease;
+    }
+    .admin-shell .winner-row:active { transform: scale(0.99); }
+    .admin-shell .winner-avatar {
+      width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 13px;
+    }
+    .admin-shell .winner-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .admin-shell .winner-info strong { font-size: 12.5px; color: var(--text); font-weight: 600; }
+    .admin-shell .winner-info small { font-size: 10.5px; color: var(--faint); }
+    .admin-shell .winner-prize {
+      font-family: var(--font-mono); font-size: 12.5px; font-weight: 500; color: var(--money);
+      white-space: nowrap;
+    }
+    .admin-shell .count-badge {
+      background: var(--alert); color: #fff; font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 10px; font-family: var(--font-mono);
+    }
+    .live-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-family: var(--font-mono); font-size: 9.5px; color: var(--money);
+      margin-left: 4px;
+    }
+
+    /* ---------- Skeleton loaders ---------- */
+    .skeleton-row { display: flex; align-items: center; gap: 12px; padding: 11px 12px; }
+    .skeleton-avatar, .skeleton-line {
+      background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
+      background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; border-radius: 8px;
+    }
+    .skeleton-avatar { width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0; }
+    .skeleton-lines { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .skeleton-line { height: 9px; }
+    .skeleton-line.w60 { width: 60%; }
+    .skeleton-line.w40 { width: 40%; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ---------- Withdrawals ---------- */
+    .admin-shell .withdrawals-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .admin-shell .withdrawal-row {
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 13px;
+    }
+    .admin-shell .withdrawal-info { display: flex; flex-direction: column; gap: 3px; }
+    .admin-shell .withdrawal-info strong { font-size: 13px; color: var(--text); }
+    .admin-shell .withdrawal-info small { font-size: 10.5px; color: var(--faint); }
+    .admin-shell .withdrawal-amount {
+      font-family: var(--font-mono); font-size: 15px; font-weight: 500; color: var(--gold);
+      margin: 8px 0;
+    }
+    .admin-shell .withdrawal-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .admin-shell .btn-withdrawal-pay, .admin-shell .btn-withdrawal-reject {
+      flex: 1; padding: 10px; border-radius: 10px; border: none; font-size: 12px; font-weight: 700;
+      font-family: inherit; transition: transform 100ms ease, opacity 150ms ease;
+    }
+    .admin-shell .btn-withdrawal-pay:active, .admin-shell .btn-withdrawal-reject:active { transform: scale(0.96); }
+    .admin-shell .btn-withdrawal-pay { background: var(--money); color: #06281f; }
+    .admin-shell .btn-withdrawal-reject { background: rgba(255,107,129,0.15); color: var(--alert); border: 1px solid rgba(255,107,129,0.3); }
+    .admin-shell .btn-withdrawal-pay:disabled, .admin-shell .btn-withdrawal-reject:disabled { opacity: 0.5; }
+
+    .empty-state { text-align: center; padding: 28px 16px; color: var(--faint); font-size: 12.5px; }
+    .empty-state i { font-size: 22px; display: block; margin-bottom: 8px; color: var(--line); }
+
+    /* ---------- Config ---------- */
+    .admin-shell .config-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+    .admin-shell .config-row {
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 11px 12px;
+    }
+    .admin-shell .config-row label { font-size: 11.5px; color: var(--muted); display: block; margin-bottom: 6px; }
+    .admin-shell .config-row-input { display: flex; gap: 8px; }
+    .admin-shell .auth-input, .admin-shell .tier-price-input, .admin-shell .config-value-input {
+      background: var(--surface); border: 1px solid var(--line); color: var(--text);
+      border-radius: 9px; padding: 9px 11px; font-size: 13px; font-family: var(--font-mono);
+      width: 100%; transition: border-color 150ms ease;
+    }
+    .admin-shell .auth-input:focus, .admin-shell .config-value-input:focus, .admin-shell .tier-price-input:focus {
+      outline: none; border-color: var(--brand-glow);
+    }
+    .admin-shell .btn-config-save {
+      width: 40px; flex-shrink: 0; border-radius: 9px; border: none;
+      background: var(--brand); color: #fff; transition: transform 100ms ease;
+    }
+    .admin-shell .btn-config-save:active { transform: scale(0.92); }
+
+    /* ---------- Ticket tiers ---------- */
+    .admin-shell .tiers-admin-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+    .admin-shell .tier-admin-row {
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 12px;
+    }
+    .admin-shell .tier-admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .admin-shell .tier-admin-header strong { color: var(--text); font-size: 13px; }
+    .admin-shell .tier-active-toggle { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+    .admin-shell .tier-admin-fields { display: flex; gap: 8px; align-items: flex-end; }
+    .admin-shell .tier-admin-fields > div { flex: 1; }
+    .admin-shell .tier-admin-fields label { font-size: 10.5px; color: var(--faint); display: block; margin-bottom: 5px; }
+
+    /* ---------- Loading / denied states ---------- */
+    .admin-shell #admin-loading, .admin-shell #admin-denied {
+      color: var(--muted); display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 60px 24px; text-align: center; gap: 10px;
+    }
+    .admin-shell #admin-loading i, .admin-shell #admin-denied i { font-size: 26px; color: var(--brand-glow); }
+
+    /* ---------- Reduced motion ---------- */
+    @media (prefers-reduced-motion: reduce) {
+      .admin-shell *, .admin-shell *::before, .admin-shell *::after {
+        animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
 </head>
-<body>
+<body class="admin-shell">
 
   <div class="mobile-container">
 
-    <header class="app-header">
-      <div class="logo-box">
-        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
-        <div class="logo-text" style="margin-left:8px;">
-          <span class="brand-name">ADMIN</span>
-          <span class="brand-sub">Panel</span>
-        </div>
+    <header class="admin-header">
+      <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+      <div class="admin-title-block">
+        <span class="eyebrow">Joy-Rise Hub</span>
+        <h1>Control Deck</h1>
       </div>
+      <div class="system-pulse"><span class="pulse-dot"></span> Live</div>
     </header>
 
-    <main class="main-content" id="admin-main" style="display:none;">
+    <nav class="admin-tabs" id="admin-tabs">
+      <button type="button" class="admin-tab-btn active" data-tab="overview">
+        <i class="fa-solid fa-chart-line"></i> Overview
+      </button>
+      <button type="button" class="admin-tab-btn" data-tab="activity">
+        <i class="fa-solid fa-bell"></i> Activity <span class="tab-dot" id="tab-dot-activity"></span>
+      </button>
+      <button type="button" class="admin-tab-btn" data-tab="withdrawals">
+        <i class="fa-solid fa-money-bill-transfer"></i> Withdrawals <span class="tab-dot" id="tab-dot-withdrawals"></span>
+      </button>
+      <button type="button" class="admin-tab-btn" data-tab="settings">
+        <i class="fa-solid fa-sliders"></i> Settings
+      </button>
+      <button type="button" class="admin-tab-btn" data-tab="tickets">
+        <i class="fa-solid fa-ticket"></i> Tickets
+      </button>
+      <button type="button" class="admin-tab-btn" data-tab="users">
+        <i class="fa-solid fa-users"></i> Users
+      </button>
+    </nav>
 
-      <div class="referral-banner" style="display:flex;">
-        <i class="fa-solid fa-headset"></i>
-        <span>Customer support line: <strong>0805 597 7558</strong> (WhatsApp &amp; calls)</span>
+    <main class="admin-main" id="admin-main" style="display:none;">
+
+      <!-- OVERVIEW -->
+      <div class="admin-tab-page active" data-tab="overview">
+        <div class="support-banner">
+          <i class="fa-solid fa-headset"></i>
+          <span>Support line: <strong>0805 597 7558</strong> (WhatsApp &amp; calls)</span>
+        </div>
+
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-chart-line"></i> Business Overview</h3>
+          <div id="analytics-grid" class="analytics-grid"></div>
+          <div id="analytics-net" class="analytics-net-row"></div>
+        </section>
+
+        <section class="admin-section draw-card">
+          <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draw</h3>
+          <button class="btn-auth-primary" id="run-draw-btn">
+            <span id="run-draw-label">Run Today's Draw</span>
+            <i class="fa-solid fa-spinner fa-spin modal-spinner" id="run-draw-spinner"></i>
+          </button>
+          <div class="admin-result" id="draw-result"></div>
+        </section>
       </div>
 
-      <!-- ANALYTICS -->
-      <section class="admin-section">
-        <h3 class="admin-section-title"><i class="fa-solid fa-chart-line"></i> Business Overview</h3>
-        <div id="analytics-grid" class="analytics-grid"></div>
-        <div id="analytics-net" class="analytics-net-row"></div>
-      </section>
+      <!-- ACTIVITY -->
+      <div class="admin-tab-page" data-tab="activity">
+        <section class="admin-section">
+          <h3 class="admin-section-title">
+            <i class="fa-solid fa-bell"></i> Live Activity
+            <span class="live-tag"><span class="pulse-dot" style="width:5px;height:5px;"></span>LIVE</span>
+            <span id="activity-new-badge" class="count-badge" style="display:none; margin-left:auto;"></span>
+          </h3>
+          <div id="activity-filters" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:2px;"></div>
+          <div id="activity-list" class="winners-list"></div>
+          <div id="activity-empty" class="empty-state" style="display:none;">
+            <i class="fa-solid fa-satellite-dish"></i>No activity yet.
+          </div>
+        </section>
+      </div>
 
-      <!-- ACTIVITY FEED -->
-      <section class="admin-section">
-        <h3 class="admin-section-title">
-          <i class="fa-solid fa-bell"></i> Activity
-          <span id="activity-new-badge" class="count-badge" style="display:none;"></span>
-        </h3>
-        <div id="activity-filters" style="display:flex; gap:6px; overflow-x:auto; margin:10px 0 12px; padding-bottom:2px;"></div>
-        <div id="activity-list" class="winners-list"></div>
-        <div id="activity-empty" style="font-size:12px; color:#636e72; margin-top:8px; display:none;">No activity yet.</div>
-      </section>
+      <!-- WITHDRAWALS -->
+      <div class="admin-tab-page" data-tab="withdrawals">
+        <section class="admin-section">
+          <h3 class="admin-section-title">
+            <i class="fa-solid fa-money-bill-transfer"></i> Pending Withdrawals
+            <span id="withdrawal-count-badge" class="count-badge" style="display:none;"></span>
+          </h3>
+          <div id="withdrawals-list" class="withdrawals-list" style="margin-top:10px;"></div>
+          <div id="withdrawals-empty" class="empty-state" style="display:none;">
+            <i class="fa-solid fa-champagne-glasses"></i>No pending withdrawals right now.
+          </div>
+        </section>
+      </div>
 
-      <!-- DRAW CONTROL -->
-      <section class="admin-section">
-        <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draw</h3>
-        <button class="btn-auth-primary" id="run-draw-btn" style="margin-top:8px;">
-          <span id="run-draw-label">Run Today's Draw</span>
-          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="run-draw-spinner"></i>
-        </button>
-        <div class="admin-result" id="draw-result"></div>
-      </section>
+      <!-- SETTINGS -->
+      <div class="admin-tab-page" data-tab="settings">
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-sliders"></i> Settings</h3>
+          <div id="config-list" class="config-list"></div>
+        </section>
+      </div>
 
-      <!-- PENDING WITHDRAWALS -->
-      <section class="admin-section">
-        <h3 class="admin-section-title"><i class="fa-solid fa-money-bill-transfer"></i> Pending Withdrawals <span id="withdrawal-count-badge" class="count-badge" style="display:none;"></span></h3>
-        <div id="withdrawals-list" class="withdrawals-list" style="margin-top:10px;"></div>
-        <div id="withdrawals-empty" style="font-size:12px; color:#636e72; margin-top:8px; display:none;">No pending withdrawals right now.</div>
-      </section>
-
-      <!-- CONFIG -->
-      <section class="admin-section">
-        <h3 class="admin-section-title"><i class="fa-solid fa-sliders"></i> Config</h3>
-        <div id="config-list" class="config-list"></div>
-      </section>
-
-      <!-- TICKET TIERS -->
-      <section class="admin-section">
-        <h3 class="admin-section-title"><i class="fa-solid fa-ticket"></i> Ticket Tiers</h3>
-        <div id="tiers-list" class="tiers-admin-list"></div>
-      </section>
+      <!-- TICKETS -->
+      <div class="admin-tab-page" data-tab="tickets">
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-ticket"></i> Ticket Tiers</h3>
+          <div id="tiers-list" class="tiers-admin-list"></div>
+        </section>
+      </div>
 
       <!-- USERS -->
-      <section class="admin-section">
-        <h3 class="admin-section-title"><i class="fa-solid fa-users"></i> Users</h3>
-        <input type="text" class="auth-input" id="user-search" placeholder="Search by name or phone..." style="margin-bottom:12px;" />
-        <div id="users-list" class="winners-list"></div>
-      </section>
+      <div class="admin-tab-page" data-tab="users">
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-users"></i> Users</h3>
+          <input type="text" class="auth-input" id="user-search" placeholder="Search by name or phone..." style="margin-bottom:12px;" />
+          <div id="users-list" class="winners-list"></div>
+        </section>
+      </div>
 
     </main>
 
-    <div id="admin-denied" class="winners-empty" style="display:none;">
+    <div id="admin-denied" style="display:none;">
       <i class="fa-solid fa-lock"></i>
       <p>You don't have admin access.</p>
     </div>
-    <div id="admin-loading" class="winners-empty">
+    <div id="admin-loading">
       <i class="fa-solid fa-spinner fa-spin"></i>
       <p>Checking access...</p>
     </div>
@@ -108,6 +458,8 @@
       document.getElementById('back-btn').addEventListener('click', () => {
         window.location.href = 'index.html';
       });
+
+      const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
       const CONFIG_LABELS = {
         ticket_price: 'Ticket Price (₦)',
@@ -130,6 +482,67 @@
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+      }
+
+      function wireTabs() {
+        const tabs = document.querySelectorAll('.admin-tab-btn');
+        const pages = document.querySelectorAll('.admin-tab-page');
+        tabs.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const target = btn.dataset.tab;
+            tabs.forEach(b => b.classList.toggle('active', b === btn));
+            pages.forEach(p => p.classList.toggle('active', p.dataset.tab === target));
+            if (target === 'activity') document.getElementById('tab-dot-activity').style.display = 'none';
+            if (target === 'withdrawals') document.getElementById('tab-dot-withdrawals').style.display = 'none';
+          });
+        });
+      }
+
+      function animateCountUp(el, endValue, isCurrency, duration = 900) {
+        if (REDUCE_MOTION || !isFinite(endValue)) {
+          el.textContent = isCurrency
+            ? '₦' + endValue.toLocaleString('en-NG', { minimumFractionDigits: 2 })
+            : endValue.toLocaleString('en-NG');
+          return;
+        }
+        const startTime = performance.now();
+        function tick(now) {
+          const progress = Math.min((now - startTime) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const current = endValue * eased;
+          el.textContent = isCurrency
+            ? '₦' + current.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : Math.round(current).toLocaleString('en-NG');
+          if (progress < 1) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+      }
+
+      function celebrateBurst(container) {
+        if (REDUCE_MOTION) return;
+        const colors = ['#6C5CE7', '#2DD4A7', '#F5B942', '#FF6B81'];
+        for (let i = 0; i < 18; i++) {
+          const p = document.createElement('span');
+          p.className = 'confetti-piece';
+          p.style.setProperty('--x', (Math.random() * 220 - 110) + 'px');
+          p.style.setProperty('--rot', (Math.random() * 360) + 'deg');
+          p.style.left = (45 + Math.random() * 10) + '%';
+          p.style.background = colors[i % colors.length];
+          container.appendChild(p);
+          setTimeout(() => p.remove(), 950);
+        }
+      }
+
+      function skeletonHTML(count) {
+        return Array.from({ length: count }).map(() => `
+          <div class="skeleton-row">
+            <div class="skeleton-avatar"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton-line w60"></div>
+              <div class="skeleton-line w40"></div>
+            </div>
+          </div>
+        `).join('');
       }
 
       async function init() {
@@ -156,6 +569,7 @@
         }
 
         document.getElementById('admin-main').style.display = 'block';
+        wireTabs();
         loadAnalytics(client);
         loadConfig(client);
         loadWithdrawals(client);
@@ -169,6 +583,7 @@
       function wireDrawButton(client) {
         const btn = document.getElementById('run-draw-btn');
         const resultEl = document.getElementById('draw-result');
+        const card = document.querySelector('.draw-card');
 
         btn.addEventListener('click', async () => {
           resultEl.textContent = '';
@@ -179,13 +594,14 @@
             const { data, error } = await client.rpc('admin_run_draw');
             if (error) throw error;
             if (data && data.length > 0) {
-              resultEl.style.color = '#00b894';
+              resultEl.style.color = 'var(--money)';
               const lines = data.map(w => `🎉 ${w.winner_name} won ₦${Number(w.prize).toLocaleString()}`);
-              resultEl.innerHTML = `<strong>${data.length} winner${data.length > 1 ? 's' : ''} this draw:</strong><br>` + lines.join('<br>');
+              resultEl.innerHTML = `<strong style="color:var(--text);">${data.length} winner${data.length > 1 ? 's' : ''} this draw:</strong><br>` + lines.join('<br>');
+              celebrateBurst(card);
             }
             loadUsers(client, document.getElementById('user-search').value.trim());
           } catch (err) {
-            resultEl.style.color = '#ff4757';
+            resultEl.style.color = 'var(--alert)';
             resultEl.textContent = err.message || 'Draw failed.';
           } finally {
             btn.disabled = false;
@@ -195,16 +611,18 @@
       }
 
       async function loadTiers(client) {
-        const { data, error } = await client.rpc('admin_list_tiers');
         const listEl = document.getElementById('tiers-list');
+        listEl.innerHTML = skeletonHTML(2);
+
+        const { data, error } = await client.rpc('admin_list_tiers');
         if (error || !data) {
-          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error?.message || 'Failed to load tiers.')}</p>`;
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error?.message || 'Failed to load tiers.')}</p>`;
           return;
         }
 
         listEl.innerHTML = `
-          <p style="font-size:11px; color:#636e72; margin-bottom:10px;">
-            Prize is now computed automatically as price × the Prize Multiplier set in Config below — no longer set per tier.
+          <p style="font-size:11px; color:var(--faint); margin-bottom:10px;">
+            Prize is computed automatically as price × the Prize Multiplier set in Settings — no longer set per tier.
           </p>
         ` + data.map(tier => `
           <div class="tier-admin-row" data-tier-id="${tier.id}">
@@ -243,7 +661,7 @@
                 p_is_active: activeInput.checked
               });
               if (error) throw error;
-              saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:#00b894;"></i>';
+              saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:var(--money);"></i>';
               setTimeout(() => { saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>'; }, 1500);
             } catch (err) {
               alert(err.message || 'Save failed.');
@@ -260,40 +678,44 @@
         const netEl = document.getElementById('analytics-net');
 
         if (error || !data || data.length === 0) {
-          grid.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error?.message || 'Failed to load analytics.')}</p>`;
+          grid.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error?.message || 'Failed to load analytics.')}</p>`;
           return;
         }
 
         const a = data[0];
-        const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
         const stats = [
-          { label: 'Total Users', value: a.total_users, color: '#6c5ce7' },
-          { label: 'Total Deposits', value: fmt(a.total_deposits), color: '#00b894' },
-          { label: 'Withdrawals Paid', value: fmt(a.total_withdrawals), color: '#ff7675' },
-          { label: 'Pending Withdrawals', value: fmt(a.total_pending_withdrawals), color: '#f59f00' },
-          { label: 'Tickets Sold', value: a.total_tickets_sold, color: '#0984e3' },
-          { label: 'Ticket Revenue', value: fmt(a.total_ticket_revenue), color: '#00b894' },
-          { label: 'Prizes Paid', value: fmt(a.total_prizes_paid), color: '#ff7675' },
-          { label: 'Referral Commissions', value: fmt(a.total_referral_commissions), color: '#e17055' },
-          { label: 'Signup Bonuses Granted', value: fmt(a.total_signup_bonuses), color: '#e17055' },
+          { label: 'Total Users', value: Number(a.total_users || 0), currency: false, color: 'var(--brand-glow)' },
+          { label: 'Total Deposits', value: Number(a.total_deposits || 0), currency: true, color: 'var(--money)' },
+          { label: 'Withdrawals Paid', value: Number(a.total_withdrawals || 0), currency: true, color: 'var(--alert)' },
+          { label: 'Pending Withdrawals', value: Number(a.total_pending_withdrawals || 0), currency: true, color: 'var(--gold)' },
+          { label: 'Tickets Sold', value: Number(a.total_tickets_sold || 0), currency: false, color: 'var(--brand-glow)' },
+          { label: 'Ticket Revenue', value: Number(a.total_ticket_revenue || 0), currency: true, color: 'var(--money)' },
+          { label: 'Prizes Paid', value: Number(a.total_prizes_paid || 0), currency: true, color: 'var(--alert)' },
+          { label: 'Referral Commissions', value: Number(a.total_referral_commissions || 0), currency: true, color: '#E17055' },
+          { label: 'Signup Bonuses Granted', value: Number(a.total_signup_bonuses || 0), currency: true, color: '#E17055' },
         ];
 
-        grid.innerHTML = stats.map(s => `
-          <div class="analytics-stat-box">
-            <strong style="color:${s.color};">${s.value}</strong>
+        grid.innerHTML = stats.map((s, i) => `
+          <div class="analytics-stat-box" style="animation-delay:${i * 45}ms;">
+            <strong style="color:${s.color};" data-target="${s.value}" data-currency="${s.currency}">${s.currency ? '₦0.00' : '0'}</strong>
             <span>${s.label}</span>
           </div>
         `).join('');
 
+        grid.querySelectorAll('.analytics-stat-box strong').forEach(el => {
+          animateCountUp(el, parseFloat(el.dataset.target), el.dataset.currency === 'true');
+        });
+
         const netPosition = Number(a.total_ticket_revenue) - Number(a.total_prizes_paid)
           - Number(a.total_referral_commissions) - Number(a.total_signup_bonuses);
-        const netColor = netPosition >= 0 ? '#00b894' : '#ff4757';
+        const netColor = netPosition >= 0 ? 'var(--money)' : 'var(--alert)';
 
         netEl.innerHTML = `
           <span>Estimated Net (Tickets − Prizes − Commissions − Bonuses)</span>
-          <strong style="color:${netColor};">${fmt(netPosition)}</strong>
+          <strong style="color:${netColor};" data-target="${netPosition}" data-currency="true">₦0.00</strong>
         `;
+        animateCountUp(netEl.querySelector('strong'), netPosition, true, 1100);
       }
 
       const ACTIVITY_FILTERS = [
@@ -312,13 +734,15 @@
         return ({
           signup: 'fa-user-plus', login: 'fa-right-to-bracket', ticket_purchase: 'fa-ticket',
           deposit: 'fa-arrow-down', withdrawal_request: 'fa-arrow-up',
+          withdrawal_completed: 'fa-circle-check', withdrawal_rejected: 'fa-circle-xmark',
         })[type] || 'fa-bell';
       }
       function activityColor(type) {
         return ({
-          signup: '#6c5ce7', login: '#636e72', ticket_purchase: '#0984e3',
-          deposit: '#00b894', withdrawal_request: '#ff7675',
-        })[type] || '#6c5ce7';
+          signup: '#9B8CFF', login: '#9089B0', ticket_purchase: '#6FB8FF',
+          deposit: '#2DD4A7', withdrawal_request: '#FF6B81',
+          withdrawal_completed: '#2DD4A7', withdrawal_rejected: '#FF6B81',
+        })[type] || '#9B8CFF';
       }
       function timeAgo(iso) {
         const diffSec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -332,8 +756,8 @@
         const filterBar = document.getElementById('activity-filters');
         filterBar.innerHTML = ACTIVITY_FILTERS.map((f, i) => `
           <button type="button" class="activity-filter-btn${i === 0 ? ' active' : ''}" data-type="${f.type || ''}"
-            style="white-space:nowrap; padding:6px 12px; border-radius:16px; border:none; font-size:11px; font-weight:600; cursor:pointer;
-                   background:${i === 0 ? '#6c5ce7' : '#f3f0ff'}; color:${i === 0 ? '#fff' : '#6c5ce7'};">
+            style="white-space:nowrap; padding:6px 12px; border-radius:16px; border:1px solid var(--line); font-size:11px; font-weight:600;
+                   background:${i === 0 ? 'var(--brand)' : 'var(--surface-2)'}; color:${i === 0 ? '#fff' : 'var(--muted)'};">
             <i class="fa-solid ${f.icon}"></i> ${f.label}
           </button>
         `).join('');
@@ -342,14 +766,15 @@
           btn.addEventListener('click', () => {
             filterBar.querySelectorAll('.activity-filter-btn').forEach(b => {
               b.classList.remove('active');
-              b.style.background = '#f3f0ff';
-              b.style.color = '#6c5ce7';
+              b.style.background = 'var(--surface-2)';
+              b.style.color = 'var(--muted)';
             });
             btn.classList.add('active');
-            btn.style.background = '#6c5ce7';
+            btn.style.background = 'var(--brand)';
             btn.style.color = '#fff';
             activityFilter = btn.dataset.type || null;
             document.getElementById('activity-new-badge').style.display = 'none';
+            document.getElementById('tab-dot-activity').style.display = 'none';
             loadActivity(client);
           });
         });
@@ -362,12 +787,12 @@
       async function loadActivity(client) {
         const listEl = document.getElementById('activity-list');
         const emptyEl = document.getElementById('activity-empty');
-        listEl.innerHTML = '<p style="font-size:12px;color:#636e72;">Loading...</p>';
+        listEl.innerHTML = skeletonHTML(4);
 
         const { data, error } = await client.rpc('admin_list_events', { p_limit: 50, p_event_type: activityFilter });
 
         if (error || !data) {
-          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error?.message || 'Failed to load activity.')}</p>`;
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error?.message || 'Failed to load activity.')}</p>`;
           return;
         }
 
@@ -401,20 +826,25 @@
 
         const newCount = data.filter(e => new Date(e.created_at) > new Date(lastSeenActivityAt)).length;
         const badge = document.getElementById('activity-new-badge');
+        const dot = document.getElementById('tab-dot-activity');
         if (newCount > 0) {
           badge.textContent = `${newCount} new`;
           badge.style.display = 'inline-block';
+          dot.style.display = 'inline-block';
         }
       }
 
       async function loadWithdrawals(client) {
-        const { data, error } = await client.rpc('admin_list_pending_withdrawals');
         const listEl = document.getElementById('withdrawals-list');
+        listEl.innerHTML = skeletonHTML(2);
+
+        const { data, error } = await client.rpc('admin_list_pending_withdrawals');
         const emptyEl = document.getElementById('withdrawals-empty');
         const badgeEl = document.getElementById('withdrawal-count-badge');
+        const dotEl = document.getElementById('tab-dot-withdrawals');
 
         if (error) {
-          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error.message)}</p>`;
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
           return;
         }
 
@@ -422,18 +852,20 @@
           listEl.innerHTML = '';
           emptyEl.style.display = 'block';
           badgeEl.style.display = 'none';
+          dotEl.style.display = 'none';
           return;
         }
 
         emptyEl.style.display = 'none';
         badgeEl.style.display = 'inline-flex';
         badgeEl.textContent = data.length;
+        dotEl.style.display = 'inline-block';
 
         listEl.innerHTML = data.map(w => {
           const hasBankDetails = !!(w.account_number && w.bank_name);
           const bankInfo = hasBankDetails
-            ? `<small style="color:#00b894; font-weight:700;"><i class="fa-solid fa-building-columns"></i> ${escapeHtml(w.account_name)} &middot; ${escapeHtml(w.bank_name)} &middot; ${escapeHtml(w.account_number)}</small>`
-            : `<small style="color:#ff7675; font-weight:700;">No bank details saved yet</small>`;
+            ? `<small style="color:var(--money); font-weight:700;"><i class="fa-solid fa-building-columns"></i> ${escapeHtml(w.account_name)} &middot; ${escapeHtml(w.bank_name)} &middot; ${escapeHtml(w.account_number)}</small>`
+            : `<small style="color:var(--alert); font-weight:700;">No bank details saved yet</small>`;
           const fmtMoney = (n) => '₦' + Number(n).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
           return `
@@ -442,12 +874,12 @@
                 <strong>${escapeHtml(w.full_name || 'Unnamed')}</strong>
                 <small>${escapeHtml(w.phone_number || 'No phone')} &middot; ${escapeHtml(w.wallet)} wallet</small>
                 <small>${new Date(w.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
-                <small>Requested ${fmtMoney(w.amount)} &middot; Fee ${fmtMoney(w.fee)} &middot; <strong style="color:#1e1e24;">Send ${fmtMoney(w.net_amount)}</strong></small>
+                <small>Requested ${fmtMoney(w.amount)} &middot; Fee ${fmtMoney(w.fee)} &middot; <strong style="color:var(--text);">Send ${fmtMoney(w.net_amount)}</strong></small>
                 ${bankInfo}
               </div>
               <div class="withdrawal-amount">${fmtMoney(w.net_amount)}</div>
               <div class="withdrawal-actions">
-                <button class="btn-withdrawal-pay" data-action="pay">Mark Paid Manually</button>
+                <button class="btn-withdrawal-pay" data-action="pay">Mark Paid</button>
                 <button class="btn-withdrawal-reject" data-action="reject">Reject</button>
               </div>
             </div>
@@ -460,7 +892,7 @@
           row.querySelector('[data-action="pay"]').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             const reference = prompt('Bank transaction reference / session ID for this payout:\n\n(This is saved so any "I didn\'t receive it" dispute can be resolved instantly.)');
-            if (reference === null) return; // cancelled
+            if (reference === null) return;
             if (!reference.trim()) {
               alert('A reference is required to mark this as paid.');
               return;
@@ -484,7 +916,7 @@
           row.querySelector('[data-action="reject"]').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
             const reason = prompt('Reason for rejecting this withdrawal:\n\n(The user will see this. Funds are refunded to their wallet automatically.)');
-            if (reason === null) return; // cancelled
+            if (reason === null) return;
             if (!reason.trim()) {
               alert('A reason is required to reject this withdrawal.');
               return;
@@ -509,8 +941,10 @@
       }
 
       async function loadConfig(client) {
-        const { data, error } = await client.from('app_config').select('key, value').order('key');
         const listEl = document.getElementById('config-list');
+        listEl.innerHTML = skeletonHTML(3);
+
+        const { data, error } = await client.from('app_config').select('key, value').order('key');
         if (error || !data) return;
 
         listEl.innerHTML = data.map(row => `
@@ -535,7 +969,7 @@
             try {
               const { error } = await client.rpc('admin_update_config', { p_key: key, p_value: value });
               if (error) throw error;
-              saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:#00b894;"></i>';
+              saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:var(--money);"></i>';
               setTimeout(() => { saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>'; }, 1500);
             } catch (err) {
               alert(err.message || 'Save failed.');
@@ -547,28 +981,30 @@
       }
 
       async function loadUsers(client, search) {
-        const { data, error } = await client.rpc('admin_list_users', { p_search: search || null });
         const listEl = document.getElementById('users-list');
+        if (!search) listEl.innerHTML = skeletonHTML(4);
+
+        const { data, error } = await client.rpc('admin_list_users', { p_search: search || null });
         if (error) {
-          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error.message)}</p>`;
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
           return;
         }
 
         if (!data || data.length === 0) {
-          listEl.innerHTML = `<p style="font-size:12px;color:#636e72;">No users found.</p>`;
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--faint);">No users found.</p>`;
           return;
         }
 
         listEl.innerHTML = data.map(u => `
           <div class="winner-row">
-            <div class="winner-avatar" style="background:#f3f0ff; color:#6c5ce7;">
+            <div class="winner-avatar" style="background:rgba(108,92,231,0.15); color:var(--brand-glow);">
               <i class="fa-solid ${u.is_admin ? 'fa-user-shield' : 'fa-user'}"></i>
             </div>
             <div class="winner-info">
               <strong>${escapeHtml(u.full_name || 'Unnamed')}</strong>
               <small>${escapeHtml(u.phone_number || 'No phone')} &middot; ${u.total_referrals} referrals (${u.active_referrals} active)</small>
             </div>
-            <div class="winner-prize" style="font-size:12px;">₦${Number(u.winnings_balance).toLocaleString()}</div>
+            <div class="winner-prize">₦${Number(u.winnings_balance).toLocaleString()}</div>
           </div>
         `).join('');
       }
