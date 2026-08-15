@@ -89,6 +89,10 @@
           const client = window.getSupabaseClient();
           const { error } = await client.auth.signInWithPassword({ email, password });
           if (error) throw error;
+
+          // Non-fatal — never let logging failure block the actual login.
+          client.rpc('log_user_login').catch((e) => console.warn('log_user_login failed:', e));
+
           window.location.href = 'index.html';
         } catch (err) {
           console.error('Login error (full object):', err);

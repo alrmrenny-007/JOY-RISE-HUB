@@ -41,6 +41,17 @@
         <div id="analytics-net" class="analytics-net-row"></div>
       </section>
 
+      <!-- ACTIVITY FEED -->
+      <section class="admin-section">
+        <h3 class="admin-section-title">
+          <i class="fa-solid fa-bell"></i> Activity
+          <span id="activity-new-badge" class="count-badge" style="display:none;"></span>
+        </h3>
+        <div id="activity-filters" style="display:flex; gap:6px; overflow-x:auto; margin:10px 0 12px; padding-bottom:2px;"></div>
+        <div id="activity-list" class="winners-list"></div>
+        <div id="activity-empty" style="font-size:12px; color:#636e72; margin-top:8px; display:none;">No activity yet.</div>
+      </section>
+
       <!-- DRAW CONTROL -->
       <section class="admin-section">
         <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draw</h3>
@@ -152,6 +163,7 @@
         loadUsers(client, '');
         wireDrawButton(client);
         wireUserSearch(client);
+        wireActivityFeed(client);
       }
 
       function wireDrawButton(client) {
@@ -282,6 +294,117 @@
           <span>Estimated Net (Tickets − Prizes − Commissions − Bonuses)</span>
           <strong style="color:${netColor};">${fmt(netPosition)}</strong>
         `;
+      }
+
+      const ACTIVITY_FILTERS = [
+        { type: null, label: 'All', icon: 'fa-list' },
+        { type: 'signup', label: 'Signups', icon: 'fa-user-plus' },
+        { type: 'login', label: 'Logins', icon: 'fa-right-to-bracket' },
+        { type: 'ticket_purchase', label: 'Tickets', icon: 'fa-ticket' },
+        { type: 'deposit', label: 'Deposits', icon: 'fa-arrow-down' },
+        { type: 'withdrawal_request', label: 'Withdrawals', icon: 'fa-arrow-up' },
+      ];
+      let activityFilter = null;
+      let lastSeenActivityAt = null;
+      let activityPollTimer = null;
+
+      function activityIcon(type) {
+        return ({
+          signup: 'fa-user-plus', login: 'fa-right-to-bracket', ticket_purchase: 'fa-ticket',
+          deposit: 'fa-arrow-down', withdrawal_request: 'fa-arrow-up',
+        })[type] || 'fa-bell';
+      }
+      function activityColor(type) {
+        return ({
+          signup: '#6c5ce7', login: '#636e72', ticket_purchase: '#0984e3',
+          deposit: '#00b894', withdrawal_request: '#ff7675',
+        })[type] || '#6c5ce7';
+      }
+      function timeAgo(iso) {
+        const diffSec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+        if (diffSec < 60) return 'just now';
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+        return `${Math.floor(diffSec / 86400)}d ago`;
+      }
+
+      function wireActivityFeed(client) {
+        const filterBar = document.getElementById('activity-filters');
+        filterBar.innerHTML = ACTIVITY_FILTERS.map((f, i) => `
+          <button type="button" class="activity-filter-btn${i === 0 ? ' active' : ''}" data-type="${f.type || ''}"
+            style="white-space:nowrap; padding:6px 12px; border-radius:16px; border:none; font-size:11px; font-weight:600; cursor:pointer;
+                   background:${i === 0 ? '#6c5ce7' : '#f3f0ff'}; color:${i === 0 ? '#fff' : '#6c5ce7'};">
+            <i class="fa-solid ${f.icon}"></i> ${f.label}
+          </button>
+        `).join('');
+
+        filterBar.querySelectorAll('.activity-filter-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            filterBar.querySelectorAll('.activity-filter-btn').forEach(b => {
+              b.classList.remove('active');
+              b.style.background = '#f3f0ff';
+              b.style.color = '#6c5ce7';
+            });
+            btn.classList.add('active');
+            btn.style.background = '#6c5ce7';
+            btn.style.color = '#fff';
+            activityFilter = btn.dataset.type || null;
+            document.getElementById('activity-new-badge').style.display = 'none';
+            loadActivity(client);
+          });
+        });
+
+        loadActivity(client);
+        if (activityPollTimer) clearInterval(activityPollTimer);
+        activityPollTimer = setInterval(() => checkForNewActivity(client), 15000);
+      }
+
+      async function loadActivity(client) {
+        const listEl = document.getElementById('activity-list');
+        const emptyEl = document.getElementById('activity-empty');
+        listEl.innerHTML = '<p style="font-size:12px;color:#636e72;">Loading...</p>';
+
+        const { data, error } = await client.rpc('admin_list_events', { p_limit: 50, p_event_type: activityFilter });
+
+        if (error || !data) {
+          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error?.message || 'Failed to load activity.')}</p>`;
+          return;
+        }
+
+        if (data.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          return;
+        }
+        emptyEl.style.display = 'none';
+
+        lastSeenActivityAt = data[0].created_at;
+
+        listEl.innerHTML = data.map(e => `
+          <div class="winner-row">
+            <div class="winner-avatar" style="background:${activityColor(e.event_type)}22; color:${activityColor(e.event_type)};">
+              <i class="fa-solid ${activityIcon(e.event_type)}"></i>
+            </div>
+            <div class="winner-info">
+              <strong>${escapeHtml(e.summary)}</strong>
+              <small>${e.phone_number ? escapeHtml(e.phone_number) + ' &middot; ' : ''}${timeAgo(e.created_at)}</small>
+            </div>
+            ${e.amount != null ? `<div class="winner-prize">₦${Number(e.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>` : ''}
+          </div>
+        `).join('');
+      }
+
+      async function checkForNewActivity(client) {
+        if (!lastSeenActivityAt) return;
+        const { data, error } = await client.rpc('admin_list_events', { p_limit: 50, p_event_type: activityFilter });
+        if (error || !data) return;
+
+        const newCount = data.filter(e => new Date(e.created_at) > new Date(lastSeenActivityAt)).length;
+        const badge = document.getElementById('activity-new-badge');
+        if (newCount > 0) {
+          badge.textContent = `${newCount} new`;
+          badge.style.display = 'inline-block';
+        }
       }
 
       async function loadWithdrawals(client) {
