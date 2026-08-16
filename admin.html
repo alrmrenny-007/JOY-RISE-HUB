@@ -308,6 +308,23 @@
     .admin-shell .tier-admin-fields > div { flex: 1; }
     .admin-shell .tier-admin-fields label { font-size: 10.5px; color: var(--faint); display: block; margin-bottom: 5px; }
 
+    .user-row-chevron { transition: transform 200ms ease; }
+    .user-history-panel {
+      background: var(--ink); border: 1px solid var(--line); border-top: none;
+      border-radius: 0 0 13px 13px; margin-top: -8px; padding: 8px 12px 10px;
+      animation: history-in 220ms ease;
+    }
+    @keyframes history-in { from { opacity: 0; } to { opacity: 1; } }
+    .history-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      padding: 8px 4px; border-bottom: 1px solid var(--line);
+    }
+    .history-row:last-child { border-bottom: none; }
+    .history-row-info { display: flex; flex-direction: column; gap: 2px; }
+    .history-row-info strong { font-size: 11.5px; color: var(--text); text-transform: capitalize; }
+    .history-row-info small { font-size: 10px; color: var(--faint); }
+    .history-row-amount { font-family: var(--font-mono); font-size: 12px; font-weight: 500; white-space: nowrap; }
+
     /* ---------- Loading / denied states ---------- */
     .admin-shell #admin-loading, .admin-shell #admin-denied {
       color: var(--muted); display: flex; flex-direction: column; align-items: center;
@@ -1000,17 +1017,70 @@
         }
 
         listEl.innerHTML = data.map(u => `
-          <div class="winner-row">
-            <div class="winner-avatar" style="background:rgba(108,92,231,0.15); color:var(--brand-glow);">
-              <i class="fa-solid ${u.is_admin ? 'fa-user-shield' : 'fa-user'}"></i>
+          <div class="user-row-wrap" data-user-id="${u.id}">
+            <div class="winner-row user-row-toggle" data-user-id="${u.id}" style="cursor:pointer;">
+              <div class="winner-avatar" style="background:rgba(108,92,231,0.15); color:var(--brand-glow);">
+                <i class="fa-solid ${u.is_admin ? 'fa-user-shield' : 'fa-user'}"></i>
+              </div>
+              <div class="winner-info">
+                <strong>${escapeHtml(u.full_name || 'Unnamed')}</strong>
+                <small>${escapeHtml(u.phone_number || 'No phone')} &middot; ${u.total_referrals} referrals (${u.active_referrals} active)</small>
+              </div>
+              <div class="winner-prize">₦${Number(u.winnings_balance).toLocaleString()}</div>
+              <i class="fa-solid fa-chevron-down user-row-chevron" style="color:var(--faint); font-size:11px; margin-left:6px;"></i>
             </div>
-            <div class="winner-info">
-              <strong>${escapeHtml(u.full_name || 'Unnamed')}</strong>
-              <small>${escapeHtml(u.phone_number || 'No phone')} &middot; ${u.total_referrals} referrals (${u.active_referrals} active)</small>
-            </div>
-            <div class="winner-prize">₦${Number(u.winnings_balance).toLocaleString()}</div>
+            <div class="user-history-panel" id="user-history-${u.id}" style="display:none;"></div>
           </div>
         `).join('');
+
+        listEl.querySelectorAll('.user-row-toggle').forEach(row => {
+          row.addEventListener('click', () => toggleUserHistory(client, row.dataset.userId));
+        });
+      }
+
+      async function toggleUserHistory(client, userId) {
+        const panel = document.getElementById(`user-history-${userId}`);
+        const chevron = document.querySelector(`.user-row-toggle[data-user-id="${userId}"] .user-row-chevron`);
+        const isOpen = panel.style.display !== 'none';
+
+        if (isOpen) {
+          panel.style.display = 'none';
+          chevron.style.transform = 'rotate(0deg)';
+          return;
+        }
+
+        panel.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+        panel.innerHTML = skeletonHTML(2);
+
+        const { data, error } = await client.rpc('admin_get_user_transactions', { p_user_id: userId, p_limit: 30 });
+        if (error || !data) {
+          panel.innerHTML = `<p style="font-size:11.5px;color:var(--alert); padding:8px 4px;">${escapeHtml(error?.message || 'Failed to load history.')}</p>`;
+          return;
+        }
+        if (data.length === 0) {
+          panel.innerHTML = `<p style="font-size:11.5px;color:var(--faint); padding:8px 4px;">No transactions yet.</p>`;
+          return;
+        }
+
+        panel.innerHTML = data.map(t => {
+          const isCredit = ['deposit', 'withdrawal_reversal', 'referral_bonus', 'signup_bonus', 'win_payout'].includes(t.type);
+          const sign = isCredit ? '+' : '−';
+          const color = isCredit ? 'var(--money)' : 'var(--alert)';
+          let extra = '';
+          if (t.payment_reference) extra = `<small style="color:var(--money);">Ref: ${escapeHtml(t.payment_reference)}</small>`;
+          if (t.rejection_reason) extra = `<small style="color:var(--alert);">${escapeHtml(t.rejection_reason)}</small>`;
+          return `
+            <div class="history-row">
+              <div class="history-row-info">
+                <strong>${escapeHtml(t.type.replace(/_/g, ' '))}</strong>
+                <small>${new Date(t.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} &middot; ${escapeHtml(t.wallet)} &middot; ${escapeHtml(t.status)}</small>
+                ${extra}
+              </div>
+              <div class="history-row-amount" style="color:${color};">${sign}₦${Number(t.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+            </div>
+          `;
+        }).join('');
       }
 
       function wireUserSearch(client) {
