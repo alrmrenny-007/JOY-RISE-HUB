@@ -107,15 +107,16 @@
         listEl.innerHTML = rows.map(t => {
           const meta = STATUS_META[t.status] || STATUS_META.active;
           const date = new Date(t.purchased_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-          const tierName = t.ticket_tiers?.name || 'Ticket';
+          const tierName = t.ticket_tiers?.name || 'Custom';
+          const ticketCode = 'TK-' + String(t.ticket_number).padStart(4, '0');
           return `
             <div class="winner-row">
               <div class="winner-avatar" style="background:${meta.bg}; color:${meta.color};">
                 <i class="fa-solid ${meta.icon}"></i>
               </div>
               <div class="winner-info">
-                <strong>${escapeHtml(tierName)} &middot; ₦${fmt(t.price)}</strong>
-                <small>${date}</small>
+                <strong>${ticketCode} &middot; ₦${fmt(t.price)}</strong>
+                <small>${escapeHtml(tierName)} &middot; ${date}</small>
               </div>
               <div style="text-align:right;">
                 <span class="referral-status-badge" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
@@ -163,7 +164,7 @@
 
         const { data, error } = await client
           .from('tickets')
-          .select('id, price, prize_amount, status, purchased_at, placed_at, ticket_tiers(name)')
+          .select('id, ticket_number, price, prize_amount, status, purchased_at, placed_at, ticket_tiers(name)')
           .eq('user_id', user.id)
           .order('purchased_at', { ascending: false })
           .limit(100);

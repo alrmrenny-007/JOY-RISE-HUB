@@ -81,14 +81,19 @@
         </div>
 
         <div class="ticket-price-row">
-          <span>Win Potential</span>
+          <span>Entries</span>
+          <strong id="confirm-entries" style="color:#2d2d3f;">1</strong>
+        </div>
+
+        <div class="ticket-price-row">
+          <span>Win Potential (per entry)</span>
           <strong id="confirm-prize" style="color:#00b894;">Up to 10x Ticket Value</strong>
         </div>
 
         <div style="display:flex; align-items:flex-start; gap:8px; background:#f3f0ff; border-radius:10px; padding:10px 12px; margin-top:10px;">
           <i class="fa-solid fa-lightbulb" style="color:#6c5ce7; font-size:13px; margin-top:1px;"></i>
           <span style="font-size:11.5px; color:#4b4b63; line-height:1.4;">
-            Buying more tickets improves your odds — each ticket is a separate entry in the draw.
+            Every <span id="tip-unit-price">₦100</span> is a separate, equally-weighted entry in the draw — a bigger tier just means more entries, not a bigger single prize.
           </span>
         </div>
 
@@ -189,6 +194,7 @@
       let prizeMultiplier = 10;
       let customMin = 100;
       let customMax = 10000;
+      let ticketUnitPrice = 100;
       let toastTimer = null;
       let lastPurchasedTicketId = null;
 
@@ -279,14 +285,17 @@
         const { data } = await client
           .from('app_config')
           .select('key, value')
-          .in('key', ['ticket_prize_multiplier', 'custom_ticket_min', 'custom_ticket_max']);
+          .in('key', ['ticket_prize_multiplier', 'custom_ticket_min', 'custom_ticket_max', 'ticket_unit_price']);
 
         if (data) {
           data.forEach(row => {
             if (row.key === 'ticket_prize_multiplier') prizeMultiplier = Number(row.value);
             if (row.key === 'custom_ticket_min') customMin = Number(row.value);
             if (row.key === 'custom_ticket_max') customMax = Number(row.value);
+            if (row.key === 'ticket_unit_price') ticketUnitPrice = Number(row.value);
           });
+          const tipEl = document.getElementById('tip-unit-price');
+          if (tipEl) tipEl.textContent = `₦${fmt(ticketUnitPrice)}`;
         }
       }
 
@@ -335,18 +344,22 @@
         // or reordered from the admin panel, no hardcoding by name.
         const popularIndex = Math.floor((data.length - 1) / 2);
 
-        const tierCards = data.map((tier, i) => `
+        const tierCards = data.map((tier, i) => {
+          const slots = Math.round(tier.price / ticketUnitPrice);
+          return `
           <div class="tier-card" data-tier-id="${tier.id}" style="--tier-color:${colors[i % colors.length]};">
             ${i === popularIndex ? '<span class="tier-popular-badge">POPULAR</span>' : ''}
             <div class="tier-card-icon"><i class="fa-solid fa-ticket"></i></div>
             <div class="tier-card-name">${escapeHtml(tier.name)}</div>
             <div class="tier-card-price">₦${fmt(tier.price)}</div>
+            ${slots > 1 ? `<div style="font-size:10px; color:#6c5ce7; font-weight:600; margin-top:2px;">${slots} entries</div>` : ''}
             <button class="tier-card-btn" data-tier-id="${tier.id}" data-name="${escapeHtml(tier.name)}"
               data-price="${tier.price}">
               Buy Ticket
             </button>
           </div>
-        `).join('');
+        `;
+        }).join('');
 
         const customCard = `
           <div class="tier-card" data-tier-id="custom" style="--tier-color:#2d3436;">
@@ -409,7 +422,8 @@
 
       function openConfirmModal() {
         document.getElementById('confirm-error').textContent = '';
-        document.getElementById('confirm-prize').textContent = `Up to ${prizeMultiplier}x Ticket Value`;
+        const slotPrize = ticketUnitPrice * prizeMultiplier;
+        document.getElementById('confirm-prize').textContent = `Up to ₦${fmt(slotPrize)}`;
 
         ticketQuantity = 1;
         document.getElementById('qty-value').textContent = '1';
@@ -424,8 +438,9 @@
           priceRow.style.display = 'none';
           customRow.style.display = 'block';
           customInput.value = '';
+          customInput.step = ticketUnitPrice;
           document.getElementById('custom-amount-hint').textContent =
-            `Enter between ₦${fmt(customMin)} and ₦${fmt(customMax)}`;
+            `Enter between ₦${fmt(customMin)} and ₦${fmt(customMax)}, in multiples of ₦${fmt(ticketUnitPrice)}`;
         } else {
           document.getElementById('confirm-tier-name').textContent = `Buy ${selectedTier.name} Ticket`;
           priceRow.style.display = 'flex';
@@ -445,7 +460,10 @@
       }
 
       function updateConfirmTotal() {
-        document.getElementById('confirm-total-price').textContent = `₦${fmt(unitPrice() * ticketQuantity)}`;
+        const total = unitPrice() * ticketQuantity;
+        document.getElementById('confirm-total-price').textContent = `₦${fmt(total)}`;
+        const entries = ticketUnitPrice > 0 ? Math.round(total / ticketUnitPrice) : 0;
+        document.getElementById('confirm-entries').textContent = entries > 0 ? entries : '—';
       }
 
       function closeConfirmModal() {

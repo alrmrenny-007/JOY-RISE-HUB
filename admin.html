@@ -475,7 +475,8 @@
         signup_bonus_amount: 'Signup Bonus Amount (₦)',
         min_first_deposit_to_unlock_withdrawal: 'Min First Deposit to Unlock Withdrawals (₦)',
         withdrawal_fee_amount: 'Withdrawal Fee (₦)',
-        min_withdrawal_amount: 'Min Withdrawal Amount (₦)'
+        min_withdrawal_amount: 'Min Withdrawal Amount (₦)',
+        ticket_unit_price: 'Ticket Unit Price (₦) — each tier must be a clean multiple of this'
       };
 
       function escapeHtml(str) {
@@ -622,7 +623,10 @@
 
         listEl.innerHTML = `
           <p style="font-size:11px; color:var(--faint); margin-bottom:10px;">
-            Prize is computed automatically as price × the Prize Multiplier set in Settings — no longer set per tier.
+            Prize is computed automatically as the ticket unit price × the Prize Multiplier (both set in Settings).
+            A tier priced above the unit price is split into that many separate equal-weight entries — e.g. a
+            tier at 5× the unit price creates 5 individual tickets per purchase, not 1 bigger one. Tier prices
+            must be a clean multiple of the unit price.
           </p>
         ` + data.map(tier => `
           <div class="tier-admin-row" data-tier-id="${tier.id}">
