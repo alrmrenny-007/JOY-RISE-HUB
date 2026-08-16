@@ -85,4 +85,88 @@
   } else {
     setupCookieBanner();
   }
+
+  // ============================================================
+  // DARK THEME — floating toggle injected on every page (works
+  // everywhere with zero per-page markup), circular "eclipse wipe"
+  // transition on toggle via the View Transitions API where
+  // supported, instant silent switch as a fallback everywhere else.
+  // ============================================================
+  const THEME_KEY = "joyrise_theme";
+
+  function getSavedTheme() {
+    return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+  }
+
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem(THEME_KEY, theme);
+    const toggleBtn = document.getElementById("theme-toggle-btn");
+    if (toggleBtn) {
+      toggleBtn.innerHTML = theme === "dark"
+        ? '<i class="fa-solid fa-sun"></i>'
+        : '<i class="fa-solid fa-moon"></i>';
+    }
+  }
+
+  // Apply immediately on script load (before the toggle button even
+  // exists) so returning visitors see their saved theme ASAP.
+  applyTheme(getSavedTheme());
+
+  function toggleTheme(clickEvent) {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!document.startViewTransition || reduceMotion) {
+      applyTheme(next);
+      return;
+    }
+
+    const x = clickEvent ? clickEvent.clientX : window.innerWidth / 2;
+    const y = clickEvent ? clickEvent.clientY : window.innerHeight / 2;
+    const radius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = document.startViewTransition(() => applyTheme(next));
+
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${radius}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 650,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+          pseudoElement: "::view-transition-new(root)",
+        }
+      );
+    });
+  }
+
+  function injectThemeToggle() {
+    if (document.getElementById("theme-toggle-btn")) return;
+
+    const btn = document.createElement("button");
+    btn.id = "theme-toggle-btn";
+    btn.type = "button";
+    btn.setAttribute("aria-label", "Toggle dark mode");
+    btn.className = "theme-toggle-fab";
+    btn.innerHTML = getSavedTheme() === "dark"
+      ? '<i class="fa-solid fa-sun"></i>'
+      : '<i class="fa-solid fa-moon"></i>';
+    document.body.appendChild(btn);
+
+    btn.addEventListener("click", (e) => toggleTheme(e));
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", injectThemeToggle);
+  } else {
+    injectThemeToggle();
+  }
 })();

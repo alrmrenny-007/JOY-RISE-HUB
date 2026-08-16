@@ -2248,3 +2248,200 @@ body {
 
 .list-item-amount.positive { color: #00b894; }
 .list-item-amount.negative { color: #ff4757; }
+
+/* ============================================================
+   DARK THEME
+   Toggled via [data-theme="dark"] on <html>. Scoped so it never
+   touches the admin Control Deck (which is always dark via its own
+   embedded styles and never sets this attribute).
+   See the theme bootstrap + toggle animation in auth.js.
+============================================================ */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* ---------- Page shell ---------- */
+html[data-theme="dark"] body { background-color: #0F0B1C; }
+html[data-theme="dark"] .mobile-container { background-color: #140F22; box-shadow: none; }
+html[data-theme="dark"] .app-header,
+html[data-theme="dark"] .bottom-navbar { background: #140F22; }
+html[data-theme="dark"] .bottom-navbar { border-top: 1px solid #241D38; }
+html[data-theme="dark"] .badge-dot { border-color: #140F22; }
+html[data-theme="dark"] .app-loading-overlay { background: #0F0B1C; }
+
+/* ---------- Card / surface backgrounds ---------- */
+html[data-theme="dark"] .admin-section,
+html[data-theme="dark"] .modal-card,
+html[data-theme="dark"] .referral-progress-card,
+html[data-theme="dark"] .winner-row,
+html[data-theme="dark"] .tier-card,
+html[data-theme="dark"] .balance-summary,
+html[data-theme="dark"] .referral-link-box,
+html[data-theme="dark"] .referral-share-card,
+html[data-theme="dark"] .dropdown-panel,
+html[data-theme="dark"] .amount-input-group,
+html[data-theme="dark"] .cookie-banner,
+html[data-theme="dark"] .toast,
+html[data-theme="dark"] .skeleton-row,
+html[data-theme="dark"] .skeleton-tier-card,
+html[data-theme="dark"] .qa-item,
+html[data-theme="dark"] .faq-item,
+html[data-theme="dark"] .withdrawal-amount,
+html[data-theme="dark"] .profile-preview-avatar {
+  background: #1A1428 !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* ---------- Subtle input / pill backgrounds ---------- */
+html[data-theme="dark"] .auth-input,
+html[data-theme="dark"] .icon-btn,
+html[data-theme="dark"] .txn-filter-chip,
+html[data-theme="dark"] .chip-amount,
+html[data-theme="dark"] .nav-pill,
+html[data-theme="dark"] .dropdown-panel-item:hover,
+html[data-theme="dark"] .notif-item:hover,
+html[data-theme="dark"] .modal-icon-circle,
+html[data-theme="dark"] .gift-icon-box,
+html[data-theme="dark"] .act-purple {
+  background: #241D38 !important;
+}
+html[data-theme="dark"] .act-mint { background: #12291f !important; }
+html[data-theme="dark"] .act-amber { background: #2b2412 !important; }
+html[data-theme="dark"] .act-blue { background: #12222b !important; }
+
+html[data-theme="dark"] .auth-input { color: #F3F0FF; }
+html[data-theme="dark"] .auth-input::placeholder { color: #6B6389; }
+html[data-theme="dark"] .icon-btn { color: #F3F0FF; }
+
+/* ---------- Headings / primary text ---------- */
+html[data-theme="dark"] .brand-name,
+html[data-theme="dark"] .user-greeting h1,
+html[data-theme="dark"] .user-greeting h2,
+html[data-theme="dark"] .winner-info strong,
+html[data-theme="dark"] .tier-card-name,
+html[data-theme="dark"] .section-heading h3,
+html[data-theme="dark"] .section-title-flex h3,
+html[data-theme="dark"] .auth-header h1,
+html[data-theme="dark"] .legal-content h3,
+html[data-theme="dark"] .profile-preview-name,
+html[data-theme="dark"] .act-details strong,
+html[data-theme="dark"] .notif-text strong,
+html[data-theme="dark"] .list-item-title,
+html[data-theme="dark"] .modal-header h3,
+html[data-theme="dark"] .qa-item summary,
+html[data-theme="dark"] .faq-item summary,
+html[data-theme="dark"] .withdrawal-info strong,
+html[data-theme="dark"] .balance-summary strong,
+html[data-theme="dark"] .referral-stat-box strong,
+html[data-theme="dark"] .ticket-price-row strong,
+html[data-theme="dark"] .dropdown-panel-title,
+html[data-theme="dark"] .tier-admin-header strong {
+  color: #F3F0FF !important;
+}
+
+/* ---------- Secondary / muted text ---------- */
+html[data-theme="dark"] .user-greeting p,
+html[data-theme="dark"] .winner-info small,
+html[data-theme="dark"] .link-view-all,
+html[data-theme="dark"] .act-details small,
+html[data-theme="dark"] .referral-text p,
+html[data-theme="dark"] .auth-header p,
+html[data-theme="dark"] .legal-content,
+html[data-theme="dark"] .legal-updated,
+html[data-theme="dark"] .notif-text small,
+html[data-theme="dark"] .list-item-sub,
+html[data-theme="dark"] .modal-header p,
+html[data-theme="dark"] .modal-balance-hint,
+html[data-theme="dark"] .qa-item small,
+html[data-theme="dark"] .faq-item p,
+html[data-theme="dark"] .withdrawal-info small,
+html[data-theme="dark"] .referral-stat-box span,
+html[data-theme="dark"] .analytics-stat-box span,
+html[data-theme="dark"] .progress-labels,
+html[data-theme="dark"] .remaining-text,
+html[data-theme="dark"] .amount-label,
+html[data-theme="dark"] .auth-label,
+html[data-theme="dark"] .tier-admin-fields label,
+html[data-theme="dark"] .ticket-price-row,
+html[data-theme="dark"] .config-row label,
+html[data-theme="dark"] .amount-prefix,
+html[data-theme="dark"] .amount-input-group input,
+html[data-theme="dark"] .analytics-net-row {
+  color: #9C93B8 !important;
+}
+
+html[data-theme="dark"] .winners-empty,
+html[data-theme="dark"] .dropdown-panel-empty,
+html[data-theme="dark"] .list-modal-empty,
+html[data-theme="dark"] .list-modal-loading {
+  color: #6B6389;
+}
+
+/* ---------- Buttons that were white-on-color, stay legible ---------- */
+html[data-theme="dark"] .btn-telegram,
+html[data-theme="dark"] .tier-card-btn,
+html[data-theme="dark"] .btn-modal-cancel,
+html[data-theme="dark"] .btn-share-native,
+html[data-theme="dark"] .password-toggle-btn,
+html[data-theme="dark"] .btn-config-save,
+html[data-theme="dark"] .avatar-option {
+  background: #241D38;
+  color: #F3F0FF;
+}
+
+html[data-theme="dark"] .btn-disabled-withdraw { background: #241D38; color: #6B6389; }
+
+/* ---------- Borders that were light-gray ---------- */
+html[data-theme="dark"] .bottom-navbar,
+html[data-theme="dark"] .progress-bar-wrapper,
+html[data-theme="dark"] .txn-filter-row {
+  border-color: #241D38;
+}
+
+/* ---------- Modal overlay a touch darker for contrast ---------- */
+html[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.72); }
+
+/* ---------- Count badges / status chips keep their color meaning ---------- */
+html[data-theme="dark"] .txn-status-pending { background: #3a2f0f; color: #f5c344; }
+html[data-theme="dark"] .txn-status-failed { background: #3a1414; color: #ff6b7a; }
+
+/* ---------- Theme toggle FAB (injected by auth.js on every page) ---------- */
+.theme-toggle-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 100px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: #6c5ce7;
+  color: #fff;
+  font-size: 16px;
+  box-shadow: 0 6px 18px rgba(108, 92, 231, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
+.theme-toggle-fab:active { transform: scale(0.88) rotate(-15deg); }
+html[data-theme="dark"] .theme-toggle-fab {
+  background: #241D38;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+}
+
+/* Admin Control Deck is always dark and manages its own UI —
+   never show the consumer toggle there. */
+.admin-shell .theme-toggle-fab { display: none; }
+
+/* Let our own circle-clip animation play solo, without the
+   browser's default crossfade fighting it. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }
