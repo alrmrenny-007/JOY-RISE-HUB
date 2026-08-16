@@ -58,7 +58,6 @@
       let allTickets = [];
 
       // TODO: swap for the real channel once the live draw page exists
-      const TELEGRAM_DRAW_URL = 'https://t.me/Bracey0';
 
       const STATUS_META = {
         active: { icon: 'fa-clock',        color: '#6c5ce7', bg: '#f3f0ff', label: "Today's Draw" },
@@ -147,7 +146,7 @@
           // Non-fatal — the ticket is already entered either way, so
           // still send them to the draw.
         }
-        window.open(TELEGRAM_DRAW_URL, '_blank');
+        window.location.href = 'live-draw.html';
       });
 
       async function loadTickets() {

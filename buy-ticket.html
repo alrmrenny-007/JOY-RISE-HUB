@@ -193,7 +193,6 @@
       let lastPurchasedTicketId = null;
 
       // TODO: swap for the real channel once the live draw page exists
-      const TELEGRAM_DRAW_URL = 'https://t.me/Bracey0';
 
       const toast = document.getElementById('toast');
       const toastIcon = document.getElementById('toast-icon');
@@ -223,7 +222,7 @@
           }
         }
         closePlaceDrawModal();
-        window.open(TELEGRAM_DRAW_URL, '_blank');
+        window.location.href = 'live-draw.html';
       });
 
       function showToast(message, type = 'success') {

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Live Draw — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    .draw-hero {
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      border-radius: 20px; padding: 24px 20px; text-align: center; color: #fff;
+      position: relative; overflow: hidden; margin-bottom: 16px;
+    }
+    .draw-hero .live-tag { background: rgba(255,255,255,0.18); }
+    .draw-hero h2 { font-size: 18px; margin: 10px 0 4px; }
+    .draw-hero p { font-size: 12.5px; opacity: 0.9; margin: 0 0 18px; }
+    .countdown-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 6px; }
+    .countdown-box {
+      background: rgba(255,255,255,0.15); border-radius: 12px; padding: 10px 14px; min-width: 56px;
+    }
+    .countdown-box strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+    .countdown-box span { font-size: 9.5px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.06em; }
+    .entries-pill {
+      display: inline-flex; align-items: center; gap: 6px; margin-top: 14px;
+      background: rgba(255,255,255,0.15); padding: 7px 14px; border-radius: 20px; font-size: 12px;
+    }
+    .entries-pill strong { font-size: 13px; }
+    .draw-hero.drawn { background: linear-gradient(135deg, #00b894, #55efc4); }
+    .draw-hero .trophy-burst { font-size: 40px; margin-bottom: 4px; }
+
+    .confetti-piece {
+      position: absolute; top: 10%; width: 7px; height: 12px; border-radius: 2px;
+      pointer-events: none; animation: confetti-fall 1400ms ease-in forwards;
+    }
+    @keyframes confetti-fall {
+      to { transform: translate(var(--x), 220px) rotate(var(--rot)); opacity: 0; }
+    }
+
+    .telegram-secondary {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: #fff; border: 1px solid #eee; border-radius: 14px; padding: 12px;
+      font-size: 12.5px; color: #636e72; margin: 4px 0 16px; text-decoration: none;
+    }
+    .telegram-secondary i { color: #229ED9; }
+    .telegram-secondary strong { color: #2d2d3f; }
+  </style>
+</head>
+<body>
+
+  <div class="mobile-container">
+
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">LIVE DRAW</span>
+          <span class="brand-sub">Tonight's Draw</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content">
+
+      <div class="draw-hero" id="draw-hero">
+        <span class="live-tag"><span class="green-dot"></span> <span id="hero-tag">LIVE DRAW</span></span>
+        <div id="hero-body">
+          <h2>Loading tonight's draw...</h2>
+        </div>
+      </div>
+
+      <a href="https://t.me/Bracey0" target="_blank" class="telegram-secondary">
+        <i class="fa-brands fa-telegram"></i>
+        Also watch it happen live on <strong>Telegram</strong>
+      </a>
+
+      <div id="winners-section" style="display:none;">
+        <div class="section-title-flex">
+          <h3>Tonight's Winners</h3>
+        </div>
+        <div id="winners-list" class="winners-list"></div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (function () {
+      document.getElementById('back-btn').addEventListener('click', () => {
+        window.location.href = 'index.html';
+      });
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      // 8:00 PM WAT = 19:00 UTC, matches the scheduled draw job — see
+      // 05_automate_daily_draw.sql
+      function nextDrawUTC() {
+        const now = new Date();
+        const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 19, 0, 0));
+        if (now.getTime() >= next.getTime()) next.setUTCDate(next.getUTCDate() + 1);
+        return next;
+      }
+
+      let countdownTimer = null;
+      let hasCelebrated = false;
+      function startCountdown() {
+        const target = nextDrawUTC();
+        if (countdownTimer) clearInterval(countdownTimer);
+        function tick() {
+          const diff = Math.max(0, target.getTime() - Date.now());
+          const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
+          const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+          const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+          const box = document.getElementById('countdown-values');
+          if (box) box.textContent = `${h}:${m}:${s}`;
+        }
+        tick();
+        countdownTimer = setInterval(tick, 1000);
+      }
+
+      function renderWaiting(entries) {
+        hasCelebrated = false;
+        document.getElementById('draw-hero').classList.remove('drawn');
+        document.getElementById('hero-tag').textContent = 'LIVE DRAW';
+        document.getElementById('hero-body').innerHTML = `
+          <h2>Tonight's draw is coming up</h2>
+          <p>Every ticket bought today is already entered</p>
+          <div class="countdown-row">
+            <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Until 8:00 PM</span></div>
+          </div>
+          <div class="entries-pill"><i class="fa-solid fa-ticket"></i> <strong id="entries-count">${entries}</strong> ticket${entries === 1 ? '' : 's'} entered tonight</div>
+        `;
+        startCountdown();
+        document.getElementById('winners-section').style.display = 'none';
+      }
+
+      function celebrate() {
+        const hero = document.getElementById('draw-hero');
+        const colors = ['#ffffff', '#ffeaa7', '#fab1a0', '#55efc4'];
+        for (let i = 0; i < 20; i++) {
+          const p = document.createElement('span');
+          p.className = 'confetti-piece';
+          p.style.setProperty('--x', (Math.random() * 240 - 120) + 'px');
+          p.style.setProperty('--rot', (Math.random() * 360) + 'deg');
+          p.style.left = (10 + Math.random() * 80) + '%';
+          p.style.background = colors[i % colors.length];
+          hero.appendChild(p);
+          setTimeout(() => p.remove(), 1500);
+        }
+      }
+
+      function renderDrawn(winners, isLiveTransition) {
+        if (countdownTimer) clearInterval(countdownTimer);
+        const hero = document.getElementById('draw-hero');
+        hero.classList.add('drawn');
+        document.getElementById('hero-tag').textContent = 'DRAWN';
+
+        const totalPrize = winners.reduce((sum, w) => sum + Number(w.prize_amount), 0);
+        document.getElementById('hero-body').innerHTML = `
+          <div class="trophy-burst">🏆</div>
+          <h2>${winners.length} winner${winners.length > 1 ? 's' : ''} tonight!</h2>
+          <p>₦${totalPrize.toLocaleString('en-NG', { minimumFractionDigits: 2 })} paid out</p>
+          <div class="countdown-row">
+            <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Next draw in</span></div>
+          </div>
+        `;
+        startCountdown();
+
+        // Only celebrate for someone who was actually watching it
+        // happen live — not every time someone opens the page hours
+        // later and sees an already-decided result.
+        if (isLiveTransition && !hasCelebrated) {
+          hasCelebrated = true;
+          setTimeout(() => celebrate(), 150);
+        }
+
+        const listEl = document.getElementById('winners-list');
+        listEl.innerHTML = winners.map(w => `
+          <div class="winner-row">
+            <div class="winner-avatar"><i class="fa-solid fa-trophy"></i></div>
+            <div class="winner-info">
+              <strong>${escapeHtml(w.display_name || 'A Winner')}</strong>
+              <small>${escapeHtml(w.tier_name || 'Ticket')}</small>
+            </div>
+            <div class="winner-prize">&#8358;${Number(w.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+          </div>
+        `).join('');
+        document.getElementById('winners-section').style.display = 'block';
+      }
+
+      let lastKnownDrawn = null;
+
+      async function loadDrawStatus(client) {
+        const { data: statusRows } = await client.rpc('get_live_draw_status');
+        const status = statusRows?.[0];
+        if (!status) return;
+
+        if (status.is_drawn) {
+          const { data: recent } = await client.rpc('get_recent_winners', { p_limit: 30 });
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const tonightsWinners = (recent || []).filter(w => w.draw_date === todayStr);
+          const isLiveTransition = lastKnownDrawn === false; // was watching it flip
+          renderDrawn(tonightsWinners.length ? tonightsWinners : recent?.slice(0, 1) || [], isLiveTransition);
+        } else {
+          renderWaiting(status.entries_today);
+        }
+        lastKnownDrawn = status.is_drawn;
+      }
+
+      async function init() {
+        const client = window.getSupabaseClient();
+        if (!client) return;
+        await loadDrawStatus(client);
+
+        // Poll for the moment the draw actually happens (or resets
+        // into a new day/cycle) — no manual refresh needed.
+        setInterval(() => loadDrawStatus(client), 20000);
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>
