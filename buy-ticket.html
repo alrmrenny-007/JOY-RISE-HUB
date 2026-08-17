@@ -465,8 +465,7 @@
 
       function openConfirmModal() {
         document.getElementById('confirm-error').textContent = '';
-        const slotPrize = ticketUnitPrice * prizeMultiplier;
-        document.getElementById('confirm-prize').textContent = `Up to ₦${fmt(slotPrize)}`;
+        document.getElementById('confirm-prize').textContent = `Up to ${prizeMultiplier}x Ticket Value`;
 
         ticketQuantity = 1;
         document.getElementById('qty-value').textContent = '1';
