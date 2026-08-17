@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Buy Ticket — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -110,6 +122,22 @@
           </div>
         </div>
 
+        <div style="margin-top:14px;">
+          <span style="font-size:13px; color:#2d2d3f; font-weight:600; display:block; margin-bottom:8px;">Pay from</span>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="wallet-choice-btn" id="wallet-choice-winnings" data-wallet="winnings">
+              <i class="fa-solid fa-wallet"></i>
+              <span>Main Wallet</span>
+              <strong id="wallet-choice-winnings-balance">₦0.00</strong>
+            </button>
+            <button type="button" class="wallet-choice-btn" id="wallet-choice-referral" data-wallet="referral">
+              <i class="fa-solid fa-people-group"></i>
+              <span>Referral Wallet</span>
+              <strong id="wallet-choice-referral-balance">₦0.00</strong>
+            </button>
+          </div>
+        </div>
+
         <div class="ticket-price-row" style="margin-top:10px;">
           <span>Total</span>
           <strong id="confirm-total-price">&#8358;0.00</strong>
@@ -127,6 +155,20 @@
         }
         .qty-btn:active { background: #e4ddff; }
         .qty-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .wallet-choice-btn {
+          flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+          padding: 12px 8px; border-radius: 12px; border: 2px solid #eee; background: #fff;
+          font-family: inherit; cursor: pointer; transition: border-color 150ms ease, background 150ms ease;
+        }
+        .wallet-choice-btn i { font-size: 15px; color: #636e72; }
+        .wallet-choice-btn span { font-size: 10.5px; color: #636e72; font-weight: 600; }
+        .wallet-choice-btn strong { font-size: 12.5px; color: #2d2d3f; }
+        .wallet-choice-btn.selected { border-color: #6c5ce7; background: #f3f0ff; }
+        .wallet-choice-btn.selected i,
+        .wallet-choice-btn.selected span { color: #6c5ce7; }
+        .wallet-choice-btn.insufficient { opacity: 0.45; }
+        .wallet-choice-btn.insufficient strong { color: #ff4757; }
       </style>
 
       <div class="modal-footer">
@@ -191,6 +233,7 @@
       let referralBalance = 0;
       let selectedTier = null; // { id, name, price, isCustom }
       let ticketQuantity = 1;
+      let selectedWallet = 'winnings';
       let prizeMultiplier = 10;
       let customMin = 100;
       let customMax = 10000;
@@ -448,8 +491,25 @@
           document.getElementById('confirm-price').textContent = `₦${fmt(selectedTier.price)}`;
         }
 
+        selectedWallet = winningsBalance > 0 ? 'winnings' : 'referral';
+        renderWalletChoices();
+
         updateConfirmTotal();
         document.getElementById('confirm-modal-overlay').classList.add('open');
+      }
+
+      function renderWalletChoices() {
+        document.getElementById('wallet-choice-winnings-balance').textContent = `₦${fmt(winningsBalance)}`;
+        document.getElementById('wallet-choice-referral-balance').textContent = `₦${fmt(referralBalance)}`;
+
+        const total = unitPrice() * ticketQuantity;
+        const winBtn = document.getElementById('wallet-choice-winnings');
+        const refBtn = document.getElementById('wallet-choice-referral');
+
+        winBtn.classList.toggle('selected', selectedWallet === 'winnings');
+        refBtn.classList.toggle('selected', selectedWallet === 'referral');
+        winBtn.classList.toggle('insufficient', total > 0 && winningsBalance < total);
+        refBtn.classList.toggle('insufficient', total > 0 && referralBalance < total);
       }
 
       function unitPrice() {
@@ -464,6 +524,7 @@
         document.getElementById('confirm-total-price').textContent = `₦${fmt(total)}`;
         const entries = ticketUnitPrice > 0 ? Math.round(total / ticketUnitPrice) : 0;
         document.getElementById('confirm-entries').textContent = entries > 0 ? entries : '—';
+        renderWalletChoices();
       }
 
       function closeConfirmModal() {
@@ -493,6 +554,13 @@
         });
         document.getElementById('custom-amount-input').addEventListener('input', updateConfirmTotal);
 
+        document.querySelectorAll('.wallet-choice-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            selectedWallet = btn.dataset.wallet;
+            renderWalletChoices();
+          });
+        });
+
         document.getElementById('confirm-buy-btn').addEventListener('click', async () => {
           const errorEl = document.getElementById('confirm-error');
           const btn = document.getElementById('confirm-buy-btn');
@@ -513,8 +581,11 @@
             }
           }
 
-          if (winningsBalance + referralBalance < purchaseAmount * ticketQuantity) {
-            errorEl.textContent = `Insufficient balance for ${ticketQuantity} ticket${ticketQuantity > 1 ? 's' : ''}.`;
+          const totalNeeded = purchaseAmount * ticketQuantity;
+          const chosenBalance = selectedWallet === 'winnings' ? winningsBalance : referralBalance;
+          if (chosenBalance < totalNeeded) {
+            const walletLabel = selectedWallet === 'winnings' ? 'Main' : 'Referral';
+            errorEl.textContent = `Insufficient ${walletLabel} Wallet balance for ${ticketQuantity} ticket${ticketQuantity > 1 ? 's' : ''}.`;
             return;
           }
 
@@ -523,8 +594,8 @@
 
           try {
             const rpcParams = selectedTier.isCustom
-              ? { p_tier_id: null, p_custom_amount: purchaseAmount, p_quantity: ticketQuantity }
-              : { p_tier_id: selectedTier.id, p_custom_amount: null, p_quantity: ticketQuantity };
+              ? { p_tier_id: null, p_custom_amount: purchaseAmount, p_quantity: ticketQuantity, p_wallet: selectedWallet }
+              : { p_tier_id: selectedTier.id, p_custom_amount: null, p_quantity: ticketQuantity, p_wallet: selectedWallet };
 
             const { data, error } = await client.rpc('buy_ticket', rpcParams);
             if (error) throw error;
