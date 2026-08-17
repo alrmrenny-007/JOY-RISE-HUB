@@ -94,6 +94,7 @@
       });
 
       let referralLink = '';
+      let shareText = "Join me on Joy-Rise Hub and let's rise together! 🚀";
       let toastTimer = null;
 
       const toast = document.getElementById('toast');
@@ -146,6 +147,20 @@
           document.getElementById('referral-link-text').textContent = referralLink;
           document.getElementById('stat-total').textContent = profile.total_referrals || 0;
           document.getElementById('stat-active').textContent = profile.active_referrals || 0;
+        }
+
+        const { data: configRows } = await client
+          .from('app_config')
+          .select('key, value')
+          .in('key', ['signup_bonus_amount', 'referral_bonus_percent', 'referral_commission_days']);
+
+        if (configRows) {
+          const cfg = {};
+          configRows.forEach(row => { cfg[row.key] = Number(row.value); });
+          const bonus = cfg.signup_bonus_amount ?? 1000;
+          const pct = cfg.referral_bonus_percent ?? 10;
+          const months = Math.round((cfg.referral_commission_days ?? 90) / 30);
+          shareText = `Claim your ₦${bonus.toLocaleString('en-NG')} signup bonus on Joy-Rise Hub! Join daily live draws, earn ${pct}% commission for ${months} month${months === 1 ? '' : 's'} on ticket sales, and withdraw cash straight to your bank! Tap to register now 👇`;
         }
 
         if (navigator.share) {
@@ -226,8 +241,8 @@
       document.getElementById('copy-link-btn').addEventListener('click', async () => {
         if (!referralLink) return;
         try {
-          await navigator.clipboard.writeText(referralLink);
-          showToast('Referral link copied to clipboard!');
+          await navigator.clipboard.writeText(`${shareText} ${referralLink}`);
+          showToast('Referral message copied to clipboard!');
         } catch {
           showToast('Could not copy — long-press the link above instead.', 'error');
         }
@@ -238,7 +253,7 @@
         try {
           await navigator.share({
             title: 'Join Joy-Rise Hub',
-            text: "Join me on Joy-Rise Hub and let's rise together! 🚀",
+            text: shareText,
             url: referralLink
           });
         } catch (err) {
