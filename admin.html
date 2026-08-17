@@ -746,6 +746,7 @@
         { type: 'ticket_purchase', label: 'Tickets', icon: 'fa-ticket' },
         { type: 'deposit', label: 'Deposits', icon: 'fa-arrow-down' },
         { type: 'withdrawal_request', label: 'Withdrawals', icon: 'fa-arrow-up' },
+        { type: 'referral_code_not_found', label: 'Referral Issues', icon: 'fa-triangle-exclamation' },
       ];
       let activityFilter = null;
       let lastSeenActivityAt = null;
@@ -756,6 +757,7 @@
           signup: 'fa-user-plus', login: 'fa-right-to-bracket', ticket_purchase: 'fa-ticket',
           deposit: 'fa-arrow-down', withdrawal_request: 'fa-arrow-up',
           withdrawal_completed: 'fa-circle-check', withdrawal_rejected: 'fa-circle-xmark',
+          referral_code_not_found: 'fa-triangle-exclamation',
         })[type] || 'fa-bell';
       }
       function activityColor(type) {
@@ -763,6 +765,7 @@
           signup: '#9B8CFF', login: '#9089B0', ticket_purchase: '#6FB8FF',
           deposit: '#2DD4A7', withdrawal_request: '#FF6B81',
           withdrawal_completed: '#2DD4A7', withdrawal_rejected: '#FF6B81',
+          referral_code_not_found: '#F5B942',
         })[type] || '#9B8CFF';
       }
       function timeAgo(iso) {
