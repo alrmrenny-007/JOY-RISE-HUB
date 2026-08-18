@@ -1,4 +1,4 @@
-const CACHE_NAME = "joyrise-shell-v3";
+const CACHE_NAME = "joyrise-shell-v4";
 
 const SHELL_FILES = [
   "index.html",
@@ -8,6 +8,7 @@ const SHELL_FILES = [
   "update-password.html",
   "winners.html",
   "live-draw.html",
+  "confirm-email.html",
   "transactions.html",
   "buy-ticket.html",
   "my-tickets.html",

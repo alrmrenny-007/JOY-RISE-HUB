@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Log In — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -100,8 +112,32 @@
           window.location.href = 'index.html';
         } catch (err) {
           console.error('Login error (full object):', err);
-          errorEl.textContent = err?.message || err?.error_description || err?.msg
-            || 'Login failed. Open the browser console for details.';
+          const message = err?.message || err?.error_description || err?.msg || '';
+
+          if (/email.*not.*confirm/i.test(message)) {
+            errorEl.innerHTML = `Please confirm your email before logging in. Check your inbox (and spam folder) for the link.
+              <br><button type="button" id="resend-confirm-btn" style="margin-top:8px; background:none; border:none; color:#6c5ce7; font-weight:700; text-decoration:underline; padding:0; font-size:inherit; cursor:pointer;">Resend confirmation email</button>`;
+
+            document.getElementById('resend-confirm-btn').addEventListener('click', async (resendEvent) => {
+              const resendBtn = resendEvent.currentTarget;
+              resendBtn.disabled = true;
+              resendBtn.textContent = 'Sending...';
+              try {
+                const client = window.getSupabaseClient();
+                const { error: resendError } = await client.auth.resend({ type: 'signup', email });
+                if (resendError) throw resendError;
+                errorEl.textContent = 'Confirmation email sent — check your inbox.';
+                errorEl.style.color = '#00b894';
+              } catch (resendErr) {
+                resendBtn.textContent = 'Resend confirmation email';
+                resendBtn.disabled = false;
+                errorEl.textContent = resendErr?.message || 'Could not resend — try again shortly.';
+              }
+            });
+          } else {
+            errorEl.textContent = message || 'Login failed. Open the browser console for details.';
+          }
+
           btn.disabled = false;
           btn.classList.remove('loading');
         }

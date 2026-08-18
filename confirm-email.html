@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- no-flash theme bootstrap -->
+  <script>(function(){var t=localStorage.getItem("joyrise_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})();</script>
+  <title>Email Confirmed — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body>
+  <div class="mobile-container">
+    <main class="main-content" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80vh; text-align:center; padding:24px;">
+      <div id="confirm-icon" style="font-size:48px; color:#6c5ce7; margin-bottom:16px;">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+      </div>
+      <h2 id="confirm-title" style="margin:0 0 8px;">Confirming your email...</h2>
+      <p id="confirm-message" style="color:#636e72; font-size:13px; max-width:280px;">Just a moment.</p>
+      <a href="login.html" id="confirm-login-link" class="btn-auth-primary" style="display:none; margin-top:20px; text-decoration:none; max-width:220px;">Go to Login</a>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script>
+    (async function () {
+      const iconEl = document.getElementById('confirm-icon');
+      const titleEl = document.getElementById('confirm-title');
+      const messageEl = document.getElementById('confirm-message');
+      const loginLink = document.getElementById('confirm-login-link');
+
+      function showSuccess() {
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#00b894;"></i>';
+        titleEl.textContent = 'Email confirmed! 🎉';
+        messageEl.textContent = "You're all set — redirecting you in...";
+        loginLink.style.display = 'inline-block';
+        let seconds = 3;
+        const tick = setInterval(() => {
+          seconds -= 1;
+          messageEl.textContent = `You're all set — redirecting you in ${seconds}...`;
+          if (seconds <= 0) {
+            clearInterval(tick);
+            window.location.href = 'index.html';
+          }
+        }, 1000);
+      }
+
+      function showFailure(msg) {
+        iconEl.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="color:#ff4757;"></i>';
+        titleEl.textContent = 'Could not confirm email';
+        messageEl.textContent = msg || 'This link may have expired. Try logging in, or request a new confirmation email from the login page.';
+        loginLink.style.display = 'inline-block';
+        loginLink.textContent = 'Go to Login';
+      }
+
+      try {
+        const client = window.getSupabaseClient();
+        if (!client) throw new Error('Could not connect.');
+
+        // Handles the PKCE flow (a `code` param in the URL)
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('code')) {
+          const { error } = await client.auth.exchangeCodeForSession(window.location.href);
+          if (error) throw error;
+          showSuccess();
+          return;
+        }
+
+        // Handles the implicit flow (tokens auto-parsed from the URL
+        // fragment by supabase-js on load) — just check if a session
+        // now exists.
+        const { data: { session } } = await client.auth.getSession();
+        if (session) {
+          showSuccess();
+        } else {
+          showFailure();
+        }
+      } catch (err) {
+        console.error('Email confirmation error:', err);
+        showFailure(err?.message);
+      }
+    })();
+  </script>
+</body>
+</html>
