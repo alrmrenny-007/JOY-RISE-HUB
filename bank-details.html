@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Bank Details — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -114,7 +126,10 @@
       async function populateBanks() {
         const select = document.getElementById('bank-select');
         try {
-          const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/list-flutterwave-banks');
+          const { data: { session } } = await client.auth.getSession();
+          const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/list-flutterwave-banks', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` },
+          });
           const result = await res.json();
 
           if (!result.success || !result.banks) {
@@ -188,9 +203,13 @@
         btn.classList.add('loading');
 
         try {
+          const { data: { session } } = await client.auth.getSession();
           const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/resolve-bank-account', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
             body: JSON.stringify({ account_number: accountNumber, account_bank: bankCode }),
           });
           const result = await res.json();
