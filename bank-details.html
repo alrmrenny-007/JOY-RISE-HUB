@@ -99,6 +99,7 @@
       let verifiedAccountName = null;
       let currentUserId = null;
       let toastTimer = null;
+      const client = window.getSupabaseClient();
 
       const toast = document.getElementById('toast');
       const toastIcon = document.getElementById('toast-icon');
@@ -156,7 +157,6 @@
       }
 
       async function init() {
-        const client = window.getSupabaseClient();
         if (!client) return;
 
         const { data: { user }, error: authError } = await client.auth.getUser();
@@ -238,7 +238,6 @@
       });
 
       document.getElementById('save-btn').addEventListener('click', async () => {
-        const client = window.getSupabaseClient();
         const errorEl = document.getElementById('bank-error');
         const btn = document.getElementById('save-btn');
 
