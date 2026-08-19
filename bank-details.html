@@ -127,13 +127,18 @@
         const select = document.getElementById('bank-select');
         try {
           const { data: { session } } = await client.auth.getSession();
+          if (!session) {
+            select.innerHTML = '<option value="">Please log out and back in, then retry</option>';
+            return;
+          }
+
           const res = await fetch('https://ijkcqsodtmmavnveflgj.supabase.co/functions/v1/list-flutterwave-banks', {
             headers: { 'Authorization': `Bearer ${session.access_token}` },
           });
           const result = await res.json();
 
           if (!result.success || !result.banks) {
-            select.innerHTML = '<option value="">Could not load bank list — refresh to retry</option>';
+            select.innerHTML = `<option value="">Error: ${(result.error || 'unknown').slice(0, 60)}</option>`;
             return;
           }
 
@@ -146,7 +151,7 @@
           });
         } catch (err) {
           console.error('Bank list error:', err);
-          select.innerHTML = '<option value="">Could not load bank list — refresh to retry</option>';
+          select.innerHTML = `<option value="">JS error: ${String(err.message || err).slice(0, 60)}</option>`;
         }
       }
 
