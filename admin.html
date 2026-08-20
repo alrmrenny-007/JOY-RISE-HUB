@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <!-- no-flash admin theme bootstrap -->
+  <script>(function(){try{if(localStorage.getItem("joyrise_admin_theme")==="light")document.documentElement.classList.add("theme-light");}catch(e){}})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Control Deck — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -37,12 +39,34 @@
       --text: #F5F3FF;
       --muted: #9089B0;
       --faint: #6B6389;
+      --header-fade: rgba(11,8,21,0.98), rgba(11,8,21,0.85);
+      --section-shadow: rgba(0,0,0,0.25);
       --font-display: 'Space Grotesk', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
 
       background: var(--ink);
       min-height: 100vh;
+      transition: background 300ms ease;
     }
+
+    /* ---------- Light variant ---------- */
+    html.theme-light .admin-shell {
+      --ink: #F4F2FA;
+      --surface: #FFFFFF;
+      --surface-2: #F3F0FF;
+      --line: #E4DFF5;
+      --brand: #6C5CE7;
+      --brand-glow: #5B4BD6;
+      --money: #00B894;
+      --alert: #E1435C;
+      --gold: #D9971C;
+      --text: #1E1B2E;
+      --muted: #6B6389;
+      --faint: #A79FC4;
+      --header-fade: rgba(244,242,250,0.98), rgba(244,242,250,0.85);
+      --section-shadow: rgba(108,92,231,0.08);
+    }
+
     .admin-shell .mobile-container {
       background: var(--ink);
       color: var(--text);
@@ -55,7 +79,7 @@
       position: sticky; top: 0; z-index: 20;
       display: flex; align-items: center; gap: 12px;
       padding: 16px 18px 14px;
-      background: linear-gradient(180deg, rgba(11,8,21,0.98) 70%, rgba(11,8,21,0.85));
+      background: linear-gradient(180deg, var(--header-fade));
       backdrop-filter: blur(10px);
       border-bottom: 1px solid var(--line);
     }
@@ -133,7 +157,7 @@
     /* ---------- Section shell ---------- */
     .admin-shell .admin-section {
       background: var(--surface); border: 1px solid var(--line); border-radius: 16px;
-      padding: 16px; margin: 14px 0; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      padding: 16px; margin: 14px 0; box-shadow: 0 8px 24px var(--section-shadow);
     }
     .admin-shell .admin-section-title {
       font-family: var(--font-display); font-size: 14px; font-weight: 600; color: var(--text);
@@ -352,6 +376,9 @@
         <h1>Control Deck</h1>
       </div>
       <div class="system-pulse"><span class="pulse-dot"></span> Live</div>
+      <button class="icon-btn" id="admin-theme-toggle-btn" aria-label="Toggle light mode" style="margin-left:4px;">
+        <i class="fa-solid fa-sun"></i>
+      </button>
     </header>
 
     <nav class="admin-tabs" id="admin-tabs">
@@ -477,6 +504,57 @@
       });
 
       const REDUCE_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const ADMIN_THEME_KEY = 'joyrise_admin_theme';
+
+      function applyAdminTheme(theme) {
+        document.documentElement.classList.toggle('theme-light', theme === 'light');
+        localStorage.setItem(ADMIN_THEME_KEY, theme);
+        const btn = document.getElementById('admin-theme-toggle-btn');
+        if (btn) {
+          btn.innerHTML = theme === 'light'
+            ? '<i class="fa-solid fa-moon"></i>'
+            : '<i class="fa-solid fa-sun"></i>';
+        }
+      }
+
+      function toggleAdminTheme(clickEvent) {
+        const isLight = document.documentElement.classList.contains('theme-light');
+        const next = isLight ? 'dark' : 'light';
+
+        if (!document.startViewTransition || REDUCE_MOTION) {
+          applyAdminTheme(next);
+          return;
+        }
+
+        const x = clickEvent ? clickEvent.clientX : window.innerWidth / 2;
+        const y = clickEvent ? clickEvent.clientY : window.innerHeight / 2;
+        const radius = Math.hypot(
+          Math.max(x, window.innerWidth - x),
+          Math.max(y, window.innerHeight - y)
+        );
+
+        const transition = document.startViewTransition(() => applyAdminTheme(next));
+        transition.ready.then(() => {
+          document.documentElement.animate(
+            {
+              clipPath: [
+                `circle(0px at ${x}px ${y}px)`,
+                `circle(${radius}px at ${x}px ${y}px)`,
+              ],
+            },
+            {
+              duration: 650,
+              easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+              pseudoElement: '::view-transition-new(root)',
+            }
+          );
+        });
+      }
+
+      document.getElementById('admin-theme-toggle-btn').addEventListener('click', (e) => toggleAdminTheme(e));
+      // Sync the icon to whatever the anti-flash bootstrap already applied
+      applyAdminTheme(document.documentElement.classList.contains('theme-light') ? 'light' : 'dark');
 
       const CONFIG_LABELS = {
         ticket_price: 'Ticket Price (₦)',
