@@ -157,10 +157,15 @@
         if (configRows) {
           const cfg = {};
           configRows.forEach(row => { cfg[row.key] = Number(row.value); });
-          const bonus = cfg.signup_bonus_amount ?? 1000;
+          const bonus = cfg.signup_bonus_amount ?? 0;
           const pct = cfg.referral_bonus_percent ?? 10;
           const months = Math.round((cfg.referral_commission_days ?? 90) / 30);
-          shareText = `Claim your ₦${bonus.toLocaleString('en-NG')} signup bonus on Joy-Rise Hub! Join daily live draws, earn ${pct}% commission for ${months} month${months === 1 ? '' : 's'} on ticket sales, and withdraw cash straight to your bank! Tap to register now 👇`;
+
+          const bonusLine = bonus > 0
+            ? `Claim your ₦${bonus.toLocaleString('en-NG')} signup bonus on Joy-Rise Hub!`
+            : `Join Joy-Rise Hub!`;
+
+          shareText = `${bonusLine} Join daily live draws, earn ${pct}% commission for ${months} month${months === 1 ? '' : 's'} on ticket sales, and withdraw cash straight to your bank! Tap to register now 👇`;
         }
 
         if (navigator.share) {

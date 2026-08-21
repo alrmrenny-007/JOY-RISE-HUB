@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -114,11 +126,11 @@
       <div class="card referral-progress-card">
         <div class="card-header-flex">
           <div class="gift-icon-box">
-            <i class="fa-solid fa-gift"></i>
+            <i class="fa-solid fa-people-group"></i>
           </div>
           <div class="referral-text">
-            <h3>Unlock Your Referral Bonus</h3>
-            <p>Your ₦1,000 signup credit lives here — refer friends to unlock it</p>
+            <h3>Grow Your Referral Wallet</h3>
+            <p>Earn commission when your referrals buy tickets — unlock withdrawals once you hit the threshold</p>
           </div>
           <a href="#" class="link-details">View Details &gt;</a>
         </div>
@@ -126,18 +138,18 @@
         <!-- PROGRESS BAR -->
         <div class="progress-section">
           <div class="progress-bar-wrapper">
-            <div class="progress-bar-fill" id="referral-progress-fill" style="width: 33%;">
-              <span class="progress-tooltip" id="referral-progress-tooltip">&#8358;1,000</span>
+            <div class="progress-bar-fill" id="referral-progress-fill" style="width: 0%;">
+              <span class="progress-tooltip" id="referral-progress-tooltip">&#8358;0</span>
             </div>
           </div>
           <div class="progress-labels">
-            <span id="referral-progress-label">&#8358;1,000 (33%)</span>
-            <span id="referral-progress-target">&#8358;3,000</span>
+            <span id="referral-progress-label">&#8358;0 (0%)</span>
+            <span id="referral-progress-target">&#8358;1,000</span>
           </div>
         </div>
 
         <div class="card-footer-flex">
-          <span class="remaining-text" id="referral-remaining-text">You need &#8358;2,000 more to unlock your bonus</span>
+          <span class="remaining-text" id="referral-remaining-text">You need &#8358;1,000 more to unlock withdrawals</span>
           <button class="btn-disabled-withdraw" id="btn-referral-withdraw" disabled>
             <i class="fa-solid fa-lock"></i> WITHDRAW
           </button>

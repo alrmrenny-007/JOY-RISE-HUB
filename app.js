@@ -257,14 +257,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (unlocked) {
       if (referralLockIcon) referralLockIcon.style.display = "none";
       if (referralUnlockBtn) {
-        referralUnlockBtn.textContent = "Withdraw Referral Bonus";
+        referralUnlockBtn.textContent = "Withdraw Referral Wallet";
         referralUnlockBtn.disabled = false;
       }
       if (referralWithdrawBtn) {
         referralWithdrawBtn.disabled = false;
         referralWithdrawBtn.innerHTML = `<i class="fa-solid fa-circle-arrow-down"></i> WITHDRAW`;
       }
-      if (referralRemainingText) referralRemainingText.textContent = "Your referral bonus is unlocked!";
+      if (referralRemainingText) referralRemainingText.textContent = "Your Referral Wallet is unlocked!";
     } else {
       const remaining = referralThreshold - referralBalance;
       if (referralLockIcon) referralLockIcon.style.display = "inline";
@@ -276,7 +276,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         referralWithdrawBtn.disabled = true;
         referralWithdrawBtn.innerHTML = `<i class="fa-solid fa-lock"></i> WITHDRAW`;
       }
-      if (referralRemainingText) referralRemainingText.textContent = `You need ₦${fmt(remaining)} more to unlock your bonus`;
+      if (referralRemainingText) referralRemainingText.textContent = `You need ₦${fmt(remaining)} more to unlock withdrawals`;
     }
   }
 
@@ -332,7 +332,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     } else {
       modalIconCircle.classList.add("withdraw-mode");
       modalIcon.className = "fa-solid fa-circle-arrow-down";
-      modalTitle.textContent = "Withdraw Referral Bonus";
+      modalTitle.textContent = "Withdraw Referral Wallet";
       modalSubtitle.textContent = "Move money out of your Referral Wallet";
       modalConfirmLabel.textContent = "Withdraw";
       modalBalanceHint.textContent = `Available: ₦${fmt(referralBalance)}`;
