@@ -101,7 +101,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   let ticketPrice = 100;
-  let referralThreshold = 3000;
+  let referralThreshold = 1000;
   let referralBalance = 0;
   let winningsBalance = 0;
   let myReferralCode = null;
