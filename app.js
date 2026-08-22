@@ -281,14 +281,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // --- 2. TOAST HELPER ---
-  function showToast(message, type = "success") {
+  function showToast(message, type = "success", duration = 3200) {
     clearTimeout(toastTimer);
     toastMessage.textContent = message;
     toast.classList.remove("error");
     toastIcon.className = "fa-solid toast-icon " + (type === "error" ? "fa-circle-exclamation" : "fa-circle-check");
     if (type === "error") toast.classList.add("error");
     toast.classList.add("show");
-    toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+    toastTimer = setTimeout(() => toast.classList.remove("show"), duration);
   }
 
   // --- 3. MODAL HELPERS ---
@@ -501,7 +501,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     if (error) throw error;
 
-    showToast(`Withdrawal request of ₦${amount.toLocaleString()} submitted!`);
+    showToast(`Success! Your withdrawal request of ₦${amount.toLocaleString()} has been submitted and will be credited to your bank account within 24 hours.`, "success", 6000);
     loadUserData();
   }
 
