@@ -455,6 +455,15 @@
             <i class="fa-solid fa-champagne-glasses"></i>No pending withdrawals right now.
           </div>
         </section>
+
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent History</h3>
+          <p style="font-size:11px; color:var(--faint); margin:2px 0 4px;">Requests, approvals, and rejections together</p>
+          <div id="withdrawal-history-list" class="winners-list" style="margin-top:8px;"></div>
+          <div id="withdrawal-history-empty" class="empty-state" style="display:none;">
+            <i class="fa-solid fa-inbox"></i>No withdrawal history yet.
+          </div>
+        </section>
       </div>
 
       <!-- SETTINGS -->
@@ -669,6 +678,7 @@
         loadAnalytics(client);
         loadConfig(client);
         loadWithdrawals(client);
+        loadWithdrawalHistory(client);
         loadTiers(client);
         loadUsers(client, '');
         wireDrawButton(client);
@@ -823,7 +833,7 @@
         { type: 'login', label: 'Logins', icon: 'fa-right-to-bracket' },
         { type: 'ticket_purchase', label: 'Tickets', icon: 'fa-ticket' },
         { type: 'deposit', label: 'Deposits', icon: 'fa-arrow-down' },
-        { type: 'withdrawal_request', label: 'Withdrawals', icon: 'fa-arrow-up' },
+        { type: 'withdrawal_all', label: 'Withdrawals', icon: 'fa-arrow-up' },
         { type: 'referral_code_not_found', label: 'Referral Issues', icon: 'fa-triangle-exclamation' },
       ];
       let activityFilter = null;
@@ -886,12 +896,19 @@
         activityPollTimer = setInterval(() => checkForNewActivity(client), 15000);
       }
 
+      async function fetchActivityData(client) {
+        if (activityFilter === 'withdrawal_all') {
+          return client.rpc('admin_list_withdrawal_history', { p_limit: 50 });
+        }
+        return client.rpc('admin_list_events', { p_limit: 50, p_event_type: activityFilter });
+      }
+
       async function loadActivity(client) {
         const listEl = document.getElementById('activity-list');
         const emptyEl = document.getElementById('activity-empty');
         listEl.innerHTML = skeletonHTML(4);
 
-        const { data, error } = await client.rpc('admin_list_events', { p_limit: 50, p_event_type: activityFilter });
+        const { data, error } = await fetchActivityData(client);
 
         if (error || !data) {
           listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error?.message || 'Failed to load activity.')}</p>`;
@@ -923,7 +940,7 @@
 
       async function checkForNewActivity(client) {
         if (!lastSeenActivityAt) return;
-        const { data, error } = await client.rpc('admin_list_events', { p_limit: 50, p_event_type: activityFilter });
+        const { data, error } = await fetchActivityData(client);
         if (error || !data) return;
 
         const newCount = data.filter(e => new Date(e.created_at) > new Date(lastSeenActivityAt)).length;
@@ -934,6 +951,37 @@
           badge.style.display = 'inline-block';
           dot.style.display = 'inline-block';
         }
+      }
+
+      async function loadWithdrawalHistory(client) {
+        const listEl = document.getElementById('withdrawal-history-list');
+        const emptyEl = document.getElementById('withdrawal-history-empty');
+        listEl.innerHTML = skeletonHTML(3);
+
+        const { data, error } = await client.rpc('admin_list_withdrawal_history', { p_limit: 30 });
+        if (error || !data) {
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error?.message || 'Failed to load history.')}</p>`;
+          return;
+        }
+        if (data.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          return;
+        }
+        emptyEl.style.display = 'none';
+
+        listEl.innerHTML = data.map(e => `
+          <div class="winner-row">
+            <div class="winner-avatar" style="background:${activityColor(e.event_type)}22; color:${activityColor(e.event_type)};">
+              <i class="fa-solid ${activityIcon(e.event_type)}"></i>
+            </div>
+            <div class="winner-info">
+              <strong>${escapeHtml(e.summary)}</strong>
+              <small>${e.phone_number ? escapeHtml(e.phone_number) + ' &middot; ' : ''}${timeAgo(e.created_at)}</small>
+            </div>
+            ${e.amount != null ? `<div class="winner-prize">₦${Number(e.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>` : ''}
+          </div>
+        `).join('');
       }
 
       async function loadWithdrawals(client) {
@@ -1009,6 +1057,7 @@
               if (error) throw error;
               row.remove();
               loadWithdrawals(client);
+              loadWithdrawalHistory(client);
             } catch (err) {
               alert(err.message || 'Failed to mark as paid.');
               btn.disabled = false;
@@ -1034,6 +1083,7 @@
               row.remove();
               loadUsers(client, document.getElementById('user-search').value.trim());
               loadWithdrawals(client);
+              loadWithdrawalHistory(client);
             } catch (err) {
               alert(err.message || 'Failed to reject withdrawal.');
               btn.disabled = false;
