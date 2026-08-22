@@ -139,6 +139,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       currentUserId = user.id;
+      loadNotifications(); // also handles the "withdrawal was just paid" pop-up check
 
       const { data: profile, error } = await supabaseClient
         .from('profiles')
@@ -534,7 +535,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const NOTIF_META = {
     deposit: { icon: "fa-circle-plus", color: "#00b894", text: (t) => `Deposit of ₦${fmt(t.amount)} confirmed` },
-    withdrawal: { icon: "fa-circle-arrow-down", color: "#ff7675", text: (t) => `Withdrawal of ₦${fmt(t.amount)} requested` },
+    withdrawal: {
+      icon: "fa-circle-arrow-down",
+      color: (t) => (t.status === "completed" ? "#00b894" : t.status === "failed" ? "#ff4757" : "#ff7675"),
+      text: (t) => {
+        if (t.status === "completed") return `Withdrawal of ₦${fmt(t.amount)} approved and paid! ✅`;
+        if (t.status === "failed") return `Withdrawal of ₦${fmt(t.amount)} was rejected`;
+        return `Withdrawal of ₦${fmt(t.amount)} requested`;
+      },
+    },
     ticket_purchase: { icon: "fa-ticket", color: "#6c5ce7", text: (t) => `Ticket purchased for ₦${fmt(t.amount)}` },
     referral_bonus: { icon: "fa-users", color: "#00b894", text: (t) => `Referral bonus of ₦${fmt(t.amount)} earned` },
     win_payout: { icon: "fa-trophy", color: "#f59f00", text: (t) => `You won ₦${fmt(t.amount)}! 🎉` },
@@ -559,10 +568,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     notificationEmpty.style.display = "none";
     notificationList.innerHTML = data.map(t => {
       const meta = NOTIF_META[t.type] || { icon: "fa-circle", color: "#636e72", text: () => t.type };
+      const color = typeof meta.color === "function" ? meta.color(t) : meta.color;
       const timeAgo = new Date(t.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
       return `
         <div class="notif-item">
-          <div class="notif-icon" style="background:${meta.color}1a; color:${meta.color};">
+          <div class="notif-icon" style="background:${color}1a; color:${color};">
             <i class="fa-solid ${meta.icon}"></i>
           </div>
           <div class="notif-text">
@@ -577,6 +587,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     const newest = new Date(data[0].created_at);
     if (Date.now() - newest.getTime() < 60 * 60 * 1000) {
       notificationDot.style.display = "block";
+    }
+
+    checkForNewlyPaidWithdrawal(data);
+  }
+
+  // One-time pop-up the next time the person opens the app after
+  // their withdrawal gets marked paid — not a live push while the
+  // app is closed, just a "welcome back, here's what happened" toast.
+  function checkForNewlyPaidWithdrawal(recentTxns) {
+    const lastSeenKey = "joyrise_last_seen_paid_withdrawal";
+    const lastSeenId = localStorage.getItem(lastSeenKey);
+
+    const latestPaid = recentTxns.find(t => t.type === "withdrawal" && t.status === "completed");
+    if (!latestPaid) return;
+
+    if (latestPaid.id !== lastSeenId) {
+      localStorage.setItem(lastSeenKey, latestPaid.id);
+      // Don't fire on the very first load for an account that already
+      // had a paid withdrawal before this feature existed — only pop
+      // the toast once we've established a real "last seen" baseline.
+      if (lastSeenId !== null) {
+        showToast(`Your withdrawal of ₦${fmt(latestPaid.amount)} has been approved and paid! 🎉`, "success", 6000);
+      }
     }
   }
 
