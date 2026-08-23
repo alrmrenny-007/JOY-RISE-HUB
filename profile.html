@@ -50,6 +50,18 @@
         <i class="fa-solid fa-spinner fa-spin modal-spinner" id="save-spinner"></i>
       </button>
 
+      <div class="admin-section" style="margin-top:20px;">
+        <h3 class="admin-section-title"><i class="fa-solid fa-lock"></i> Change Password</h3>
+        <input type="password" class="auth-input" id="new-password-input" placeholder="New password (min 6 characters)" style="margin-top:10px;" autocomplete="new-password" />
+        <input type="password" class="auth-input" id="confirm-password-input" placeholder="Confirm new password" style="margin-top:10px;" autocomplete="new-password" />
+        <div class="modal-error" id="password-error"></div>
+        <div class="modal-success" id="password-success" style="display:none; color:#00b894; font-size:12px; margin-top:6px;"></div>
+        <button class="btn-auth-primary" id="password-save-btn" style="margin-top:12px;">
+          <span id="password-save-label">Update Password</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="password-save-spinner"></i>
+        </button>
+      </div>
+
     </main>
 
   </div>
@@ -177,6 +189,47 @@
           setTimeout(() => { window.location.href = 'index.html'; }, 900);
         } catch (err) {
           errorEl.textContent = err.message || 'Failed to save changes.';
+        } finally {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+        }
+      });
+
+      document.getElementById('password-save-btn').addEventListener('click', async () => {
+        const client = window.getSupabaseClient();
+        const newPasswordInput = document.getElementById('new-password-input');
+        const confirmPasswordInput = document.getElementById('confirm-password-input');
+        const errorEl = document.getElementById('password-error');
+        const successEl = document.getElementById('password-success');
+        const btn = document.getElementById('password-save-btn');
+        errorEl.textContent = '';
+        successEl.style.display = 'none';
+
+        const newPassword = newPasswordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+
+        if (newPassword.length < 6) {
+          errorEl.textContent = 'Password must be at least 6 characters.';
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          errorEl.textContent = 'Passwords do not match.';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.classList.add('loading');
+
+        try {
+          const { error } = await client.auth.updateUser({ password: newPassword });
+          if (error) throw error;
+
+          newPasswordInput.value = '';
+          confirmPasswordInput.value = '';
+          successEl.textContent = 'Password updated successfully!';
+          successEl.style.display = 'block';
+        } catch (err) {
+          errorEl.textContent = err.message || 'Failed to update password.';
         } finally {
           btn.disabled = false;
           btn.classList.remove('loading');
