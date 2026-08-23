@@ -1127,6 +1127,11 @@ body {
   color: #ff4757;
 }
 
+.txn-status-completed {
+  background: #d4f7ec;
+  color: #00b894;
+}
+
 /* ================= ADMIN PANEL ================= */
 .admin-section {
   background: #ffffff;
@@ -2405,6 +2410,7 @@ html[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.72); }
 /* ---------- Count badges / status chips keep their color meaning ---------- */
 html[data-theme="dark"] .txn-status-pending { background: #3a2f0f; color: #f5c344; }
 html[data-theme="dark"] .txn-status-failed { background: #3a1414; color: #ff6b7a; }
+html[data-theme="dark"] .txn-status-completed { background: #12291f; color: #2dd4a7; }
 
 /* ---------- Theme toggle FAB (injected by auth.js on every page) ---------- */
 .theme-toggle-fab {

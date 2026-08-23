@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Transactions — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -93,7 +105,8 @@
           const meta = TYPE_META[t.type] || { icon: 'fa-circle', color: '#636e72', label: t.type, sign: '' };
           const date = new Date(t.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
           const statusBadge = t.status !== 'completed'
-            ? `<span class="txn-status-badge txn-status-${escapeHtml(t.status)}">${escapeHtml(t.status)}</span>` : '';
+            ? `<span class="txn-status-badge txn-status-${escapeHtml(t.status)}">${escapeHtml(t.status)}</span>`
+            : (t.type === 'withdrawal' ? `<span class="txn-status-badge txn-status-completed">successful</span>` : '');
 
           let extraLine = '';
           if (t.type === 'withdrawal' && t.status === 'completed' && t.payment_reference) {
