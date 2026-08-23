@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Live Draw — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -75,7 +87,7 @@
         </div>
       </div>
 
-      <a href="https://t.me/Bracey0" target="_blank" class="telegram-secondary">
+      <a href="https://t.me/+fPu591BuqSRiYTY0" target="_blank" class="telegram-secondary">
         <i class="fa-brands fa-telegram"></i>
         Also watch it happen live on <strong>Telegram</strong>
       </a>
