@@ -109,6 +109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let hasQualifyingDeposit = false;
   let minWithdrawalAmount = 1000;
   let minFirstDeposit = 500;
+  let withdrawalFee = 200;
 
   // --- 1. LOAD CONFIG (ticket price, referral unlock threshold) ---
   async function loadConfig() {
@@ -120,6 +121,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (row.key === 'referral_unlock_threshold') referralThreshold = Number(row.value);
       if (row.key === 'min_withdrawal_amount') minWithdrawalAmount = Number(row.value);
       if (row.key === 'min_first_deposit_to_unlock_withdrawal') minFirstDeposit = Number(row.value);
+      if (row.key === 'withdrawal_fee_amount') withdrawalFee = Number(row.value);
     });
   }
 
@@ -329,14 +331,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       modalTitle.textContent = "Withdraw Funds";
       modalSubtitle.textContent = "Move money out of your Main Wallet";
       modalConfirmLabel.textContent = "Withdraw";
-      modalBalanceHint.textContent = `Available: ₦${fmt(winningsBalance)}`;
+      modalBalanceHint.textContent = `Available: ₦${fmt(winningsBalance)} · Withdrawal fee: ₦${fmt(withdrawalFee)}`;
     } else {
       modalIconCircle.classList.add("withdraw-mode");
       modalIcon.className = "fa-solid fa-circle-arrow-down";
       modalTitle.textContent = "Withdraw Referral Wallet";
       modalSubtitle.textContent = "Move money out of your Referral Wallet";
       modalConfirmLabel.textContent = "Withdraw";
-      modalBalanceHint.textContent = `Available: ₦${fmt(referralBalance)}`;
+      modalBalanceHint.textContent = `Available: ₦${fmt(referralBalance)} · Withdrawal fee: ₦${fmt(withdrawalFee)}`;
     }
 
     modalOverlay.classList.add("open");
