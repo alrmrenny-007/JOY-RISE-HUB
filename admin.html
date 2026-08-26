@@ -691,14 +691,112 @@
         const resultEl = document.getElementById('draw-result');
         const card = document.querySelector('.draw-card');
 
-        btn.addEventListener('click', async () => {
-          resultEl.textContent = '';
-          btn.disabled = true;
-          btn.classList.add('loading');
+        const overlay = document.getElementById('draw-modal-overlay');
+        const loadingEl = document.getElementById('draw-preview-loading');
+        const bodyEl = document.getElementById('draw-preview-body');
+        const errorEl = document.getElementById('draw-modal-error');
+        const closeBtn = document.getElementById('draw-modal-close-btn');
+        const cancelBtn = document.getElementById('draw-modal-cancel-btn');
+        const confirmBtn = document.getElementById('draw-modal-confirm-btn');
+        const confirmLabel = document.getElementById('draw-modal-confirm-label');
+        const spinner = document.getElementById('draw-modal-spinner');
+        const minusBtn = document.getElementById('pv-winner-minus');
+        const plusBtn = document.getElementById('pv-winner-plus');
+
+        const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+
+        let latestPreview = null;   // last preview row from the server
+        let overrideCount = null;   // null = use tier default; number = explicit override
+        let totalEntries = 0;
+
+        function fmtWinnerCount() {
+          document.getElementById('pv-winner-count').textContent = latestPreview.winner_count;
+          document.getElementById('pv-override-badge').style.display = latestPreview.is_override ? 'inline-block' : 'none';
+          // Disable [-] at 1 winner, disable [+] once winners == total entries
+          minusBtn.disabled = latestPreview.winner_count <= 1;
+          plusBtn.disabled = latestPreview.winner_count >= totalEntries;
+        }
+
+        function renderPreview() {
+          document.getElementById('pv-entries').textContent = latestPreview.total_entries;
+          document.getElementById('pv-revenue').textContent = fmt(latestPreview.total_revenue);
+          document.getElementById('pv-pool').textContent = fmt(latestPreview.prize_pool);
+          document.getElementById('pv-admin').textContent = fmt(latestPreview.admin_cut);
+          document.getElementById('pv-referral').textContent = fmt(latestPreview.referral_reserve);
+          document.getElementById('pv-per-winner').textContent = fmt(latestPreview.prize_per_winner);
+          fmtWinnerCount();
+        }
+
+        async function loadPreview() {
+          loadingEl.style.display = 'block';
+          bodyEl.style.display = 'none';
+          errorEl.textContent = '';
 
           try {
-            const { data, error } = await client.rpc('admin_run_draw');
+            const { data, error } = await client.rpc('admin_preview_draw', {
+              p_draw_date: new Date().toISOString().slice(0, 10),
+              p_override_winner_count: overrideCount,
+            });
             if (error) throw error;
+
+            const row = data?.[0];
+            if (!row) throw new Error('No preview data returned.');
+
+            latestPreview = row;
+            totalEntries = row.total_entries;
+            renderPreview();
+
+            loadingEl.style.display = 'none';
+            bodyEl.style.display = 'block';
+          } catch (err) {
+            loadingEl.style.display = 'none';
+            errorEl.textContent = err.message || 'Could not load draw preview.';
+          }
+        }
+
+        function openModal() {
+          overrideCount = null; // reset to tier default every time the modal opens
+          overlay.classList.add('open');
+          loadPreview();
+        }
+
+        function closeModal() {
+          overlay.classList.remove('open');
+        }
+
+        btn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+        minusBtn.addEventListener('click', () => {
+          const current = latestPreview.winner_count;
+          if (current <= 1) return;
+          overrideCount = current - 1;
+          loadPreview();
+        });
+
+        plusBtn.addEventListener('click', () => {
+          const current = latestPreview.winner_count;
+          if (current >= totalEntries) return;
+          overrideCount = current + 1;
+          loadPreview();
+        });
+
+        confirmBtn.addEventListener('click', async () => {
+          errorEl.textContent = '';
+          confirmBtn.disabled = true;
+          confirmBtn.classList.add('loading');
+
+          try {
+            const { data, error } = await client.rpc('admin_run_draw', {
+              p_winner_count: overrideCount,
+            });
+            if (error) throw error;
+
+            closeModal();
+            resultEl.textContent = '';
+
             if (data && data.length > 0) {
               resultEl.style.color = 'var(--money)';
               const lines = data.map(w => `🎉 ${w.winner_name} won ₦${Number(w.prize).toLocaleString()}`);
@@ -707,11 +805,10 @@
             }
             loadUsers(client, document.getElementById('user-search').value.trim());
           } catch (err) {
-            resultEl.style.color = 'var(--alert)';
-            resultEl.textContent = err.message || 'Draw failed.';
+            errorEl.textContent = err.message || 'Draw failed.';
           } finally {
-            btn.disabled = false;
-            btn.classList.remove('loading');
+            confirmBtn.disabled = false;
+            confirmBtn.classList.remove('loading');
           }
         });
       }
@@ -1225,5 +1322,64 @@
       init();
     })();
   </script>
+  <!-- RUN DRAW CONFIRMATION MODAL -->
+  <div class="modal-overlay" id="draw-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-circle">
+          <i class="fa-solid fa-trophy"></i>
+        </div>
+        <div>
+          <h3>Run Today's Draw</h3>
+          <p>Review the split before confirming</p>
+        </div>
+        <button class="modal-close-btn" id="draw-modal-close-btn">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div id="draw-preview-loading" style="text-align:center; padding:16px 0; color:#636e72; font-size:13px;">
+          Loading preview...
+        </div>
+
+        <div id="draw-preview-body" style="display:none;">
+          <div style="font-size:13px; line-height:2; color:#2d3436;">
+            <div style="display:flex; justify-content:space-between;"><span>Total entries</span><strong id="pv-entries">-</strong></div>
+            <div style="display:flex; justify-content:space-between;"><span>Total revenue</span><strong id="pv-revenue">-</strong></div>
+            <div style="display:flex; justify-content:space-between;"><span>Prize pool (60%)</span><strong id="pv-pool">-</strong></div>
+            <div style="display:flex; justify-content:space-between; color:#636e72;"><span>Admin cut (30%)</span><span id="pv-admin">-</span></div>
+            <div style="display:flex; justify-content:space-between; color:#636e72;"><span>Referral reserve (10%)</span><span id="pv-referral">-</span></div>
+          </div>
+
+          <div style="margin-top:14px; padding-top:14px; border-top:1px solid #eee;">
+            <label class="amount-label">Number of Winners</label>
+            <div style="display:flex; align-items:center; gap:14px; margin-top:8px;">
+              <button type="button" id="pv-winner-minus" class="btn-modal-cancel" style="width:44px; padding:10px 0;">−</button>
+              <span id="pv-winner-count" style="font-size:22px; font-weight:800; min-width:32px; text-align:center;">-</span>
+              <button type="button" id="pv-winner-plus" class="btn-modal-cancel" style="width:44px; padding:10px 0;">+</button>
+              <span id="pv-override-badge" style="display:none; font-size:10px; font-weight:700; color:#6c5ce7; background:#f3f0ff; padding:3px 8px; border-radius:8px;">OVERRIDDEN</span>
+            </div>
+          </div>
+
+          <div style="margin-top:14px; padding:12px 14px; background:#f3f0ff; border-radius:12px;">
+            <div style="font-size:10px; color:#636e72; font-weight:700; text-transform:uppercase;">Prize Per Winner</div>
+            <div id="pv-per-winner" style="font-size:20px; font-weight:800; color:#1e1e24;">-</div>
+          </div>
+        </div>
+
+        <div class="modal-error" id="draw-modal-error"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="draw-modal-cancel-btn">Cancel</button>
+        <button class="btn-modal-primary" id="draw-modal-confirm-btn">
+          <span id="draw-modal-confirm-label">Run Draw</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="draw-modal-spinner"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
