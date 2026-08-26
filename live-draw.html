@@ -62,6 +62,58 @@
     }
     .telegram-secondary i { color: #229ED9; }
     .telegram-secondary strong { color: #2d2d3f; }
+
+    /* ---- TICKET REEL ---- */
+    #reel-section {
+      background: #1e1e2f;
+      border-radius: 18px;
+      padding: 18px 0 20px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .reel-title {
+      color: #fff; font-size: 13px; font-weight: 700;
+      text-align: center; margin-bottom: 14px; opacity: 0.85;
+    }
+    .reel-viewport {
+      position: relative;
+      height: 84px;
+      overflow: hidden;
+      mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+    }
+    .reel-pointer {
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 3px; height: 100%; background: #fdcb6e; z-index: 5;
+      box-shadow: 0 0 10px #fdcb6e;
+    }
+    .reel-track {
+      position: absolute; top: 0; left: 50%; height: 100%;
+      display: flex; align-items: center; gap: 8px;
+      will-change: transform;
+    }
+    .reel-card {
+      flex: 0 0 auto;
+      width: 74px; height: 74px;
+      background: #2d2d44;
+      border-radius: 12px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px;
+      border: 2px solid rgba(255,255,255,0.08);
+    }
+    .reel-card img {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: #fff;
+    }
+    .reel-card small {
+      color: #b2b2c8; font-size: 8.5px; font-weight: 700;
+      max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .reel-card.reel-winner-card {
+      background: linear-gradient(160deg, #fdcb6e, #f59f00);
+      border-color: #fff;
+    }
+    .reel-card.reel-winner-card small { color: #4a3200; }
   </style>
 </head>
 <body>
@@ -84,6 +136,14 @@
         <span class="live-tag"><span class="green-dot"></span> <span id="hero-tag">LIVE DRAW</span></span>
         <div id="hero-body">
           <h2>Loading tonight's draw...</h2>
+        </div>
+      </div>
+
+      <div id="reel-section" style="display:none;">
+        <div class="reel-title">Picking tonight's winner...</div>
+        <div class="reel-viewport">
+          <div class="reel-pointer"></div>
+          <div class="reel-track" id="reel-track"></div>
         </div>
       </div>
 
@@ -175,7 +235,10 @@
         }
       }
 
-      function renderDrawn(winners, isLiveTransition) {
+      // Renders the final "N winners tonight" hero + winners list.
+      // Used both for late viewers (instantly) and for live viewers
+      // (after the reel animation finishes).
+      function showFinalDrawnState(winners, shouldCelebrate) {
         if (countdownTimer) clearInterval(countdownTimer);
         const hero = document.getElementById('draw-hero');
         hero.classList.add('drawn');
@@ -192,11 +255,7 @@
         `;
         startCountdown();
 
-        // Only celebrate for someone who was actually watching it
-        // happen live — not every time someone opens the page hours
-        // later and sees an already-decided result.
-        if (isLiveTransition && !hasCelebrated) {
-          hasCelebrated = true;
+        if (shouldCelebrate) {
           setTimeout(() => celebrate(), 150);
         }
 
@@ -214,6 +273,86 @@
         document.getElementById('winners-section').style.display = 'block';
       }
 
+      // Builds and animates the ticket-by-ticket reel, landing on the
+      // actual winning ticket, then reveals the final state. The
+      // winner is already decided server-side by get_draw_reel() —
+      // this animation only ever reveals a result that already
+      // exists, never generates one.
+      function animateReel(reel) {
+        return new Promise((resolve) => {
+          const section = document.getElementById('reel-section');
+          const viewport = section.querySelector('.reel-viewport');
+          const track = document.getElementById('reel-track');
+          section.style.display = 'block';
+          track.innerHTML = '';
+          track.style.transition = 'none';
+          track.style.transform = 'translateX(0px)';
+
+          const CARD_W = 74, GAP = 8, STEP = CARD_W + GAP, LOOPS = 3;
+
+          // Land on the first winning ticket in reel order. (Note:
+          // for draws with more than one winner, this animates to
+          // just the first — a future improvement could chain one
+          // short spin per winner instead of a single landing.)
+          const winnerIdx = reel.findIndex(t => t.is_winner);
+          const targetIdx = winnerIdx >= 0 ? winnerIdx : 0;
+
+          const displaySeq = [];
+          for (let i = 0; i < LOOPS; i++) displaySeq.push(...reel);
+          displaySeq.push(...reel.slice(0, targetIdx + 1));
+          const landingIndex = displaySeq.length - 1;
+
+          displaySeq.forEach((t, i) => {
+            const card = document.createElement('div');
+            card.className = 'reel-card' + (i === landingIndex ? ' reel-winner-card' : '');
+            const seed = encodeURIComponent(t.display_name || 'Player');
+            const avatarSrc = t.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+            const firstName = (t.display_name || 'Player').split(' ')[0];
+            card.innerHTML = `<img src="${avatarSrc}" alt="" /><small>${escapeHtml(firstName)}</small>`;
+            track.appendChild(card);
+          });
+
+          // Force layout flush so the transition below actually
+          // animates from translateX(0) instead of jumping instantly.
+          void track.offsetWidth;
+
+          const finalOffset = -(landingIndex * STEP + CARD_W / 2);
+          const duration = Math.min(6000, Math.max(3200, landingIndex * 14));
+          track.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.72, 0.1, 1)`;
+
+          requestAnimationFrame(() => {
+            track.style.transform = `translateX(${finalOffset}px)`;
+          });
+
+          setTimeout(resolve, duration + 300);
+        });
+      }
+
+      async function playReelThenReveal(client, winners, todayStr) {
+        try {
+          const { data: reel, error } = await client.rpc('get_draw_reel', { p_draw_date: todayStr });
+          if (error) throw error;
+          if (reel && reel.length > 0) {
+            await animateReel(reel);
+          }
+        } catch (err) {
+          // If the reel can't be loaded for any reason, don't block
+          // the reveal — just skip straight to the result.
+          console.warn('Reel animation skipped:', err);
+        }
+        document.getElementById('reel-section').style.display = 'none';
+        showFinalDrawnState(winners, true);
+      }
+
+      function renderDrawn(client, winners, isLiveTransition, todayStr) {
+        if (isLiveTransition && !hasCelebrated) {
+          hasCelebrated = true;
+          playReelThenReveal(client, winners, todayStr);
+        } else {
+          showFinalDrawnState(winners, false);
+        }
+      }
+
       let lastKnownDrawn = null;
 
       async function loadDrawStatus(client) {
@@ -226,7 +365,7 @@
           const todayStr = new Date().toISOString().slice(0, 10);
           const tonightsWinners = (recent || []).filter(w => w.draw_date === todayStr);
           const isLiveTransition = lastKnownDrawn === false; // was watching it flip
-          renderDrawn(tonightsWinners.length ? tonightsWinners : recent?.slice(0, 1) || [], isLiveTransition);
+          renderDrawn(client, tonightsWinners.length ? tonightsWinners : recent?.slice(0, 1) || [], isLiveTransition, todayStr);
         } else {
           renderWaiting(status.entries_today);
         }
