@@ -372,9 +372,43 @@
         lastKnownDrawn = status.is_drawn;
       }
 
+      // ---- TEMPORARY TEST HOOK ----
+      // Lets you manually replay today's already-completed reel
+      // animation without needing to run a new draw or open dev
+      // tools. Only activates if you add ?testreel=1 to the URL —
+      // normal users visiting the page never see this. Safe to
+      // delete this whole block once you're happy with the animation.
+      async function runTestReel(client) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const { data: reel, error } = await client.rpc('get_draw_reel', { p_draw_date: todayStr });
+        if (error) {
+          alert('Reel error: ' + error.message);
+          return;
+        }
+        if (!reel || reel.length === 0) {
+          alert('No completed draw found for today yet — nothing to replay.');
+          return;
+        }
+        await animateReel(reel);
+        document.getElementById('reel-section').style.display = 'none';
+      }
+
+      function setupTestHook(client) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('testreel') !== '1') return;
+
+        const btn = document.createElement('button');
+        btn.textContent = '▶ Test Reel Animation';
+        btn.style.cssText = 'display:block; width:100%; margin-bottom:12px; padding:12px; background:#fdcb6e; border:none; border-radius:12px; font-weight:800; font-size:13px;';
+        btn.addEventListener('click', () => runTestReel(client));
+        document.querySelector('.main-content').prepend(btn);
+      }
+      // ---- END TEMPORARY TEST HOOK ----
+
       async function init() {
         const client = window.getSupabaseClient();
         if (!client) return;
+        setupTestHook(client);
         await loadDrawStatus(client);
 
         // Poll for the moment the draw actually happens (or resets
