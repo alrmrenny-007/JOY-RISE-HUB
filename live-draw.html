@@ -100,6 +100,11 @@
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 3px;
       border: 2px solid rgba(255,255,255,0.08);
+      filter: blur(0px);
+      transition: filter 280ms ease-out;
+    }
+    .reel-track.spinning .reel-card {
+      filter: blur(1.4px);
     }
     .reel-card img {
       width: 30px; height: 30px; border-radius: 50%;
@@ -114,6 +119,23 @@
       border-color: #fff;
     }
     .reel-card.reel-winner-card small { color: #4a3200; }
+
+    @keyframes reelCardPop {
+      0%   { transform: scale(1); }
+      45%  { transform: scale(1.18); }
+      100% { transform: scale(1); }
+    }
+    .reel-card-pop {
+      animation: reelCardPop 420ms ease-out;
+    }
+    @keyframes reelPointerPulse {
+      0%   { box-shadow: 0 0 10px #fdcb6e; }
+      50%  { box-shadow: 0 0 22px 6px #fdcb6e; }
+      100% { box-shadow: 0 0 10px #fdcb6e; }
+    }
+    .reel-pointer.pulse {
+      animation: reelPointerPulse 420ms ease-out;
+    }
   </style>
 </head>
 <body>
@@ -273,38 +295,63 @@
         document.getElementById('winners-section').style.display = 'block';
       }
 
-      // Builds and animates the ticket-by-ticket reel, landing on the
-      // actual winning ticket, then reveals the final state. The
-      // winner is already decided server-side by get_draw_reel() —
-      // this animation only ever reveals a result that already
-      // exists, never generates one.
-      function animateReel(reel) {
+      // ---- REEL TUNING KNOBS ----
+      // Change any of these numbers to adjust the feel of the draw
+      // reel — nothing else in the code below needs to be touched.
+      const REEL_CONFIG = {
+        CARD_WIDTH: 74,
+        CARD_GAP: 8,
+        LOOPS_FIRST: 3,        // full laps around the reel before the first winner lands
+        LOOPS_BETWEEN: 1,      // laps between each additional winner (for multi-winner draws)
+        FIRST_SPIN_MIN_MS: 2600,  // shortest the opening spin can be (small draws)
+        FIRST_SPIN_MAX_MS: 6500,  // longest the opening spin can be (big draws)
+        BETWEEN_SPIN_MS: 1300,    // duration of each follow-up spin to the next winner
+        PAUSE_AFTER_WIN_MS: 1100, // pause on a winner before spinning to the next one
+        PAUSE_AFTER_LAST_MS: 900, // pause on the final winner before the reel hides
+        BLUR_CLEAR_BEFORE_LANDING_MS: 450, // motion blur clears this long before it stops
+      };
+      // ---- END REEL TUNING KNOBS ----
+
+      // Builds and animates the ticket-by-ticket reel. Handles ANY
+      // number of winners: it spins to the first winner, pauses and
+      // highlights them, then does a shorter follow-up spin to the
+      // next winner, and so on — one continuous strip, never resetting
+      // to the start between winners. All winners are already decided
+      // server-side by get_draw_reel() before this ever runs — this
+      // only reveals results that already exist, never generates one.
+      function animateMultiWinnerReel(reel, winnerTargets) {
         return new Promise((resolve) => {
           const section = document.getElementById('reel-section');
-          const viewport = section.querySelector('.reel-viewport');
+          const titleEl = section.querySelector('.reel-title');
+          const pointerEl = section.querySelector('.reel-pointer');
           const track = document.getElementById('reel-track');
           section.style.display = 'block';
+          titleEl.textContent = winnerTargets.length > 1
+            ? `Picking winner 1 of ${winnerTargets.length}...`
+            : "Picking tonight's winner...";
           track.innerHTML = '';
+          track.classList.remove('spinning');
           track.style.transition = 'none';
           track.style.transform = 'translateX(0px)';
 
-          const CARD_W = 74, GAP = 8, STEP = CARD_W + GAP, LOOPS = 3;
+          const { CARD_WIDTH: CARD_W, CARD_GAP: GAP } = REEL_CONFIG;
+          const STEP = CARD_W + GAP;
 
-          // Land on the first winning ticket in reel order. (Note:
-          // for draws with more than one winner, this animates to
-          // just the first — a future improvement could chain one
-          // short spin per winner instead of a single landing.)
-          const winnerIdx = reel.findIndex(t => t.is_winner);
-          const targetIdx = winnerIdx >= 0 ? winnerIdx : 0;
-
+          // Build one continuous sequence of cards covering every
+          // winner's reveal, one after another, always moving forward
+          // (never jumping backward through the strip).
           const displaySeq = [];
-          for (let i = 0; i < LOOPS; i++) displaySeq.push(...reel);
-          displaySeq.push(...reel.slice(0, targetIdx + 1));
-          const landingIndex = displaySeq.length - 1;
+          const landings = [];
+          winnerTargets.forEach((target, i) => {
+            const loopsToAdd = i === 0 ? REEL_CONFIG.LOOPS_FIRST : REEL_CONFIG.LOOPS_BETWEEN;
+            for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
+            displaySeq.push(...reel.slice(0, target.idx + 1));
+            landings.push(displaySeq.length - 1);
+          });
 
-          displaySeq.forEach((t, i) => {
+          displaySeq.forEach((t) => {
             const card = document.createElement('div');
-            card.className = 'reel-card' + (i === landingIndex ? ' reel-winner-card' : '');
+            card.className = 'reel-card';
             const seed = encodeURIComponent(t.display_name || 'Player');
             const avatarSrc = t.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
             const firstName = (t.display_name || 'Player').split(' ')[0];
@@ -312,19 +359,62 @@
             track.appendChild(card);
           });
 
-          // Force layout flush so the transition below actually
+          // Force layout flush so the very first transition actually
           // animates from translateX(0) instead of jumping instantly.
           void track.offsetWidth;
 
-          const finalOffset = -(landingIndex * STEP + CARD_W / 2);
-          const duration = Math.min(6000, Math.max(3200, landingIndex * 14));
-          track.style.transition = `transform ${duration}ms cubic-bezier(0.12, 0.72, 0.1, 1)`;
+          const allCards = track.querySelectorAll('.reel-card');
 
-          requestAnimationFrame(() => {
-            track.style.transform = `translateX(${finalOffset}px)`;
-          });
+          function runSegment(segmentIdx) {
+            if (segmentIdx >= landings.length) {
+              resolve();
+              return;
+            }
 
-          setTimeout(resolve, duration + 300);
+            const landingIndex = landings[segmentIdx];
+            const isFirst = segmentIdx === 0;
+            const finalOffset = -(landingIndex * STEP + CARD_W / 2);
+            const duration = isFirst
+              ? Math.min(REEL_CONFIG.FIRST_SPIN_MAX_MS, Math.max(REEL_CONFIG.FIRST_SPIN_MIN_MS, landingIndex * 14))
+              : REEL_CONFIG.BETWEEN_SPIN_MS;
+
+            if (winnerTargets.length > 1 && segmentIdx > 0) {
+              titleEl.textContent = `Picking winner ${segmentIdx + 1} of ${winnerTargets.length}...`;
+            }
+
+            // Motion blur while it's flying past cards, clearing to
+            // sharp focus just before it settles on the winner — this
+            // is what makes it read as "fast" rather than just "sliding".
+            track.classList.add('spinning');
+            const blurClearAt = Math.max(0, duration - REEL_CONFIG.BLUR_CLEAR_BEFORE_LANDING_MS);
+            setTimeout(() => track.classList.remove('spinning'), blurClearAt);
+
+            // easeOutExpo — a fast start with a long, satisfying
+            // slowdown. This is the standard curve for slot-machine /
+            // prize-reveal style animations.
+            track.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+            requestAnimationFrame(() => {
+              track.style.transform = `translateX(${finalOffset}px)`;
+            });
+
+            setTimeout(() => {
+              const landedCard = allCards[landingIndex];
+              landedCard.classList.add('reel-winner-card', 'reel-card-pop');
+              pointerEl.classList.add('pulse');
+              setTimeout(() => pointerEl.classList.remove('pulse'), 450);
+
+              const target = winnerTargets[segmentIdx];
+              const prizeStr = Number(target.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+              titleEl.textContent = `🎉 ${target.display_name || 'A Winner'} — ₦${prizeStr}`;
+
+              const pause = segmentIdx === winnerTargets.length - 1
+                ? REEL_CONFIG.PAUSE_AFTER_LAST_MS
+                : REEL_CONFIG.PAUSE_AFTER_WIN_MS;
+              setTimeout(() => runSegment(segmentIdx + 1), pause);
+            }, duration + 150);
+          }
+
+          runSegment(0);
         });
       }
 
@@ -333,7 +423,12 @@
           const { data: reel, error } = await client.rpc('get_draw_reel', { p_draw_date: todayStr });
           if (error) throw error;
           if (reel && reel.length > 0) {
-            await animateReel(reel);
+            const winnerTargets = reel
+              .map((t, idx) => ({ ...t, idx }))
+              .filter((t) => t.is_winner);
+            if (winnerTargets.length > 0) {
+              await animateMultiWinnerReel(reel, winnerTargets);
+            }
           }
         } catch (err) {
           // If the reel can't be loaded for any reason, don't block
@@ -372,43 +467,9 @@
         lastKnownDrawn = status.is_drawn;
       }
 
-      // ---- TEMPORARY TEST HOOK ----
-      // Lets you manually replay today's already-completed reel
-      // animation without needing to run a new draw or open dev
-      // tools. Only activates if you add ?testreel=1 to the URL —
-      // normal users visiting the page never see this. Safe to
-      // delete this whole block once you're happy with the animation.
-      async function runTestReel(client) {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const { data: reel, error } = await client.rpc('get_draw_reel', { p_draw_date: todayStr });
-        if (error) {
-          alert('Reel error: ' + error.message);
-          return;
-        }
-        if (!reel || reel.length === 0) {
-          alert('No completed draw found for today yet — nothing to replay.');
-          return;
-        }
-        await animateReel(reel);
-        document.getElementById('reel-section').style.display = 'none';
-      }
-
-      function setupTestHook(client) {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('testreel') !== '1') return;
-
-        const btn = document.createElement('button');
-        btn.textContent = '▶ Test Reel Animation';
-        btn.style.cssText = 'display:block; width:100%; margin-bottom:12px; padding:12px; background:#fdcb6e; border:none; border-radius:12px; font-weight:800; font-size:13px;';
-        btn.addEventListener('click', () => runTestReel(client));
-        document.querySelector('.main-content').prepend(btn);
-      }
-      // ---- END TEMPORARY TEST HOOK ----
-
       async function init() {
         const client = window.getSupabaseClient();
         if (!client) return;
-        setupTestHook(client);
         await loadDrawStatus(client);
 
         // Poll for the moment the draw actually happens (or resets
