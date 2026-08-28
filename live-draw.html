@@ -226,7 +226,7 @@
         countdownTimer = setInterval(tick, 1000);
       }
 
-      function renderWaiting(entries) {
+      function renderWaiting(entries, participants) {
         hasCelebrated = false;
         document.getElementById('draw-hero').classList.remove('drawn');
         document.getElementById('hero-tag').textContent = 'LIVE DRAW';
@@ -236,7 +236,10 @@
           <div class="countdown-row">
             <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Until 8:00 PM</span></div>
           </div>
-          <div class="entries-pill"><i class="fa-solid fa-ticket"></i> <strong id="entries-count">${entries}</strong> ticket${entries === 1 ? '' : 's'} entered tonight</div>
+          <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+            <div class="entries-pill"><i class="fa-solid fa-ticket"></i> <strong id="entries-count">${entries}</strong> ticket${entries === 1 ? '' : 's'} entered</div>
+            <div class="entries-pill"><i class="fa-solid fa-users"></i> <strong id="participants-count">${participants}</strong> participant${participants === 1 ? '' : 's'}</div>
+          </div>
         `;
         startCountdown();
         document.getElementById('winners-section').style.display = 'none';
@@ -462,7 +465,9 @@
           const isLiveTransition = lastKnownDrawn === false; // was watching it flip
           renderDrawn(client, tonightsWinners.length ? tonightsWinners : recent?.slice(0, 1) || [], isLiveTransition, todayStr);
         } else {
-          renderWaiting(status.entries_today);
+          const todayStr = new Date().toISOString().slice(0, 10);
+          const { data: participantCount } = await client.rpc('get_live_draw_participant_count', { p_draw_date: todayStr });
+          renderWaiting(status.entries_today, participantCount ?? 0);
         }
         lastKnownDrawn = status.is_drawn;
       }
