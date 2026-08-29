@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Winners — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -12,6 +24,62 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    .draw-summary-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 16px 14px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .draw-summary-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 2px;
+    }
+    .draw-summary-header h3 {
+      font-size: 15px; font-weight: 800; color: #1e1e24; margin: 0;
+    }
+    .draw-status-pill {
+      font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 10px;
+      background: #d3f9e8; color: #00b894; text-transform: uppercase;
+    }
+    .draw-summary-date {
+      font-size: 12px; color: #636e72; margin-bottom: 12px;
+    }
+    .draw-stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px;
+      margin-bottom: 12px;
+    }
+    .draw-stat-label {
+      color: #909398; font-size: 10px; text-transform: uppercase;
+      font-weight: 700; margin-bottom: 2px;
+    }
+    .draw-stat-value {
+      color: #1e1e24; font-weight: 800; font-size: 14px;
+    }
+    .draw-tickets-line {
+      font-size: 11.5px; color: #636e72; background: #f4f5f9;
+      border-radius: 10px; padding: 8px 10px; margin-bottom: 10px;
+      word-break: break-word;
+    }
+    .draw-winner-row {
+      display: flex; align-items: center; gap: 10px; padding: 8px 0;
+      border-top: 1px solid #f1f2f6;
+    }
+    .draw-winner-row:first-of-type {
+      border-top: none; padding-top: 0;
+    }
+    .draw-winner-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: #fff3cd; color: #f59f00;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 13px;
+    }
+    .draw-winner-info { flex: 1; min-width: 0; }
+    .draw-winner-info strong { font-size: 12.5px; display: block; }
+    .draw-winner-info small { font-size: 10.5px; color: #909398; }
+    .draw-winner-prize { font-size: 12.5px; font-weight: 800; color: #00b894; white-space: nowrap; }
+  </style>
 </head>
 <body>
 
@@ -32,7 +100,7 @@
         <div class="banner-content">
           <span class="live-tag"><span class="green-dot"></span> DAILY DRAW</span>
           <h2>Recent Winners</h2>
-          <p>See who's won so far</p>
+          <p>Full breakdown of every completed draw</p>
           <div class="banner-bottom">
             <a href="live-draw.html" class="btn-telegram">Watch Tonight's Draw <i class="fa-solid fa-bolt"></i></a>
           </div>
@@ -59,6 +127,20 @@
         window.location.href = 'index.html';
       });
 
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      }
+
+      function fmt(n) {
+        return Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      }
+
+      function ticketCode(num) {
+        return 'TK-' + String(num).padStart(4, '0');
+      }
+
       function skeletonRows(count) {
         return Array.from({ length: count }).map(() => `
           <div class="skeleton-row">
@@ -72,21 +154,85 @@
         `).join('');
       }
 
-      async function loadWinners() {
+      function renderDrawCard(d) {
+        const dateStr = new Date(d.draw_date + 'T00:00:00').toLocaleDateString('en-NG', {
+          day: 'numeric', month: 'short', year: 'numeric',
+        });
+        // Uses the ACTUAL completed_at timestamp — not an assumed
+        // "8:00 PM" — since manual draws can be run at any time, and
+        // this page's whole point is showing what really happened.
+        const timeStr = d.completed_at
+          ? new Date(d.completed_at).toLocaleTimeString('en-NG', {
+              hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos',
+            })
+          : '—';
+
+        const winners = d.winners || [];
+        const pct = d.total_revenue > 0 ? Math.round((d.prize_pool / d.total_revenue) * 100) : 0;
+        const ticketCodes = winners.map(w => ticketCode(w.ticket_number)).join(', ');
+
+        return `
+          <div class="draw-summary-card">
+            <div class="draw-summary-header">
+              <h3>Draw #${String(d.draw_number).padStart(3, '0')}</h3>
+              <span class="draw-status-pill">${escapeHtml(d.status)}</span>
+            </div>
+            <div class="draw-summary-date">${dateStr} &middot; ${timeStr} WAT</div>
+
+            <div class="draw-stats-grid">
+              <div>
+                <div class="draw-stat-label">Eligible Entries</div>
+                <div class="draw-stat-value">${Number(d.total_entries).toLocaleString('en-NG')}</div>
+              </div>
+              <div>
+                <div class="draw-stat-label">Draw Revenue</div>
+                <div class="draw-stat-value">&#8358;${fmt(d.total_revenue)}</div>
+              </div>
+              <div>
+                <div class="draw-stat-label">Prize Pool${pct > 0 ? ` (${pct}%)` : ''}</div>
+                <div class="draw-stat-value">&#8358;${fmt(d.prize_pool)}</div>
+              </div>
+              <div>
+                <div class="draw-stat-label">Winners</div>
+                <div class="draw-stat-value">${d.winner_count}</div>
+              </div>
+            </div>
+
+            ${winners.length > 0 ? `
+              <div class="draw-tickets-line">
+                <i class="fa-solid fa-ticket"></i> Winning ticket${winners.length > 1 ? 's' : ''}: ${ticketCodes}
+              </div>
+            ` : ''}
+
+            ${winners.map(w => `
+              <div class="draw-winner-row">
+                <div class="draw-winner-avatar"><i class="fa-solid fa-trophy"></i></div>
+                <div class="draw-winner-info">
+                  <strong>${escapeHtml(w.display_name || 'A Winner')}</strong>
+                  <small>${ticketCode(w.ticket_number)}</small>
+                </div>
+                <div class="draw-winner-prize">&#8358;${fmt(w.prize_amount)}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      async function loadDrawHistory() {
         const client = window.getSupabaseClient();
         if (!client) return;
 
         const listEl = document.getElementById('winners-list');
         const emptyEl = document.getElementById('winners-empty');
-        listEl.innerHTML = skeletonRows(5);
+        listEl.innerHTML = skeletonRows(4);
 
-        const { data, error } = await client.rpc('get_recent_winners', { p_limit: 30 });
+        const { data, error } = await client.rpc('get_draw_history', { p_limit: 30 });
 
         if (error) {
-          console.error('Error loading winners:', error.message);
+          console.error('Error loading draw history:', error.message);
           listEl.innerHTML = '';
           emptyEl.style.display = 'flex';
-          emptyEl.querySelector('p').textContent = "Couldn't load winners right now.";
+          emptyEl.querySelector('p').textContent = "Couldn't load draw history right now.";
           return;
         }
 
@@ -96,25 +242,10 @@
           return;
         }
 
-        listEl.innerHTML = data.map(w => `
-          <div class="winner-row">
-            <div class="winner-avatar"><i class="fa-solid fa-trophy"></i></div>
-            <div class="winner-info">
-              <strong>${escapeHtml(w.display_name || 'A Winner')}</strong>
-              <small>${new Date(w.draw_date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}</small>
-            </div>
-            <div class="winner-prize">&#8358;${Number(w.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
-          </div>
-        `).join('');
+        listEl.innerHTML = data.map(renderDrawCard).join('');
       }
 
-      function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-      }
-
-      loadWinners();
+      loadDrawHistory();
     })();
   </script>
 </body>
