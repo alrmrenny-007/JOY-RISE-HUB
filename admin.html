@@ -201,6 +201,10 @@
 
     /* ---------- Draw control ---------- */
     .draw-card { position: relative; overflow: visible; text-align: center; }
+    .draw-mode-btn.selected {
+      background: #6c5ce7 !important;
+      color: #fff !important;
+    }
     .admin-shell .btn-auth-primary#run-draw-btn {
       width: 100%; margin-top: 10px; border: none; border-radius: 14px;
       padding: 15px; font-family: var(--font-display); font-weight: 700; font-size: 14px;
@@ -415,6 +419,36 @@
           <h3 class="admin-section-title"><i class="fa-solid fa-chart-line"></i> Business Overview</h3>
           <div id="analytics-grid" class="analytics-grid"></div>
           <div id="analytics-net" class="analytics-net-row"></div>
+        </section>
+
+        <section class="admin-section draw-card">
+          <h3 class="admin-section-title"><i class="fa-solid fa-sliders"></i> Today's Draw Mode</h3>
+          <p style="font-size:12px; color:#636e72; margin:6px 0 12px;">
+            Manual = you run it yourself from the button below. Automatic = the 8PM scheduler runs it on its own, using the winner count set here.
+          </p>
+
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <button type="button" class="btn-modal-cancel draw-mode-btn" id="mode-manual-btn" style="flex:1;">
+              <i class="fa-solid fa-hand"></i> Manual
+            </button>
+            <button type="button" class="btn-modal-cancel draw-mode-btn" id="mode-automatic-btn" style="flex:1;">
+              <i class="fa-solid fa-gears"></i> Automatic
+            </button>
+          </div>
+
+          <div id="mode-winner-count-row" style="display:none; align-items:center; gap:14px; margin-bottom:12px;">
+            <label class="amount-label" style="margin:0;">Winners (auto mode)</label>
+            <button type="button" id="mode-winner-minus" class="btn-modal-cancel" style="width:38px; padding:8px 0;">−</button>
+            <span id="mode-winner-count" style="font-size:18px; font-weight:800; min-width:24px; text-align:center;">1</span>
+            <button type="button" id="mode-winner-plus" class="btn-modal-cancel" style="width:38px; padding:8px 0;">+</button>
+          </div>
+
+          <div class="modal-error" id="mode-settings-error"></div>
+
+          <button class="btn-auth-primary" id="save-mode-btn" style="margin-top:2px;">
+            <span id="save-mode-label">Save Draw Mode</span>
+            <i class="fa-solid fa-spinner fa-spin modal-spinner" id="save-mode-spinner"></i>
+          </button>
         </section>
 
         <section class="admin-section draw-card">
@@ -682,6 +716,7 @@
         loadTiers(client);
         loadUsers(client, '');
         wireDrawButton(client);
+        wireDrawModeSettings(client);
         wireUserSearch(client);
         wireActivityFeed(client);
       }
@@ -811,6 +846,80 @@
             confirmBtn.classList.remove('loading');
           }
         });
+      }
+
+      function wireDrawModeSettings(client) {
+        const manualBtn = document.getElementById('mode-manual-btn');
+        const autoBtn = document.getElementById('mode-automatic-btn');
+        const winnerRow = document.getElementById('mode-winner-count-row');
+        const winnerCountEl = document.getElementById('mode-winner-count');
+        const minusBtn = document.getElementById('mode-winner-minus');
+        const plusBtn = document.getElementById('mode-winner-plus');
+        const saveBtn = document.getElementById('save-mode-btn');
+        const errorEl = document.getElementById('mode-settings-error');
+
+        let currentMode = 'manual';
+        let currentWinnerCount = 1;
+
+        function renderModeUI() {
+          manualBtn.classList.toggle('selected', currentMode === 'manual');
+          autoBtn.classList.toggle('selected', currentMode === 'automatic');
+          winnerRow.style.display = currentMode === 'automatic' ? 'flex' : 'none';
+          winnerCountEl.textContent = currentWinnerCount;
+          minusBtn.disabled = currentWinnerCount <= 1;
+        }
+
+        async function loadSettings() {
+          try {
+            const { data, error } = await client.rpc('admin_get_draw_day_settings', {
+              p_draw_date: new Date().toISOString().slice(0, 10),
+            });
+            if (error) throw error;
+            const row = data?.[0];
+            currentMode = row?.mode || 'manual';
+            currentWinnerCount = row?.planned_winner_count || 1;
+            renderModeUI();
+          } catch (err) {
+            errorEl.textContent = 'Could not load draw mode: ' + (err.message || 'unknown error');
+          }
+        }
+
+        manualBtn.addEventListener('click', () => { currentMode = 'manual'; renderModeUI(); });
+        autoBtn.addEventListener('click', () => { currentMode = 'automatic'; renderModeUI(); });
+
+        minusBtn.addEventListener('click', () => {
+          if (currentWinnerCount > 1) { currentWinnerCount--; renderModeUI(); }
+        });
+        plusBtn.addEventListener('click', () => {
+          currentWinnerCount++; renderModeUI();
+        });
+
+        saveBtn.addEventListener('click', async () => {
+          errorEl.textContent = '';
+          saveBtn.disabled = true;
+          saveBtn.classList.add('loading');
+
+          try {
+            const { error } = await client.rpc('admin_set_draw_day_settings', {
+              p_draw_date: new Date().toISOString().slice(0, 10),
+              p_mode: currentMode,
+              p_planned_winner_count: currentMode === 'automatic' ? currentWinnerCount : null,
+            });
+            if (error) throw error;
+
+            errorEl.style.color = '#00b894';
+            errorEl.textContent = 'Saved!';
+            setTimeout(() => { errorEl.textContent = ''; errorEl.style.color = ''; }, 2500);
+          } catch (err) {
+            errorEl.style.color = '';
+            errorEl.textContent = err.message || 'Failed to save draw mode.';
+          } finally {
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('loading');
+          }
+        });
+
+        loadSettings();
       }
 
       async function loadTiers(client) {
