@@ -201,25 +201,35 @@
 
     /* ---------- Draw control ---------- */
     .draw-card { position: relative; overflow: visible; text-align: center; }
-    .draw-mode-btn.selected {
+    .draw-mode-btn.selected, .slot-mode-btn.selected {
       background: #6c5ce7 !important;
       color: #fff !important;
     }
-    .admin-shell .btn-auth-primary#run-draw-btn {
-      width: 100%; margin-top: 10px; border: none; border-radius: 14px;
-      padding: 15px; font-family: var(--font-display); font-weight: 700; font-size: 14px;
-      color: #1a1220;
-      background: linear-gradient(135deg, var(--gold), #FFD97A);
-      box-shadow: 0 0 0 0 rgba(245,185,66,0.5);
-      animation: gold-breathe 2.6s ease-in-out infinite;
-      transition: transform 120ms ease;
+    .schedule-slot-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid #f1f2f6;
     }
-    .admin-shell .btn-auth-primary#run-draw-btn:active { transform: scale(0.98); }
-    .admin-shell .btn-auth-primary#run-draw-btn:disabled { animation: none; opacity: 0.7; }
-    @keyframes gold-breathe {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(245,185,66,0.35); }
-      50%      { box-shadow: 0 0 22px 4px rgba(245,185,66,0.35); }
+    .schedule-slot-row:last-child { border-bottom: none; }
+    .schedule-slot-time { font-size: 15px; font-weight: 800; color: #1e1e24; }
+    .schedule-slot-meta { font-size: 11px; color: #909398; margin-top: 2px; }
+    .schedule-slot-badge {
+      font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+      padding: 2px 7px; border-radius: 8px; margin-right: 6px;
     }
+    .schedule-slot-badge.manual { background: #f4f5f9; color: #636e72; }
+    .schedule-slot-badge.automatic { background: #d3f9e8; color: #00b894; }
+    .schedule-slot-badge.inactive { background: #ffeaea; color: #ff4757; }
+    .today-slot-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid #f1f2f6; text-align: left;
+    }
+    .today-slot-row:last-child { border-bottom: none; }
+    .today-slot-run-btn {
+      background: #6c5ce7; color: #fff; border: none; border-radius: 10px;
+      padding: 8px 16px; font-size: 12.5px; font-weight: 700;
+    }
+    .today-slot-run-btn:disabled { opacity: 0.6; }
+    .today-slot-done { font-size: 11.5px; color: #00b894; font-weight: 700; }
     .admin-result { margin-top: 12px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
     .confetti-piece {
       position: absolute; top: 50%; width: 6px; height: 10px; border-radius: 2px;
@@ -421,42 +431,22 @@
           <div id="analytics-net" class="analytics-net-row"></div>
         </section>
 
-        <section class="admin-section draw-card">
-          <h3 class="admin-section-title"><i class="fa-solid fa-sliders"></i> Today's Draw Mode</h3>
+        <section class="admin-section draw-card" style="text-align:left;">
+          <h3 class="admin-section-title"><i class="fa-solid fa-calendar-days"></i> Draw Schedule</h3>
           <p style="font-size:12px; color:#636e72; margin:6px 0 12px;">
-            Manual = you run it yourself from the button below. Automatic = the 8PM scheduler runs it on its own, using the winner count set here.
+            Recurring daily draw times — these repeat every day. Add as many as you like, each with its own mode and winner count.
           </p>
 
-          <div style="display:flex; gap:8px; margin-bottom:12px;">
-            <button type="button" class="btn-modal-cancel draw-mode-btn" id="mode-manual-btn" style="flex:1;">
-              <i class="fa-solid fa-hand"></i> Manual
-            </button>
-            <button type="button" class="btn-modal-cancel draw-mode-btn" id="mode-automatic-btn" style="flex:1;">
-              <i class="fa-solid fa-gears"></i> Automatic
-            </button>
-          </div>
+          <div id="schedule-slots-list"></div>
 
-          <div id="mode-winner-count-row" style="display:none; align-items:center; gap:14px; margin-bottom:12px;">
-            <label class="amount-label" style="margin:0;">Winners (auto mode)</label>
-            <button type="button" id="mode-winner-minus" class="btn-modal-cancel" style="width:38px; padding:8px 0;">−</button>
-            <span id="mode-winner-count" style="font-size:18px; font-weight:800; min-width:24px; text-align:center;">1</span>
-            <button type="button" id="mode-winner-plus" class="btn-modal-cancel" style="width:38px; padding:8px 0;">+</button>
-          </div>
-
-          <div class="modal-error" id="mode-settings-error"></div>
-
-          <button class="btn-auth-primary" id="save-mode-btn" style="margin-top:2px;">
-            <span id="save-mode-label">Save Draw Mode</span>
-            <i class="fa-solid fa-spinner fa-spin modal-spinner" id="save-mode-spinner"></i>
+          <button class="btn-auth-primary" id="add-slot-btn" style="margin-top:10px; background:#f4f5f9; color:#2d3436; box-shadow:none;">
+            <i class="fa-solid fa-plus"></i> Add Draw Time
           </button>
         </section>
 
-        <section class="admin-section draw-card">
-          <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draw</h3>
-          <button class="btn-auth-primary" id="run-draw-btn">
-            <span id="run-draw-label">Run Today's Draw</span>
-            <i class="fa-solid fa-spinner fa-spin modal-spinner" id="run-draw-spinner"></i>
-          </button>
+        <section class="admin-section draw-card" style="text-align:left;">
+          <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draws</h3>
+          <div id="today-slots-list" style="font-size:13px; color:#636e72;">Loading...</div>
           <div class="admin-result" id="draw-result"></div>
         </section>
       </div>
@@ -715,39 +705,44 @@
         loadWithdrawalHistory(client);
         loadTiers(client);
         loadUsers(client, '');
-        wireDrawButton(client);
-        wireDrawModeSettings(client);
+        wireDrawModal(client);
+        wireScheduleManager(client);
+        wireTodaySlots(client);
         wireUserSearch(client);
         wireActivityFeed(client);
       }
 
-      function wireDrawButton(client) {
-        const btn = document.getElementById('run-draw-btn');
+      // Generic slot-aware draw confirmation modal. Call
+      // openDrawModalForSlot(slot) from anywhere (e.g. a "Run Now"
+      // button on a specific slot row) to open it scoped to that slot.
+      let openDrawModalForSlot = null;
+
+      function wireDrawModal(client) {
         const resultEl = document.getElementById('draw-result');
         const card = document.querySelector('.draw-card');
 
         const overlay = document.getElementById('draw-modal-overlay');
+        const titleEl = document.getElementById('draw-modal-title');
+        const subtitleEl = document.getElementById('draw-modal-subtitle');
         const loadingEl = document.getElementById('draw-preview-loading');
         const bodyEl = document.getElementById('draw-preview-body');
         const errorEl = document.getElementById('draw-modal-error');
         const closeBtn = document.getElementById('draw-modal-close-btn');
         const cancelBtn = document.getElementById('draw-modal-cancel-btn');
         const confirmBtn = document.getElementById('draw-modal-confirm-btn');
-        const confirmLabel = document.getElementById('draw-modal-confirm-label');
-        const spinner = document.getElementById('draw-modal-spinner');
         const minusBtn = document.getElementById('pv-winner-minus');
         const plusBtn = document.getElementById('pv-winner-plus');
 
         const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
-        let latestPreview = null;   // last preview row from the server
-        let overrideCount = null;   // null = use tier default; number = explicit override
+        let currentSlot = null;    // { id, label, slot_time }
+        let latestPreview = null;
+        let overrideCount = null;
         let totalEntries = 0;
 
         function fmtWinnerCount() {
           document.getElementById('pv-winner-count').textContent = latestPreview.winner_count;
           document.getElementById('pv-override-badge').style.display = latestPreview.is_override ? 'inline-block' : 'none';
-          // Disable [-] at 1 winner, disable [+] once winners == total entries
           minusBtn.disabled = latestPreview.winner_count <= 1;
           plusBtn.disabled = latestPreview.winner_count >= totalEntries;
         }
@@ -770,6 +765,7 @@
           try {
             const { data, error } = await client.rpc('admin_preview_draw', {
               p_draw_date: new Date().toISOString().slice(0, 10),
+              p_slot_id: currentSlot.id,
               p_override_winner_count: overrideCount,
             });
             if (error) throw error;
@@ -789,8 +785,11 @@
           }
         }
 
-        function openModal() {
-          overrideCount = null; // reset to tier default every time the modal opens
+        function openModal(slot) {
+          currentSlot = slot;
+          overrideCount = null;
+          titleEl.textContent = `Run ${slot.label || 'Draw'}`;
+          subtitleEl.textContent = `${slot.slot_time?.slice(0, 5) || ''} · Review the split before confirming`;
           overlay.classList.add('open');
           loadPreview();
         }
@@ -799,7 +798,8 @@
           overlay.classList.remove('open');
         }
 
-        btn.addEventListener('click', openModal);
+        openDrawModalForSlot = openModal;
+
         closeBtn.addEventListener('click', closeModal);
         cancelBtn.addEventListener('click', closeModal);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
@@ -825,6 +825,7 @@
 
           try {
             const { data, error } = await client.rpc('admin_run_draw', {
+              p_slot_id: currentSlot.id,
               p_winner_count: overrideCount,
             });
             if (error) throw error;
@@ -839,6 +840,7 @@
               celebrateBurst(card);
             }
             loadUsers(client, document.getElementById('user-search').value.trim());
+            wireTodaySlots(client); // refresh the today's-draws list so this slot now shows completed
           } catch (err) {
             errorEl.textContent = err.message || 'Draw failed.';
           } finally {
@@ -848,78 +850,218 @@
         });
       }
 
-      function wireDrawModeSettings(client) {
-        const manualBtn = document.getElementById('mode-manual-btn');
-        const autoBtn = document.getElementById('mode-automatic-btn');
-        const winnerRow = document.getElementById('mode-winner-count-row');
-        const winnerCountEl = document.getElementById('mode-winner-count');
-        const minusBtn = document.getElementById('mode-winner-minus');
-        const plusBtn = document.getElementById('mode-winner-plus');
-        const saveBtn = document.getElementById('save-mode-btn');
-        const errorEl = document.getElementById('mode-settings-error');
+      // ---- Draw Schedule manager (recurring slot definitions) ----
 
-        let currentMode = 'manual';
-        let currentWinnerCount = 1;
+      function wireScheduleManager(client) {
+        const listEl = document.getElementById('schedule-slots-list');
+        const addBtn = document.getElementById('add-slot-btn');
 
-        function renderModeUI() {
-          manualBtn.classList.toggle('selected', currentMode === 'manual');
-          autoBtn.classList.toggle('selected', currentMode === 'automatic');
-          winnerRow.style.display = currentMode === 'automatic' ? 'flex' : 'none';
-          winnerCountEl.textContent = currentWinnerCount;
-          minusBtn.disabled = currentWinnerCount <= 1;
+        const overlay = document.getElementById('slot-modal-overlay');
+        const titleEl = document.getElementById('slot-modal-title');
+        const closeBtn = document.getElementById('slot-modal-close-btn');
+        const cancelBtn = document.getElementById('slot-modal-cancel-btn');
+        const saveBtn = document.getElementById('slot-modal-save-btn');
+        const errorEl = document.getElementById('slot-modal-error');
+        const timeInput = document.getElementById('slot-time-input');
+        const labelInput = document.getElementById('slot-label-input');
+        const manualBtn = document.getElementById('slot-mode-manual-btn');
+        const autoBtn = document.getElementById('slot-mode-automatic-btn');
+        const winnerCountEl = document.getElementById('slot-winner-count');
+        const winnerMinus = document.getElementById('slot-winner-minus');
+        const winnerPlus = document.getElementById('slot-winner-plus');
+        const activeCheckbox = document.getElementById('slot-active-checkbox');
+
+        let editingSlotId = null;
+        let formMode = 'manual';
+        let formWinnerCount = 1;
+
+        function fmtTime(t) {
+          if (!t) return '';
+          const [h, m] = t.split(':').map(Number);
+          const period = h >= 12 ? 'PM' : 'AM';
+          const h12 = h % 12 === 0 ? 12 : h % 12;
+          return `${h12}:${String(m).padStart(2, '0')} ${period}`;
         }
 
-        async function loadSettings() {
-          try {
-            const { data, error } = await client.rpc('admin_get_draw_day_settings', {
-              p_draw_date: new Date().toISOString().slice(0, 10),
-            });
-            if (error) throw error;
-            const row = data?.[0];
-            currentMode = row?.mode || 'manual';
-            currentWinnerCount = row?.planned_winner_count || 1;
-            renderModeUI();
-          } catch (err) {
-            errorEl.textContent = 'Could not load draw mode: ' + (err.message || 'unknown error');
-          }
+        function renderFormMode() {
+          manualBtn.classList.toggle('selected', formMode === 'manual');
+          autoBtn.classList.toggle('selected', formMode === 'automatic');
+          winnerCountEl.textContent = formWinnerCount;
+          winnerMinus.disabled = formWinnerCount <= 1;
         }
 
-        manualBtn.addEventListener('click', () => { currentMode = 'manual'; renderModeUI(); });
-        autoBtn.addEventListener('click', () => { currentMode = 'automatic'; renderModeUI(); });
+        function openAddModal() {
+          editingSlotId = null;
+          titleEl.textContent = 'Add Draw Time';
+          timeInput.value = '';
+          labelInput.value = '';
+          formMode = 'manual';
+          formWinnerCount = 1;
+          activeCheckbox.checked = true;
+          errorEl.textContent = '';
+          renderFormMode();
+          overlay.classList.add('open');
+        }
 
-        minusBtn.addEventListener('click', () => {
-          if (currentWinnerCount > 1) { currentWinnerCount--; renderModeUI(); }
+        function openEditModal(slot) {
+          editingSlotId = slot.id;
+          titleEl.textContent = 'Edit Draw Time';
+          timeInput.value = slot.slot_time?.slice(0, 5) || '';
+          labelInput.value = slot.label || '';
+          formMode = slot.mode || 'manual';
+          formWinnerCount = slot.planned_winner_count || 1;
+          activeCheckbox.checked = slot.is_active !== false;
+          errorEl.textContent = '';
+          renderFormMode();
+          overlay.classList.add('open');
+        }
+
+        function closeModal() {
+          overlay.classList.remove('open');
+        }
+
+        addBtn.addEventListener('click', openAddModal);
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+        manualBtn.addEventListener('click', () => { formMode = 'manual'; renderFormMode(); });
+        autoBtn.addEventListener('click', () => { formMode = 'automatic'; renderFormMode(); });
+        winnerMinus.addEventListener('click', () => {
+          if (formWinnerCount > 1) { formWinnerCount--; renderFormMode(); }
         });
-        plusBtn.addEventListener('click', () => {
-          currentWinnerCount++; renderModeUI();
-        });
+        winnerPlus.addEventListener('click', () => { formWinnerCount++; renderFormMode(); });
 
         saveBtn.addEventListener('click', async () => {
           errorEl.textContent = '';
+
+          if (!timeInput.value) {
+            errorEl.textContent = 'Please pick a time.';
+            return;
+          }
+
           saveBtn.disabled = true;
           saveBtn.classList.add('loading');
 
           try {
-            const { error } = await client.rpc('admin_set_draw_day_settings', {
-              p_draw_date: new Date().toISOString().slice(0, 10),
-              p_mode: currentMode,
-              p_planned_winner_count: currentMode === 'automatic' ? currentWinnerCount : null,
-            });
-            if (error) throw error;
+            if (editingSlotId) {
+              const { error } = await client.rpc('admin_update_draw_slot', {
+                p_id: editingSlotId,
+                p_slot_time: timeInput.value,
+                p_label: labelInput.value.trim() || null,
+                p_mode: formMode,
+                p_planned_winner_count: formWinnerCount,
+                p_is_active: activeCheckbox.checked,
+              });
+              if (error) throw error;
+            } else {
+              const { error } = await client.rpc('admin_add_draw_slot', {
+                p_slot_time: timeInput.value,
+                p_label: labelInput.value.trim() || null,
+                p_mode: formMode,
+                p_planned_winner_count: formWinnerCount,
+              });
+              if (error) throw error;
+            }
 
-            errorEl.style.color = '#00b894';
-            errorEl.textContent = 'Saved!';
-            setTimeout(() => { errorEl.textContent = ''; errorEl.style.color = ''; }, 2500);
+            closeModal();
+            loadSlotsList();
+            wireTodaySlots(client);
           } catch (err) {
-            errorEl.style.color = '';
-            errorEl.textContent = err.message || 'Failed to save draw mode.';
+            errorEl.textContent = err.message || 'Failed to save.';
           } finally {
             saveBtn.disabled = false;
             saveBtn.classList.remove('loading');
           }
         });
 
-        loadSettings();
+        async function loadSlotsList() {
+          listEl.innerHTML = '<div style="font-size:12px; color:#909398; padding:8px 0;">Loading...</div>';
+          try {
+            const { data, error } = await client.rpc('admin_list_draw_slots');
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+              listEl.innerHTML = '<div style="font-size:12px; color:#909398; padding:8px 0;">No draw times set yet.</div>';
+              return;
+            }
+
+            listEl.innerHTML = data.map(slot => `
+              <div class="schedule-slot-row">
+                <div>
+                  <div class="schedule-slot-time">${fmtTime(slot.slot_time)}</div>
+                  <div class="schedule-slot-meta">
+                    <span class="schedule-slot-badge ${slot.mode}">${slot.mode}</span>
+                    ${!slot.is_active ? '<span class="schedule-slot-badge inactive">inactive</span>' : ''}
+                    ${slot.label ? escapeHtml(slot.label) + ' · ' : ''}${slot.planned_winner_count || 1} winner${(slot.planned_winner_count || 1) > 1 ? 's' : ''}
+                  </div>
+                </div>
+                <button class="icon-btn edit-slot-btn" data-slot='${JSON.stringify(slot).replace(/'/g, "&apos;")}'>
+                  <i class="fa-solid fa-pen"></i>
+                </button>
+              </div>
+            `).join('');
+
+            listEl.querySelectorAll('.edit-slot-btn').forEach(btn => {
+              btn.addEventListener('click', () => {
+                const slot = JSON.parse(btn.dataset.slot.replace(/&apos;/g, "'"));
+                openEditModal(slot);
+              });
+            });
+          } catch (err) {
+            listEl.innerHTML = `<div style="font-size:12px; color:#ff4757;">${escapeHtml(err.message || 'Failed to load schedule.')}</div>`;
+          }
+        }
+
+        loadSlotsList();
+      }
+
+      // ---- Today's Draws list (per-slot Run Now / Completed) ----
+
+      async function wireTodaySlots(client) {
+        const listEl = document.getElementById('today-slots-list');
+
+        function fmtTime(t) {
+          if (!t) return '';
+          const [h, m] = t.split(':').map(Number);
+          const period = h >= 12 ? 'PM' : 'AM';
+          const h12 = h % 12 === 0 ? 12 : h % 12;
+          return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+        }
+
+        try {
+          const { data, error } = await client.rpc('admin_get_today_slots_status', {
+            p_draw_date: new Date().toISOString().slice(0, 10),
+          });
+          if (error) throw error;
+
+          if (!data || data.length === 0) {
+            listEl.innerHTML = '<div style="font-size:12px; color:#909398;">No active draw times configured. Add one above.</div>';
+            return;
+          }
+
+          listEl.innerHTML = data.map(slot => `
+            <div class="today-slot-row">
+              <div>
+                <strong style="font-size:14px;">${fmtTime(slot.slot_time)}</strong>
+                ${slot.label ? `<div style="font-size:11.5px; color:#909398;">${escapeHtml(slot.label)}</div>` : ''}
+              </div>
+              ${slot.is_completed
+                ? `<span class="today-slot-done"><i class="fa-solid fa-circle-check"></i> ${slot.winners_count || 0} winner${(slot.winners_count || 0) !== 1 ? 's' : ''}</span>`
+                : `<button class="today-slot-run-btn run-slot-btn" data-slot='${JSON.stringify({ id: slot.slot_id, label: slot.label, slot_time: slot.slot_time }).replace(/'/g, "&apos;")}'>Run Now</button>`
+              }
+            </div>
+          `).join('');
+
+          listEl.querySelectorAll('.run-slot-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const slot = JSON.parse(btn.dataset.slot.replace(/&apos;/g, "'"));
+              if (openDrawModalForSlot) openDrawModalForSlot(slot);
+            });
+          });
+        } catch (err) {
+          listEl.innerHTML = `<div style="font-size:12px; color:#ff4757;">${escapeHtml(err.message || 'Failed to load today\\'s draws.')}</div>`;
+        }
       }
 
       async function loadTiers(client) {
@@ -1439,8 +1581,8 @@
           <i class="fa-solid fa-trophy"></i>
         </div>
         <div>
-          <h3>Run Today's Draw</h3>
-          <p>Review the split before confirming</p>
+          <h3 id="draw-modal-title">Run Draw</h3>
+          <p id="draw-modal-subtitle">Review the split before confirming</p>
         </div>
         <button class="modal-close-btn" id="draw-modal-close-btn">
           <i class="fa-solid fa-xmark"></i>
@@ -1485,6 +1627,64 @@
         <button class="btn-modal-primary" id="draw-modal-confirm-btn">
           <span id="draw-modal-confirm-label">Run Draw</span>
           <i class="fa-solid fa-spinner fa-spin modal-spinner" id="draw-modal-spinner"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADD/EDIT DRAW SLOT MODAL -->
+  <div class="modal-overlay" id="slot-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-circle">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+        <div>
+          <h3 id="slot-modal-title">Add Draw Time</h3>
+          <p>Set a recurring daily draw slot</p>
+        </div>
+        <button class="modal-close-btn" id="slot-modal-close-btn">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <label class="auth-label">Time of Day</label>
+        <input type="time" class="auth-input" id="slot-time-input" style="margin-bottom:12px;" />
+
+        <label class="auth-label">Label (optional)</label>
+        <input type="text" class="auth-input" id="slot-label-input" placeholder="e.g. Morning Draw" style="margin-bottom:14px;" />
+
+        <label class="amount-label">Mode</label>
+        <div style="display:flex; gap:8px; margin:8px 0 14px;">
+          <button type="button" class="btn-modal-cancel slot-mode-btn" id="slot-mode-manual-btn" style="flex:1;">
+            <i class="fa-solid fa-hand"></i> Manual
+          </button>
+          <button type="button" class="btn-modal-cancel slot-mode-btn" id="slot-mode-automatic-btn" style="flex:1;">
+            <i class="fa-solid fa-gears"></i> Automatic
+          </button>
+        </div>
+
+        <label class="amount-label">Default Winners</label>
+        <div style="display:flex; align-items:center; gap:14px; margin:8px 0 14px;">
+          <button type="button" id="slot-winner-minus" class="btn-modal-cancel" style="width:38px; padding:8px 0;">−</button>
+          <span id="slot-winner-count" style="font-size:18px; font-weight:800; min-width:24px; text-align:center;">1</span>
+          <button type="button" id="slot-winner-plus" class="btn-modal-cancel" style="width:38px; padding:8px 0;">+</button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <input type="checkbox" id="slot-active-checkbox" checked style="width:18px; height:18px;" />
+          <label for="slot-active-checkbox" style="font-size:13px; color:#2d3436;">Active</label>
+        </div>
+
+        <div class="modal-error" id="slot-modal-error"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-cancel" id="slot-modal-cancel-btn">Cancel</button>
+        <button class="btn-modal-primary" id="slot-modal-save-btn">
+          <span id="slot-modal-save-label">Save</span>
+          <i class="fa-solid fa-spinner fa-spin modal-spinner" id="slot-modal-spinner"></i>
         </button>
       </div>
     </div>
