@@ -996,9 +996,14 @@
                     ${slot.label ? escapeHtml(slot.label) + ' · ' : ''}${slot.planned_winner_count || 1} winner${(slot.planned_winner_count || 1) > 1 ? 's' : ''}
                   </div>
                 </div>
-                <button class="icon-btn edit-slot-btn" data-slot='${JSON.stringify(slot).replace(/'/g, "&apos;")}'>
-                  <i class="fa-solid fa-pen"></i>
-                </button>
+                <div style="display:flex; gap:6px;">
+                  <button class="icon-btn edit-slot-btn" data-slot='${JSON.stringify(slot).replace(/'/g, "&apos;")}'>
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button class="icon-btn delete-slot-btn" data-id="${slot.id}" data-time="${fmtTime(slot.slot_time)}" style="color:#ff4757;">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </div>
               </div>
             `).join('');
 
@@ -1006,6 +1011,22 @@
               btn.addEventListener('click', () => {
                 const slot = JSON.parse(btn.dataset.slot.replace(/&apos;/g, "'"));
                 openEditModal(slot);
+              });
+            });
+
+            listEl.querySelectorAll('.delete-slot-btn').forEach(btn => {
+              btn.addEventListener('click', async () => {
+                const confirmed = confirm(`Delete the ${btn.dataset.time} draw time? This can't be undone.`);
+                if (!confirmed) return;
+
+                try {
+                  const { error } = await client.rpc('admin_delete_draw_slot', { p_id: btn.dataset.id });
+                  if (error) throw error;
+                  loadSlotsList();
+                  wireTodaySlots(client);
+                } catch (err) {
+                  alert(err.message || 'Failed to delete this draw time.');
+                }
               });
             });
           } catch (err) {
