@@ -200,22 +200,28 @@
         return div.innerHTML;
       }
 
-      // 8:00 PM WAT = 19:00 UTC, matches the scheduled draw job — see
-      // 05_automate_daily_draw.sql
-      function nextDrawUTC() {
-        const now = new Date();
-        const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 19, 0, 0));
-        if (now.getTime() >= next.getTime()) next.setUTCDate(next.getUTCDate() + 1);
-        return next;
+      function fmtSlotTime(slotTime) {
+        if (!slotTime) return '';
+        const [h, m] = slotTime.split(':').map(Number);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+      }
+
+      // slot.slot_time is a WAT (UTC+1) time like "08:00:00", slot.draw_date
+      // is a WAT calendar date like "2026-08-31". Building the ISO string
+      // with an explicit "+01:00" offset gives the correct UTC instant
+      // regardless of the visitor's own local timezone.
+      function slotTargetDate(slot) {
+        const timeStr = slot.slot_time.length === 5 ? slot.slot_time + ':00' : slot.slot_time;
+        return new Date(`${slot.draw_date}T${timeStr}+01:00`);
       }
 
       let countdownTimer = null;
-      let hasCelebrated = false;
-      function startCountdown() {
-        const target = nextDrawUTC();
+      function startCountdown(targetDate) {
         if (countdownTimer) clearInterval(countdownTimer);
         function tick() {
-          const diff = Math.max(0, target.getTime() - Date.now());
+          const diff = Math.max(0, targetDate.getTime() - Date.now());
           const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
           const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
           const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
@@ -226,22 +232,23 @@
         countdownTimer = setInterval(tick, 1000);
       }
 
-      function renderWaiting(entries, participants) {
-        hasCelebrated = false;
+      function renderWaiting(slot, entries, participants) {
         document.getElementById('draw-hero').classList.remove('drawn');
         document.getElementById('hero-tag').textContent = 'LIVE DRAW';
+        const label = slot.label || 'Next Draw';
+        const timeStr = fmtSlotTime(slot.slot_time);
         document.getElementById('hero-body').innerHTML = `
-          <h2>Tonight's draw is coming up</h2>
-          <p>Every ticket bought today is already entered</p>
+          <h2>${escapeHtml(label)} is coming up</h2>
+          <p>Every ticket bought now is entered into this draw</p>
           <div class="countdown-row">
-            <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Until 8:00 PM</span></div>
+            <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Until ${timeStr}</span></div>
           </div>
           <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
             <div class="entries-pill"><i class="fa-solid fa-ticket"></i> <strong id="entries-count">${entries}</strong> ticket${entries === 1 ? '' : 's'} entered</div>
             <div class="entries-pill"><i class="fa-solid fa-users"></i> <strong id="participants-count">${participants}</strong> participant${participants === 1 ? '' : 's'}</div>
           </div>
         `;
-        startCountdown();
+        startCountdown(slotTargetDate(slot));
         document.getElementById('winners-section').style.display = 'none';
       }
 
@@ -260,25 +267,30 @@
         }
       }
 
-      // Renders the final "N winners tonight" hero + winners list.
-      // Used both for late viewers (instantly) and for live viewers
-      // (after the reel animation finishes).
-      function showFinalDrawnState(winners, shouldCelebrate) {
+      // Renders the "N winners!" reveal + winners list for a draw that
+      // just completed. nextSlot (if provided) is shown as a "Next:"
+      // countdown right on this same screen — it's the slot the page
+      // will switch to watching once the reveal has been on screen a
+      // little while.
+      function showFinalDrawnState(winners, shouldCelebrate, nextSlot) {
         if (countdownTimer) clearInterval(countdownTimer);
         const hero = document.getElementById('draw-hero');
         hero.classList.add('drawn');
         document.getElementById('hero-tag').textContent = 'DRAWN';
 
         const totalPrize = winners.reduce((sum, w) => sum + Number(w.prize_amount), 0);
+        const nextLabel = nextSlot ? (nextSlot.label || fmtSlotTime(nextSlot.slot_time)) : null;
         document.getElementById('hero-body').innerHTML = `
           <div class="trophy-burst">🏆</div>
-          <h2>${winners.length} winner${winners.length > 1 ? 's' : ''} tonight!</h2>
+          <h2>${winners.length} winner${winners.length > 1 ? 's' : ''}!</h2>
           <p>₦${totalPrize.toLocaleString('en-NG', { minimumFractionDigits: 2 })} paid out</p>
-          <div class="countdown-row">
-            <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Next draw in</span></div>
-          </div>
+          ${nextLabel ? `
+            <div class="countdown-row">
+              <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Next: ${escapeHtml(nextLabel)}</span></div>
+            </div>
+          ` : ''}
         `;
-        startCountdown();
+        if (nextSlot) startCountdown(slotTargetDate(nextSlot));
 
         if (shouldCelebrate) {
           setTimeout(() => celebrate(), 150);
@@ -290,13 +302,14 @@
             <div class="winner-avatar"><i class="fa-solid fa-trophy"></i></div>
             <div class="winner-info">
               <strong>${escapeHtml(w.display_name || 'A Winner')}</strong>
-              <small>${escapeHtml(w.tier_name || 'Ticket')}</small>
+              <small>Ticket TK-${String(w.ticket_number).padStart(4, '0')}</small>
             </div>
             <div class="winner-prize">&#8358;${Number(w.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
           </div>
         `).join('');
         document.getElementById('winners-section').style.display = 'block';
       }
+
 
       // ---- REEL TUNING KNOBS ----
       // Change any of these numbers to adjust the feel of the draw
@@ -421,9 +434,12 @@
         });
       }
 
-      async function playReelThenReveal(client, winners, todayStr) {
+      async function playReelThenReveal(client, slot, winners, nextSlot) {
         try {
-          const { data: reel, error } = await client.rpc('get_draw_reel', { p_draw_date: todayStr });
+          const { data: reel, error } = await client.rpc('get_draw_reel', {
+            p_draw_date: slot.draw_date,
+            p_slot_id: slot.slot_id,
+          });
           if (error) throw error;
           if (reel && reel.length > 0) {
             const winnerTargets = reel
@@ -439,37 +455,85 @@
           console.warn('Reel animation skipped:', err);
         }
         document.getElementById('reel-section').style.display = 'none';
-        showFinalDrawnState(winners, true);
+        showFinalDrawnState(winners, true, nextSlot);
       }
 
-      function renderDrawn(client, winners, isLiveTransition, todayStr) {
-        if (isLiveTransition && !hasCelebrated) {
-          hasCelebrated = true;
-          playReelThenReveal(client, winners, todayStr);
-        } else {
-          showFinalDrawnState(winners, false);
-        }
-      }
+      // watchedSlot = the slot this page is currently focused on —
+      // either counting down to it, or (briefly) showing its result
+      // right after it completed. celebratedSlotId tracks which slot
+      // we've already played the reel animation for, so a slow poll
+      // cycle or a page left open for a while never replays it twice.
+      let watchedSlot = null;
+      let celebratedSlotId = null;
 
-      let lastKnownDrawn = null;
+      async function refreshWaitingStats(client, slot) {
+        const { data } = await client.rpc('get_slot_draw_info', {
+          p_draw_date: slot.draw_date,
+          p_slot_id: slot.slot_id,
+        });
+        const info = data?.[0];
+        renderWaiting(slot, info?.entries_count ?? 0, info?.participants_count ?? 0);
+      }
 
       async function loadDrawStatus(client) {
-        const { data: statusRows } = await client.rpc('get_live_draw_status');
-        const status = statusRows?.[0];
-        if (!status) return;
+        const { data: pendingRows, error: pendingErr } = await client.rpc('get_next_pending_slot');
 
-        if (status.is_drawn) {
-          const { data: recent } = await client.rpc('get_recent_winners', { p_limit: 30 });
-          const todayStr = new Date().toISOString().slice(0, 10);
-          const tonightsWinners = (recent || []).filter(w => w.draw_date === todayStr);
-          const isLiveTransition = lastKnownDrawn === false; // was watching it flip
-          renderDrawn(client, tonightsWinners.length ? tonightsWinners : recent?.slice(0, 1) || [], isLiveTransition, todayStr);
-        } else {
-          const todayStr = new Date().toISOString().slice(0, 10);
-          const { data: participantCount } = await client.rpc('get_live_draw_participant_count', { p_draw_date: todayStr });
-          renderWaiting(status.entries_today, participantCount ?? 0);
+        if (pendingErr || !pendingRows || pendingRows.length === 0) {
+          if (countdownTimer) clearInterval(countdownTimer);
+          document.getElementById('draw-hero').classList.remove('drawn');
+          document.getElementById('hero-tag').textContent = 'LIVE DRAW';
+          document.getElementById('hero-body').innerHTML = `
+            <h2>No draws scheduled right now</h2>
+            <p>Check back soon.</p>
+          `;
+          document.getElementById('winners-section').style.display = 'none';
+          return;
         }
-        lastKnownDrawn = status.is_drawn;
+
+        const pending = pendingRows[0]; // { slot_id, slot_time, label, draw_date }
+
+        if (!watchedSlot) {
+          // First load this session — just show what's currently
+          // pending. (Past results live on the Winners page, not here
+          // — this page is about what's happening now / next.)
+          watchedSlot = pending;
+          await refreshWaitingStats(client, watchedSlot);
+          return;
+        }
+
+        if (pending.slot_id === watchedSlot.slot_id) {
+          // Nothing's changed — still waiting on the same draw, just
+          // refresh the live entry/participant counts.
+          await refreshWaitingStats(client, watchedSlot);
+          return;
+        }
+
+        // The slot we were watching is no longer "pending" — meaning
+        // it just completed.
+        const justCompletedSlot = watchedSlot;
+        const { data: infoRows } = await client.rpc('get_slot_draw_info', {
+          p_draw_date: justCompletedSlot.draw_date,
+          p_slot_id: justCompletedSlot.slot_id,
+        });
+        const info = infoRows?.[0];
+        const winners = info?.winners || [];
+
+        if (celebratedSlotId !== justCompletedSlot.slot_id && winners.length > 0) {
+          celebratedSlotId = justCompletedSlot.slot_id;
+          await playReelThenReveal(client, justCompletedSlot, winners, pending);
+
+          // Let the reveal stay on screen for a moment before moving
+          // on to counting down to the next draw.
+          setTimeout(async () => {
+            watchedSlot = pending;
+            await refreshWaitingStats(client, watchedSlot);
+          }, 6000);
+        } else {
+          // Missed the live moment (e.g. tab was backgrounded) — just
+          // move straight to the next pending draw.
+          watchedSlot = pending;
+          await refreshWaitingStats(client, watchedSlot);
+        }
       }
 
       async function init() {
@@ -477,8 +541,8 @@
         if (!client) return;
         await loadDrawStatus(client);
 
-        // Poll for the moment the draw actually happens (or resets
-        // into a new day/cycle) — no manual refresh needed.
+        // Poll for the moment any watched draw actually happens — no
+        // manual refresh needed.
         setInterval(() => loadDrawStatus(client), 20000);
       }
 
