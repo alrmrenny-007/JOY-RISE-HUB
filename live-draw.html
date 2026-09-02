@@ -77,29 +77,45 @@
     }
     .reel-viewport {
       position: relative;
-      height: 84px;
+      height: 340px;
       overflow: hidden;
-      mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-      -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+      border-radius: 12px;
+      mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
     }
     .reel-pointer {
-      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-      width: 3px; height: 100%; background: #fdcb6e; z-index: 5;
+      position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+      width: 100%; height: 56px; z-index: 5;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 6px;
+      pointer-events: none;
+    }
+    .reel-pointer::before {
+      content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+      border-top: 2px solid #fdcb6e; border-bottom: 2px solid #fdcb6e;
       box-shadow: 0 0 10px #fdcb6e;
     }
+    .reel-pointer-arrow {
+      color: #fdcb6e; font-size: 16px; z-index: 6; text-shadow: 0 0 6px rgba(253,203,110,0.8);
+    }
+    .reel-spin-badge {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 52px; height: 52px; border-radius: 50%; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 800; color: #6c5ce7; letter-spacing: 0.03em;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 6;
+    }
     .reel-track {
-      position: absolute; top: 0; left: 50%; height: 100%;
-      display: flex; align-items: center; gap: 8px;
+      position: absolute; top: 50%; left: 0; width: 100%;
+      display: flex; flex-direction: column; align-items: stretch; gap: 6px;
       will-change: transform;
     }
     .reel-card {
       flex: 0 0 auto;
-      width: 74px; height: 74px;
-      background: #2d2d44;
-      border-radius: 12px;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px;
-      border: 2px solid rgba(255,255,255,0.08);
+      height: 56px;
+      border-radius: 8px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 14px;
       filter: blur(0px);
       transition: filter 280ms ease-out;
     }
@@ -107,31 +123,33 @@
       filter: blur(1.4px);
     }
     .reel-card img {
-      width: 30px; height: 30px; border-radius: 50%;
-      background: #fff;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: #fff; flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.5);
     }
-    .reel-card small {
-      color: #b2b2c8; font-size: 8.5px; font-weight: 700;
-      max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    .reel-card strong {
+      color: #fff; font-size: 14px; font-weight: 800;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
     }
     .reel-card.reel-winner-card {
-      background: linear-gradient(160deg, #fdcb6e, #f59f00);
-      border-color: #fff;
+      background: linear-gradient(90deg, #fdcb6e, #f59f00) !important;
+      box-shadow: 0 0 0 3px #fff, 0 0 16px rgba(253,203,110,0.7);
     }
-    .reel-card.reel-winner-card small { color: #4a3200; }
+    .reel-card.reel-winner-card strong { color: #4a3200; text-shadow: none; }
 
     @keyframes reelCardPop {
       0%   { transform: scale(1); }
-      45%  { transform: scale(1.18); }
+      45%  { transform: scale(1.06); }
       100% { transform: scale(1); }
     }
     .reel-card-pop {
       animation: reelCardPop 420ms ease-out;
     }
     @keyframes reelPointerPulse {
-      0%   { box-shadow: 0 0 10px #fdcb6e; }
-      50%  { box-shadow: 0 0 22px 6px #fdcb6e; }
-      100% { box-shadow: 0 0 10px #fdcb6e; }
+      0%   { filter: brightness(1); }
+      50%  { filter: brightness(1.6); }
+      100% { filter: brightness(1); }
     }
     .reel-pointer.pulse {
       animation: reelPointerPulse 420ms ease-out;
@@ -164,8 +182,12 @@
       <div id="reel-section" style="display:none;">
         <div class="reel-title">Picking tonight's winner...</div>
         <div class="reel-viewport">
-          <div class="reel-pointer"></div>
           <div class="reel-track" id="reel-track"></div>
+          <div class="reel-pointer">
+            <i class="fa-solid fa-caret-right reel-pointer-arrow"></i>
+            <i class="fa-solid fa-caret-left reel-pointer-arrow"></i>
+          </div>
+          <div class="reel-spin-badge">SPIN</div>
         </div>
       </div>
 
@@ -315,8 +337,8 @@
       // Change any of these numbers to adjust the feel of the draw
       // reel — nothing else in the code below needs to be touched.
       const REEL_CONFIG = {
-        CARD_WIDTH: 74,
-        CARD_GAP: 8,
+        CARD_HEIGHT: 56,
+        CARD_GAP: 6,
         LOOPS_FIRST: 3,        // full laps around the reel before the first winner lands
         LOOPS_BETWEEN: 1,      // laps between each additional winner (for multi-winner draws)
         FIRST_SPIN_MIN_MS: 2600,  // shortest the opening spin can be (small draws)
@@ -327,6 +349,20 @@
         BLUR_CLEAR_BEFORE_LANDING_MS: 450, // motion blur clears this long before it stops
       };
       // ---- END REEL TUNING KNOBS ----
+
+      // A small rotating palette so each buyer's ticket cards share a
+      // consistent color, however many they have and wherever they
+      // land in the shuffled reel — a buyer with 5 tickets reads as
+      // "5 chances scattered through the reel", not 5 random strangers.
+      const REEL_PALETTE = ['#3ec6e0', '#ff6b5b', '#8bc34a', '#a839c4', '#f5a623', '#4a7cff', '#ff4fa3'];
+      function colorForUser(userId) {
+        let hash = 0;
+        const str = String(userId || '');
+        for (let i = 0; i < str.length; i++) {
+          hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+        }
+        return REEL_PALETTE[hash % REEL_PALETTE.length];
+      }
 
       // Builds and animates the ticket-by-ticket reel. Handles ANY
       // number of winners: it spins to the first winner, pauses and
@@ -348,10 +384,10 @@
           track.innerHTML = '';
           track.classList.remove('spinning');
           track.style.transition = 'none';
-          track.style.transform = 'translateX(0px)';
+          track.style.transform = 'translateY(0px)';
 
-          const { CARD_WIDTH: CARD_W, CARD_GAP: GAP } = REEL_CONFIG;
-          const STEP = CARD_W + GAP;
+          const { CARD_HEIGHT: CARD_H, CARD_GAP: GAP } = REEL_CONFIG;
+          const STEP = CARD_H + GAP;
 
           // Build one continuous sequence of cards covering every
           // winner's reveal, one after another, always moving forward
@@ -368,16 +404,16 @@
           displaySeq.forEach((t) => {
             const card = document.createElement('div');
             card.className = 'reel-card';
+            card.style.background = colorForUser(t.user_id);
             const seed = encodeURIComponent(t.display_name || 'Player');
             const avatarSrc = t.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
-            const firstName = (t.display_name || 'Player').split(' ')[0];
-            card.innerHTML = `<img src="${avatarSrc}" alt="" /><small>${escapeHtml(firstName)}</small>`;
+            card.innerHTML = `<img src="${avatarSrc}" alt="" /><strong>${escapeHtml(t.display_name || 'Player')}</strong>`;
             track.appendChild(card);
           });
 
           // Force layout flush so the very first transition actually
-          // animates from translateX(0) instead of jumping instantly.
-          void track.offsetWidth;
+          // animates from translateY(0) instead of jumping instantly.
+          void track.offsetHeight;
 
           const allCards = track.querySelectorAll('.reel-card');
 
@@ -389,7 +425,7 @@
 
             const landingIndex = landings[segmentIdx];
             const isFirst = segmentIdx === 0;
-            const finalOffset = -(landingIndex * STEP + CARD_W / 2);
+            const finalOffset = -(landingIndex * STEP + CARD_H / 2);
             const duration = isFirst
               ? Math.min(REEL_CONFIG.FIRST_SPIN_MAX_MS, Math.max(REEL_CONFIG.FIRST_SPIN_MIN_MS, landingIndex * 14))
               : REEL_CONFIG.BETWEEN_SPIN_MS;
@@ -410,7 +446,7 @@
             // prize-reveal style animations.
             track.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1)`;
             requestAnimationFrame(() => {
-              track.style.transform = `translateX(${finalOffset}px)`;
+              track.style.transform = `translateY(${finalOffset}px)`;
             });
 
             setTimeout(() => {
