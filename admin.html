@@ -230,6 +230,96 @@
     }
     .today-slot-run-btn:disabled { opacity: 0.6; }
     .today-slot-done { font-size: 11.5px; color: #00b894; font-weight: 700; }
+
+    /* ---- Ticket reel (same visual system as live-draw.html) ---- */
+    #admin-reel-section {
+      background: #1e1e2f;
+      border-radius: 18px;
+      padding: 18px 0 20px;
+    }
+    .reel-title {
+      color: #fff; font-size: 13px; font-weight: 700;
+      text-align: center; margin-bottom: 14px; opacity: 0.85;
+    }
+    .reel-viewport {
+      position: relative;
+      height: 340px;
+      overflow: hidden;
+      border-radius: 12px;
+      mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+    }
+    .reel-pointer {
+      position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+      width: 100%; height: 56px; z-index: 5;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 6px;
+      pointer-events: none;
+    }
+    .reel-pointer::before {
+      content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+      border-top: 2px solid #fdcb6e; border-bottom: 2px solid #fdcb6e;
+      box-shadow: 0 0 10px #fdcb6e;
+    }
+    .reel-pointer-arrow {
+      color: #fdcb6e; font-size: 16px; z-index: 6; text-shadow: 0 0 6px rgba(253,203,110,0.8);
+    }
+    .reel-spin-badge {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: 52px; height: 52px; border-radius: 50%; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 800; color: #6c5ce7; letter-spacing: 0.03em;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 6;
+    }
+    .reel-track {
+      position: absolute; top: 50%; left: 0; width: 100%;
+      display: flex; flex-direction: column; align-items: stretch; gap: 6px;
+      will-change: transform;
+    }
+    .reel-card {
+      flex: 0 0 auto;
+      height: 56px;
+      border-radius: 8px;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 14px;
+      filter: blur(0px);
+      transition: filter 280ms ease-out;
+    }
+    .reel-track.spinning .reel-card {
+      filter: blur(1.4px);
+    }
+    .reel-card img {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: #fff; flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.5);
+    }
+    .reel-card strong {
+      color: #fff; font-size: 14px; font-weight: 800;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    }
+    .reel-card.reel-winner-card {
+      background: linear-gradient(90deg, #fdcb6e, #f59f00) !important;
+      box-shadow: 0 0 0 3px #fff, 0 0 16px rgba(253,203,110,0.7);
+    }
+    .reel-card.reel-winner-card strong { color: #4a3200; text-shadow: none; }
+
+    @keyframes reelCardPop {
+      0%   { transform: scale(1); }
+      45%  { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+    .reel-card-pop {
+      animation: reelCardPop 420ms ease-out;
+    }
+    @keyframes reelPointerPulse {
+      0%   { filter: brightness(1); }
+      50%  { filter: brightness(1.6); }
+      100% { filter: brightness(1); }
+    }
+    .reel-pointer.pulse {
+      animation: reelPointerPulse 420ms ease-out;
+    }
     .admin-result { margin-top: 12px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
     .confetti-piece {
       position: absolute; top: 50%; width: 6px; height: 10px; border-radius: 2px;
@@ -447,6 +537,17 @@
         <section class="admin-section draw-card" style="text-align:left;">
           <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Today's Draws</h3>
           <div id="today-slots-list" style="font-size:13px; color:#636e72;">Loading...</div>
+          <div id="admin-reel-section" style="display:none; margin-top:14px;">
+            <div class="reel-title" id="admin-reel-title">Picking the winner...</div>
+            <div class="reel-viewport">
+              <div class="reel-track" id="admin-reel-track"></div>
+              <div class="reel-pointer">
+                <i class="fa-solid fa-caret-right reel-pointer-arrow"></i>
+                <i class="fa-solid fa-caret-left reel-pointer-arrow"></i>
+              </div>
+              <div class="reel-spin-badge">SPIN</div>
+            </div>
+          </div>
           <div class="admin-result" id="draw-result"></div>
         </section>
       </div>
@@ -717,6 +818,123 @@
       // button on a specific slot row) to open it scoped to that slot.
       let openDrawModalForSlot = null;
 
+      // ---- Admin-panel ticket reel (same logic as live-draw.html) ----
+      const ADMIN_REEL_CONFIG = {
+        CARD_HEIGHT: 56,
+        CARD_GAP: 6,
+        LOOPS_FIRST: 3,
+        LOOPS_BETWEEN: 1,
+        FIRST_SPIN_MIN_MS: 2600,
+        FIRST_SPIN_MAX_MS: 6500,
+        BETWEEN_SPIN_MS: 1300,
+        PAUSE_AFTER_WIN_MS: 1100,
+        PAUSE_AFTER_LAST_MS: 900,
+        BLUR_CLEAR_BEFORE_LANDING_MS: 450,
+      };
+
+      const ADMIN_REEL_PALETTE = ['#3ec6e0', '#ff6b5b', '#8bc34a', '#a839c4', '#f5a623', '#4a7cff', '#ff4fa3'];
+      function adminColorForUser(userId) {
+        let hash = 0;
+        const str = String(userId || '');
+        for (let i = 0; i < str.length; i++) {
+          hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+        }
+        return ADMIN_REEL_PALETTE[hash % ADMIN_REEL_PALETTE.length];
+      }
+
+      // Winners are already decided server-side (admin_run_draw already
+      // ran and returned a result) before this is ever called — this
+      // only replays that already-fixed outcome as a spinning reveal,
+      // it never influences who actually won.
+      function animateAdminReel(reel, winnerTargets) {
+        return new Promise((resolve) => {
+          const section = document.getElementById('admin-reel-section');
+          const titleEl = document.getElementById('admin-reel-title');
+          const pointerEl = section.querySelector('.reel-pointer');
+          const track = document.getElementById('admin-reel-track');
+          section.style.display = 'block';
+          section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          titleEl.textContent = winnerTargets.length > 1
+            ? `Picking winner 1 of ${winnerTargets.length}...`
+            : 'Picking the winner...';
+          track.innerHTML = '';
+          track.classList.remove('spinning');
+          track.style.transition = 'none';
+          track.style.transform = 'translateY(0px)';
+
+          const { CARD_HEIGHT: CARD_H, CARD_GAP: GAP } = ADMIN_REEL_CONFIG;
+          const STEP = CARD_H + GAP;
+
+          const displaySeq = [];
+          const landings = [];
+          winnerTargets.forEach((target, i) => {
+            const loopsToAdd = i === 0 ? ADMIN_REEL_CONFIG.LOOPS_FIRST : ADMIN_REEL_CONFIG.LOOPS_BETWEEN;
+            for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
+            displaySeq.push(...reel.slice(0, target.idx + 1));
+            landings.push(displaySeq.length - 1);
+          });
+
+          displaySeq.forEach((t) => {
+            const cardEl = document.createElement('div');
+            cardEl.className = 'reel-card';
+            cardEl.style.background = adminColorForUser(t.user_id);
+            const seed = encodeURIComponent(t.display_name || 'Player');
+            const avatarSrc = t.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+            cardEl.innerHTML = `<img src="${avatarSrc}" alt="" /><strong>${escapeHtml(t.display_name || 'Player')}</strong>`;
+            track.appendChild(cardEl);
+          });
+
+          void track.offsetHeight;
+
+          const allCards = track.querySelectorAll('.reel-card');
+
+          function runSegment(segmentIdx) {
+            if (segmentIdx >= landings.length) {
+              setTimeout(() => { section.style.display = 'none'; resolve(); }, 600);
+              return;
+            }
+
+            const landingIndex = landings[segmentIdx];
+            const isFirst = segmentIdx === 0;
+            const finalOffset = -(landingIndex * STEP + CARD_H / 2);
+            const duration = isFirst
+              ? Math.min(ADMIN_REEL_CONFIG.FIRST_SPIN_MAX_MS, Math.max(ADMIN_REEL_CONFIG.FIRST_SPIN_MIN_MS, landingIndex * 14))
+              : ADMIN_REEL_CONFIG.BETWEEN_SPIN_MS;
+
+            if (winnerTargets.length > 1 && segmentIdx > 0) {
+              titleEl.textContent = `Picking winner ${segmentIdx + 1} of ${winnerTargets.length}...`;
+            }
+
+            track.classList.add('spinning');
+            const blurClearAt = Math.max(0, duration - ADMIN_REEL_CONFIG.BLUR_CLEAR_BEFORE_LANDING_MS);
+            setTimeout(() => track.classList.remove('spinning'), blurClearAt);
+
+            track.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1)`;
+            requestAnimationFrame(() => {
+              track.style.transform = `translateY(${finalOffset}px)`;
+            });
+
+            setTimeout(() => {
+              const landedCard = allCards[landingIndex];
+              landedCard.classList.add('reel-winner-card', 'reel-card-pop');
+              pointerEl.classList.add('pulse');
+              setTimeout(() => pointerEl.classList.remove('pulse'), 450);
+
+              const target = winnerTargets[segmentIdx];
+              const prizeStr = Number(target.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+              titleEl.textContent = `🎉 ${target.display_name || 'A Winner'} — ₦${prizeStr}`;
+
+              const pause = segmentIdx === winnerTargets.length - 1
+                ? ADMIN_REEL_CONFIG.PAUSE_AFTER_LAST_MS
+                : ADMIN_REEL_CONFIG.PAUSE_AFTER_WIN_MS;
+              setTimeout(() => runSegment(segmentIdx + 1), pause);
+            }, duration + 150);
+          }
+
+          runSegment(0);
+        });
+      }
+
       function wireDrawModal(client) {
         const resultEl = document.getElementById('draw-result');
         const card = document.querySelector('.draw-card');
@@ -834,6 +1052,29 @@
             resultEl.textContent = '';
 
             if (data && data.length > 0) {
+              // Play the spinning reel right here in the admin panel
+              // before revealing the result — same reel logic as
+              // live-draw.html, scoped to this exact slot/date.
+              try {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const { data: reel, error: reelError } = await client.rpc('get_draw_reel', {
+                  p_draw_date: todayStr,
+                  p_slot_id: currentSlot.id,
+                });
+                if (reelError) throw reelError;
+
+                if (reel && reel.length > 0) {
+                  const winnerTargets = reel
+                    .map((t, idx) => ({ ...t, idx }))
+                    .filter((t) => t.is_winner);
+                  if (winnerTargets.length > 0) {
+                    await animateAdminReel(reel, winnerTargets);
+                  }
+                }
+              } catch (reelErr) {
+                console.warn('Admin reel skipped:', reelErr);
+              }
+
               resultEl.style.color = 'var(--money)';
               const lines = data.map(w => `🎉 ${w.winner_name} won ₦${Number(w.prize).toLocaleString()}`);
               resultEl.innerHTML = `<strong style="color:var(--text);">${data.length} winner${data.length > 1 ? 's' : ''} this draw:</strong><br>` + lines.join('<br>');
