@@ -2,6 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <script>
+    // Apply saved theme instantly, before first paint, to avoid a
+    // flash of the wrong theme on load.
+    (function () {
+      try {
+        if (localStorage.getItem('joyrise_theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>My Tickets — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
@@ -32,7 +44,7 @@
 
       <div class="txn-filter-row" id="ticket-filter-row">
         <button class="txn-filter-chip active" data-filter="all">All</button>
-        <button class="txn-filter-chip" data-filter="active">In Today's Draw</button>
+        <button class="txn-filter-chip" data-filter="active">Pending</button>
         <button class="txn-filter-chip" data-filter="won">Won</button>
         <button class="txn-filter-chip" data-filter="lost">Not This Time</button>
       </div>
@@ -56,11 +68,10 @@
       });
 
       let allTickets = [];
-
-      // TODO: swap for the real channel once the live draw page exists
+      let slotLookup = {}; // slot_id -> { label, slot_time }
 
       const STATUS_META = {
-        active: { icon: 'fa-clock',        color: '#6c5ce7', bg: '#f3f0ff', label: "Today's Draw" },
+        active: { icon: 'fa-clock',        color: '#6c5ce7', bg: '#f3f0ff', label: 'Pending' },
         won:    { icon: 'fa-trophy',        color: '#00b894', bg: '#d3f9e8', label: 'Won' },
         lost:   { icon: 'fa-circle-xmark',  color: '#b2bec3', bg: '#f1f2f6', label: 'Not This Time' },
       };
@@ -73,6 +84,30 @@
 
       function fmt(n) {
         return Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+      }
+
+      function fmtSlotTime(slotTime) {
+        if (!slotTime) return '';
+        const [h, m] = slotTime.split(':').map(Number);
+        const period = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 === 0 ? 12 : h % 12;
+        return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+      }
+
+      function drawInfoText(t) {
+        const dateStr = t.draw_date
+          ? new Date(t.draw_date + 'T00:00:00').toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })
+          : '';
+        const slot = slotLookup[t.slot_id];
+
+        if (!slot) {
+          // No slot on record (very old ticket from before the
+          // multi-draw system) — just show the date, if we have one.
+          return dateStr ? `Draw: ${dateStr}` : '';
+        }
+
+        const label = slot.label || fmtSlotTime(slot.slot_time);
+        return dateStr ? `${escapeHtml(label)} draw · ${dateStr}` : `${escapeHtml(label)} draw`;
       }
 
       function skeletonRows(count) {
@@ -106,9 +141,10 @@
 
         listEl.innerHTML = rows.map(t => {
           const meta = STATUS_META[t.status] || STATUS_META.active;
-          const date = new Date(t.purchased_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+          const purchasedStr = new Date(t.purchased_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
           const tierName = t.ticket_tiers?.name || 'Custom';
           const ticketCode = 'TK-' + String(t.ticket_number).padStart(4, '0');
+          const drawLine = drawInfoText(t);
           return `
             <div class="winner-row">
               <div class="winner-avatar" style="background:${meta.bg}; color:${meta.color};">
@@ -116,7 +152,8 @@
               </div>
               <div class="winner-info">
                 <strong>${ticketCode} &middot; ₦${fmt(t.price)}</strong>
-                <small>${escapeHtml(tierName)} &middot; ${date}</small>
+                <small>${escapeHtml(tierName)} &middot; Bought ${purchasedStr}</small>
+                ${drawLine ? `<small style="color:#6c5ce7; font-weight:700;">${drawLine}</small>` : ''}
               </div>
               <div style="text-align:right;">
                 <span class="referral-status-badge" style="background:${meta.bg}; color:${meta.color};">${meta.label}</span>
@@ -162,9 +199,21 @@
 
         document.getElementById('tickets-list').innerHTML = skeletonRows(6);
 
+        // Slot labels live in a table regular users can't query
+        // directly (admin-only RLS) — this small lookup RPC is the
+        // safe read path for just the label/time, nothing else.
+        try {
+          const { data: slots } = await client.rpc('get_draw_slots_lookup');
+          (slots || []).forEach(s => { slotLookup[s.id] = { label: s.label, slot_time: s.slot_time }; });
+        } catch (err) {
+          console.warn('Could not load draw slot labels:', err.message);
+          // Non-fatal — tickets will just show their date without a
+          // slot label if this fails.
+        }
+
         const { data, error } = await client
           .from('tickets')
-          .select('id, ticket_number, price, prize_amount, status, purchased_at, placed_at, ticket_tiers(name)')
+          .select('id, ticket_number, price, prize_amount, status, purchased_at, placed_at, draw_date, slot_id, ticket_tiers(name)')
           .eq('user_id', user.id)
           .order('purchased_at', { ascending: false })
           .limit(100);
