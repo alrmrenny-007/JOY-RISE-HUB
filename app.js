@@ -720,6 +720,97 @@ document.addEventListener("DOMContentLoaded", async () => {
   const navPill = document.getElementById("nav-pill");
   const bottomNavbar = document.querySelector(".bottom-navbar");
 
+  // ---- Dynamic "Next Draw" banner ----
+  // Reads the exact same schedule the admin panel and Live Draw page
+  // use (get_next_pending_slot / get_slot_draw_info) — nothing here
+  // is hardcoded. If the admin adds, removes, or retimes draws from
+  // the schedule manager, this banner updates on its own, no code
+  // changes needed anywhere.
+
+  let dashCountdownTimer = null;
+
+  function fmtSlotTimeDash(slotTime) {
+    if (!slotTime) return "";
+    const [h, m] = slotTime.split(":").map(Number);
+    const period = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12}:${String(m).padStart(2, "0")} ${period}`;
+  }
+
+  // slot.slot_time is a West Africa Time (UTC+1) time-of-day, and
+  // slot.draw_date is a WAT calendar date. Building the ISO string
+  // with an explicit "+01:00" offset gives the correct UTC instant
+  // regardless of the visitor's own local timezone.
+  function slotTargetDateDash(slot) {
+    const timeStr = slot.slot_time.length === 5 ? slot.slot_time + ":00" : slot.slot_time;
+    return new Date(`${slot.draw_date}T${timeStr}+01:00`);
+  }
+
+  // Today's calendar date IN WAT (not the visitor's local date) —
+  // adding exactly 1 hour to the current UTC instant before reading
+  // off the date portion gives this reliably, matching how the
+  // database itself defines "today" for the draw schedule.
+  function watTodayStr() {
+    return new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 10);
+  }
+
+  function startDashCountdown(targetDate) {
+    if (dashCountdownTimer) clearInterval(dashCountdownTimer);
+    const el = document.getElementById("dash-draw-countdown");
+    function tick() {
+      const diff = Math.max(0, targetDate.getTime() - Date.now());
+      const h = String(Math.floor(diff / 3600000)).padStart(2, "0");
+      const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+      if (el) el.textContent = `${h}:${m}:${s}`;
+    }
+    tick();
+    dashCountdownTimer = setInterval(tick, 1000);
+  }
+
+  async function loadDashboardDrawBanner() {
+    if (!supabaseClient) return;
+    const headlineEl = document.getElementById("dash-draw-headline");
+    const subtextEl = document.getElementById("dash-draw-subtext");
+    if (!headlineEl || !subtextEl) return; // banner markup not on this page
+
+    try {
+      const { data: rows, error } = await supabaseClient.rpc("get_next_pending_slot");
+      if (error) throw error;
+      const slot = rows?.[0];
+
+      if (!slot) {
+        if (dashCountdownTimer) clearInterval(dashCountdownTimer);
+        headlineEl.textContent = "No draws scheduled";
+        subtextEl.textContent = "Check back soon";
+        const cd = document.getElementById("dash-draw-countdown");
+        if (cd) cd.textContent = "--:--:--";
+        return;
+      }
+
+      const timeStr = fmtSlotTimeDash(slot.slot_time);
+      const isToday = slot.draw_date === watTodayStr();
+      const hour = parseInt(slot.slot_time.split(":")[0], 10);
+
+      let headline;
+      if (!isToday) {
+        headline = `Tomorrow's ${timeStr} Draw`;
+      } else if (hour >= 18) {
+        headline = `Tonight's ${timeStr} Draw`;
+      } else {
+        headline = `Today's ${timeStr} Draw`;
+      }
+
+      headlineEl.textContent = headline;
+      subtextEl.textContent = `Next draw at ${timeStr}`;
+      startDashCountdown(slotTargetDateDash(slot));
+    } catch (err) {
+      console.warn("Could not load draw schedule for dashboard banner:", err.message);
+      headlineEl.textContent = "Next Draw";
+      subtextEl.textContent = "Check the Live Draw page for details";
+    }
+  }
+
   function movePillToActiveNav() {
     if (!navPill || !bottomNavbar) return;
     const active = document.querySelector(".nav-item.active");
@@ -759,6 +850,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await loadConfig();
   loadUserData();
+  loadDashboardDrawBanner();
+  setInterval(loadDashboardDrawBanner, 20000);
 
   // Check admin status separately (doesn't block the main dashboard load)
   if (supabaseClient) {
