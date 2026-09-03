@@ -583,6 +583,17 @@
           </div>
           <div class="admin-result" id="draw-result"></div>
         </section>
+
+        <section class="admin-section draw-card" style="text-align:left;">
+          <h3 class="admin-section-title"><i class="fa-solid fa-bell"></i> Push Notifications (Test)</h3>
+          <p style="font-size:12px; color:#636e72; margin:6px 0 12px;">
+            Sends a real push notification to your OWN subscribed device(s) — a quick way to confirm the whole pipe works before it's wired into automatic triggers.
+          </p>
+          <button class="btn-auth-primary" id="test-push-btn" style="background:#f4f5f9; color:#2d3436; box-shadow:none;">
+            <i class="fa-solid fa-paper-plane"></i> Send Test Notification to Myself
+          </button>
+          <div class="admin-result" id="test-push-result"></div>
+        </section>
       </div>
 
       <!-- ACTIVITY -->
@@ -842,6 +853,7 @@
         wireDrawModal(client);
         wireScheduleManager(client);
         wireTodaySlots(client);
+        wireTestPushButton(client);
         wireUserSearch(client);
         wireActivityFeed(client);
       }
@@ -1008,6 +1020,51 @@
           }
 
           runSegment(0);
+        });
+      }
+
+      function wireTestPushButton(client) {
+        const btn = document.getElementById('test-push-btn');
+        const resultEl = document.getElementById('test-push-result');
+        const SUPABASE_URL = 'https://ijkcqsodtmmavnveflgj.supabase.co';
+
+        btn.addEventListener('click', async () => {
+          resultEl.textContent = '';
+          btn.disabled = true;
+          btn.classList.add('loading');
+
+          try {
+            const { data: { user } } = await client.auth.getUser();
+            if (!user) throw new Error('Not logged in');
+
+            const { data: { session } } = await client.auth.getSession();
+
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/send-push-notification`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({
+                user_id: user.id,
+                title: 'Joy-Rise Hub Test',
+                body: 'If you can see this, push notifications are working! 🎉',
+                url: 'index.html',
+              }),
+            });
+            const result = await res.json();
+
+            if (!result.success) throw new Error(result.error || 'Failed to send.');
+
+            resultEl.style.color = 'var(--money)';
+            resultEl.textContent = `Sent to ${result.sent} device(s).` + (result.removed > 0 ? ` (${result.removed} expired subscription(s) cleaned up.)` : '');
+          } catch (err) {
+            resultEl.style.color = '#ff4757';
+            resultEl.textContent = err.message || 'Failed to send test notification.';
+          } finally {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+          }
         });
       }
 
