@@ -1,4 +1,4 @@
-const CACHE_NAME = "joyrise-shell-v4";
+const CACHE_NAME = "joyrise-shell-v5";
 
 const SHELL_FILES = [
   "index.html",
@@ -87,6 +87,54 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cached);
       return cached || networkFetch;
+    })
+  );
+});
+
+// ============================================================
+// PUSH NOTIFICATIONS
+// ============================================================
+
+// Fired when a push message arrives from the server (via the edge
+// function we build in a later phase). The payload is whatever JSON
+// that function sends — title/body/url are the only fields we expect.
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (err) {
+    payload = { title: "Joy-Rise Hub", body: event.data ? event.data.text() : "" };
+  }
+
+  const title = payload.title || "Joy-Rise Hub";
+  const options = {
+    body: payload.body || "",
+    icon: "icons/icon-192.png",
+    badge: "icons/icon-192.png",
+    data: { url: payload.url || "index.html" },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Fired when the user taps the notification itself. Focuses an
+// already-open tab if one matches, otherwise opens a new one.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data && event.notification.data.url
+    ? event.notification.data.url
+    : "index.html";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
     })
   );
 });

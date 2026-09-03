@@ -169,4 +169,123 @@
   } else {
     injectThemeToggle();
   }
+
+  // ============================================================
+  // PUSH NOTIFICATIONS — opt-in prompt + subscription
+  // ============================================================
+  const VAPID_PUBLIC_KEY = "BEyoNhoZ0IZ6mfSZm0PORSNSSfOsE6PZyLqbVyeZ0lbR1_7gaCjYJiF087f3tm0kv4Yo7x0sc_RXXOzzaS9cFTM";
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  // Registers (or re-registers) this browser's push subscription and
+  // saves it against the logged-in user. Safe to call more than once
+  // — getSubscription() returns the existing one if already subscribed.
+  async function subscribeToPush() {
+    try {
+      const client = window.getSupabaseClient();
+      if (!client) return;
+
+      const { data: { user } } = await client.auth.getUser();
+      if (!user) return; // only logged-in users can subscribe
+
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+      }
+
+      const subJson = subscription.toJSON();
+      await client.from("push_subscriptions").upsert(
+        {
+          user_id: user.id,
+          endpoint: subJson.endpoint,
+          p256dh: subJson.keys.p256dh,
+          auth_key: subJson.keys.auth,
+        },
+        { onConflict: "endpoint" }
+      );
+    } catch (err) {
+      console.warn("Push subscription failed:", err);
+    }
+  }
+
+  // Shows a one-time opt-in banner (same visual style as the cookie
+  // banner) to logged-in users who haven't decided yet. Never nags
+  // someone who already said no, and never auto-prompts without a
+  // tap — browsers penalize permission requests that aren't tied to
+  // a real user gesture.
+  function setupNotificationPrompt() {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      return; // not supported in this browser context (e.g. iOS Safari when not installed to home screen)
+    }
+    if (Notification.permission === "granted") {
+      subscribeToPush();
+      return;
+    }
+    if (Notification.permission === "denied") {
+      return; // they already said no — don't ask again
+    }
+    if (localStorage.getItem("joyrise_notif_prompt_dismissed")) return;
+
+    const navbar = document.querySelector(".bottom-navbar");
+    const bottomOffset = navbar ? navbar.offsetHeight : 0;
+
+    const banner = document.createElement("div");
+    banner.className = "cookie-banner";
+    banner.style.bottom = bottomOffset + "px";
+    banner.innerHTML = `
+      <p>Get notified the moment you win, when withdrawals are paid, and before each draw starts.</p>
+      <div style="display:flex; gap:8px; margin-top:8px;">
+        <button type="button" id="notif-enable-btn">Enable</button>
+        <button type="button" id="notif-dismiss-btn" style="background:transparent; color:#999;">Not now</button>
+      </div>
+    `;
+    document.body.appendChild(banner);
+    requestAnimationFrame(() => banner.classList.add("show"));
+
+    document.getElementById("notif-enable-btn").addEventListener("click", async () => {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        await subscribeToPush();
+      } else {
+        localStorage.setItem("joyrise_notif_prompt_dismissed", "1");
+      }
+      banner.classList.remove("show");
+      setTimeout(() => banner.remove(), 350);
+    });
+
+    document.getElementById("notif-dismiss-btn").addEventListener("click", () => {
+      localStorage.setItem("joyrise_notif_prompt_dismissed", "1");
+      banner.classList.remove("show");
+      setTimeout(() => banner.remove(), 350);
+    });
+  }
+
+  // Only show this to logged-in users, and after a short delay so it
+  // doesn't visually compete with the cookie banner on first load.
+  async function initNotificationPrompt() {
+    const client = window.getSupabaseClient();
+    if (!client) return;
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) return;
+    setTimeout(setupNotificationPrompt, 4000);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initNotificationPrompt);
+  } else {
+    initNotificationPrompt();
+  }
 })();
