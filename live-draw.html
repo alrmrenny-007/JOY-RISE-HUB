@@ -154,6 +154,33 @@
     .reel-pointer.pulse {
       animation: reelPointerPulse 420ms ease-out;
     }
+
+    .reel-countdown-wrap {
+      height: 340px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(circle at center, #2d2d44, #1e1e2f);
+      border-radius: 12px;
+    }
+    .reel-countdown-label {
+      color: #fdcb6e; font-size: 15px; font-weight: 700; letter-spacing: 0.03em;
+      margin-bottom: 6px;
+    }
+    .reel-countdown-number {
+      color: #fff; font-size: 72px; font-weight: 900;
+      text-shadow: 0 0 24px rgba(253,203,110,0.7);
+      line-height: 1;
+    }
+    .reel-countdown-number.small-text {
+      font-size: 24px; font-weight: 800; color: #fdcb6e; text-shadow: none;
+    }
+    @keyframes reelCountdownPop {
+      0%   { transform: scale(0.4); opacity: 0; }
+      45%  { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .reel-countdown-number.pop {
+      animation: reelCountdownPop 650ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
   </style>
 </head>
 <body>
@@ -181,6 +208,12 @@
 
       <div id="reel-section" style="display:none;">
         <div class="reel-title">Picking tonight's winner...</div>
+
+        <div id="reel-countdown" class="reel-countdown-wrap" style="display:none;">
+          <div class="reel-countdown-label" id="reel-countdown-label">Draw starting in</div>
+          <div class="reel-countdown-number" id="reel-countdown-number">3</div>
+        </div>
+
         <div class="reel-viewport">
           <div class="reel-track" id="reel-track"></div>
           <div class="reel-pointer">
@@ -371,6 +404,48 @@
       // to the start between winners. All winners are already decided
       // server-side by get_draw_reel() before this ever runs — this
       // only reveals results that already exist, never generates one.
+      // Builds anticipation before the reel actually spins: "Draw
+      // starting in... 3... 2... 1... THE SPIN BEGINS!" — purely
+      // theatrical, the winner is already decided by this point (the
+      // draw already ran server-side) — this just delays the reveal
+      // for effect, the same way a live TV draw holds a beat before
+      // showing the ball.
+      function showPreSpinCountdown(section) {
+        return new Promise((resolve) => {
+          const countdownEl = document.getElementById('reel-countdown');
+          const labelEl = document.getElementById('reel-countdown-label');
+          const numberEl = document.getElementById('reel-countdown-number');
+          const viewportEl = section.querySelector('.reel-viewport');
+
+          section.style.display = 'block';
+          viewportEl.style.display = 'none';
+          countdownEl.style.display = 'flex';
+          labelEl.textContent = 'Draw starting in';
+          numberEl.classList.remove('small-text');
+
+          function show(text, isBig) {
+            numberEl.textContent = text;
+            numberEl.classList.toggle('small-text', !isBig);
+            numberEl.classList.remove('pop');
+            void numberEl.offsetWidth; // force reflow so the animation replays each tick
+            numberEl.classList.add('pop');
+          }
+
+          show('3', true);
+          setTimeout(() => show('2', true), 700);
+          setTimeout(() => show('1', true), 1400);
+          setTimeout(() => {
+            labelEl.textContent = '';
+            show('THE SPIN BEGINS! 🎉', false);
+          }, 2100);
+          setTimeout(() => {
+            countdownEl.style.display = 'none';
+            viewportEl.style.display = 'block';
+            resolve();
+          }, 2750);
+        });
+      }
+
       function animateMultiWinnerReel(reel, winnerTargets) {
         return new Promise((resolve) => {
           const section = document.getElementById('reel-section');
@@ -482,6 +557,8 @@
               .map((t, idx) => ({ ...t, idx }))
               .filter((t) => t.is_winner);
             if (winnerTargets.length > 0) {
+              const reelSection = document.getElementById('reel-section');
+              await showPreSpinCountdown(reelSection);
               await animateMultiWinnerReel(reel, winnerTargets);
             }
           }

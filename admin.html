@@ -320,6 +320,33 @@
     .reel-pointer.pulse {
       animation: reelPointerPulse 420ms ease-out;
     }
+
+    .reel-countdown-wrap {
+      height: 340px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(circle at center, #2d2d44, #1e1e2f);
+      border-radius: 12px;
+    }
+    .reel-countdown-label {
+      color: #fdcb6e; font-size: 15px; font-weight: 700; letter-spacing: 0.03em;
+      margin-bottom: 6px;
+    }
+    .reel-countdown-number {
+      color: #fff; font-size: 72px; font-weight: 900;
+      text-shadow: 0 0 24px rgba(253,203,110,0.7);
+      line-height: 1;
+    }
+    .reel-countdown-number.small-text {
+      font-size: 24px; font-weight: 800; color: #fdcb6e; text-shadow: none;
+    }
+    @keyframes reelCountdownPop {
+      0%   { transform: scale(0.4); opacity: 0; }
+      45%  { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .reel-countdown-number.pop {
+      animation: reelCountdownPop 650ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
     .admin-result { margin-top: 12px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
     .confetti-piece {
       position: absolute; top: 50%; width: 6px; height: 10px; border-radius: 2px;
@@ -539,6 +566,12 @@
           <div id="today-slots-list" style="font-size:13px; color:#636e72;">Loading...</div>
           <div id="admin-reel-section" style="display:none; margin-top:14px;">
             <div class="reel-title" id="admin-reel-title">Picking the winner...</div>
+
+            <div id="admin-reel-countdown" class="reel-countdown-wrap" style="display:none;">
+              <div class="reel-countdown-label" id="admin-countdown-label">Draw starting in</div>
+              <div class="reel-countdown-number" id="admin-countdown-number">3</div>
+            </div>
+
             <div class="reel-viewport">
               <div class="reel-track" id="admin-reel-track"></div>
               <div class="reel-pointer">
@@ -846,6 +879,49 @@
       // ran and returned a result) before this is ever called — this
       // only replays that already-fixed outcome as a spinning reveal,
       // it never influences who actually won.
+      // Builds anticipation before the reel actually spins: "Draw
+      // starting in... 3... 2... 1... THE SPIN BEGINS!" — purely
+      // theatrical, the winner is already decided by this point
+      // (admin_run_draw already ran) — this just delays the reveal
+      // for effect, the same way a live TV draw holds a beat before
+      // showing the ball.
+      function showPreSpinCountdown(section) {
+        return new Promise((resolve) => {
+          const countdownEl = document.getElementById('admin-reel-countdown');
+          const labelEl = document.getElementById('admin-countdown-label');
+          const numberEl = document.getElementById('admin-countdown-number');
+          const viewportEl = section.querySelector('.reel-viewport');
+
+          section.style.display = 'block';
+          section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          viewportEl.style.display = 'none';
+          countdownEl.style.display = 'flex';
+          labelEl.textContent = 'Draw starting in';
+          numberEl.classList.remove('small-text');
+
+          function show(text, isBig) {
+            numberEl.textContent = text;
+            numberEl.classList.toggle('small-text', !isBig);
+            numberEl.classList.remove('pop');
+            void numberEl.offsetWidth; // force reflow so the animation replays each tick
+            numberEl.classList.add('pop');
+          }
+
+          show('3', true);
+          setTimeout(() => show('2', true), 700);
+          setTimeout(() => show('1', true), 1400);
+          setTimeout(() => {
+            labelEl.textContent = '';
+            show('THE SPIN BEGINS! 🎉', false);
+          }, 2100);
+          setTimeout(() => {
+            countdownEl.style.display = 'none';
+            viewportEl.style.display = 'block';
+            resolve();
+          }, 2750);
+        });
+      }
+
       function animateAdminReel(reel, winnerTargets) {
         return new Promise((resolve) => {
           const section = document.getElementById('admin-reel-section');
@@ -1068,6 +1144,8 @@
                     .map((t, idx) => ({ ...t, idx }))
                     .filter((t) => t.is_winner);
                   if (winnerTargets.length > 0) {
+                    const reelSection = document.getElementById('admin-reel-section');
+                    await showPreSpinCountdown(reelSection);
                     await animateAdminReel(reel, winnerTargets);
                   }
                 }
