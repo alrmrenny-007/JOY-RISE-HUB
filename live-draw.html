@@ -18,10 +18,10 @@
   <title>Live Draw — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6c5ce7" />
-  <link rel="icon" type="image/webp" href="favicon.webp" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
@@ -372,10 +372,11 @@
       const REEL_CONFIG = {
         CARD_HEIGHT: 56,
         CARD_GAP: 6,
-        LOOPS_FIRST: 3,        // full laps around the reel before the first winner lands
+        LOOPS_FIRST_MIN: 3,    // fewest full laps around the reel before the first winner lands
+        LOOPS_FIRST_MAX: 5,    // most full laps — a random number in [MIN, MAX] is picked each draw
         LOOPS_BETWEEN: 1,      // laps between each additional winner (for multi-winner draws)
-        FIRST_SPIN_MIN_MS: 2600,  // shortest the opening spin can be (small draws)
-        FIRST_SPIN_MAX_MS: 6500,  // longest the opening spin can be (big draws)
+        FIRST_SPIN_MIN_MS: 3000,  // shortest the opening spin can be (small draws)
+        FIRST_SPIN_MAX_MS: 7500,  // longest the opening spin can be (big draws / more laps)
         BETWEEN_SPIN_MS: 1300,    // duration of each follow-up spin to the next winner
         PAUSE_AFTER_WIN_MS: 1100, // pause on a winner before spinning to the next one
         PAUSE_AFTER_LAST_MS: 900, // pause on the final winner before the reel hides
@@ -467,10 +468,17 @@
           // Build one continuous sequence of cards covering every
           // winner's reveal, one after another, always moving forward
           // (never jumping backward through the strip).
+          // A fresh random lap count each draw (3, 4, or 5 full laps)
+          // so the opening spin doesn't feel identical every night —
+          // purely cosmetic, the winner is already fixed regardless of
+          // how many laps the reel takes to get there.
+          const loopsFirst = REEL_CONFIG.LOOPS_FIRST_MIN +
+            Math.floor(Math.random() * (REEL_CONFIG.LOOPS_FIRST_MAX - REEL_CONFIG.LOOPS_FIRST_MIN + 1));
+
           const displaySeq = [];
           const landings = [];
           winnerTargets.forEach((target, i) => {
-            const loopsToAdd = i === 0 ? REEL_CONFIG.LOOPS_FIRST : REEL_CONFIG.LOOPS_BETWEEN;
+            const loopsToAdd = i === 0 ? loopsFirst : REEL_CONFIG.LOOPS_BETWEEN;
             for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
             displaySeq.push(...reel.slice(0, target.idx + 1));
             landings.push(displaySeq.length - 1);
