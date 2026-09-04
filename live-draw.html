@@ -191,6 +191,13 @@
     .reel-countdown-number.pop {
       animation: reelCountdownPop 650ms cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+    @keyframes reelCountdownFadeOut {
+      0%   { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0.92); opacity: 0; }
+    }
+    .reel-countdown-number.fade-out {
+      animation: reelCountdownFadeOut 350ms ease-in forwards;
+    }
   </style>
 </head>
 <body>
@@ -442,18 +449,29 @@
             numberEl.classList.add('pop');
           }
 
+          // 1 second per count (3... 2... 1...), then hold "THE SPIN
+          // BEGINS!" for 1.75s with a zoom-in entrance, fading smoothly
+          // out just before the reel takes over.
+          const SPIN_BEGINS_HOLD_MS = 1750;
+          const FADE_OUT_MS = 300;
+
           show('3', true);
-          setTimeout(() => show('2', true), 700);
-          setTimeout(() => show('1', true), 1400);
+          setTimeout(() => show('2', true), 1000);
+          setTimeout(() => show('1', true), 2000);
           setTimeout(() => {
             labelEl.textContent = '';
             show('THE SPIN BEGINS! 🎉', false);
-          }, 2100);
+          }, 3000);
+          setTimeout(() => {
+            numberEl.classList.remove('pop');
+            numberEl.classList.add('fade-out');
+          }, 3000 + SPIN_BEGINS_HOLD_MS - FADE_OUT_MS);
           setTimeout(() => {
             countdownEl.style.display = 'none';
+            numberEl.classList.remove('fade-out');
             viewportEl.style.display = 'block';
             resolve();
-          }, 2750);
+          }, 3000 + SPIN_BEGINS_HOLD_MS);
         });
       }
 
@@ -564,14 +582,30 @@
         });
       }
 
+      // Fisher–Yates shuffle — purely cosmetic, applied only to how
+      // tickets are ARRANGED in the visual reel. It runs after
+      // is_winner is already fixed server-side, so it can never change
+      // who wins; it just stops one buyer's several tickets (e.g.
+      // TK-0001, TK-0002, TK-0003) from clumping together in a visible
+      // run, which would look suspicious even though it's harmless.
+      function shuffledReel(reel) {
+        const arr = reel.slice();
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
       async function playReelThenReveal(client, slot, winners, nextSlot) {
         try {
-          const { data: reel, error } = await client.rpc('get_draw_reel', {
+          const { data: reelRaw, error } = await client.rpc('get_draw_reel', {
             p_draw_date: slot.draw_date,
             p_slot_id: slot.slot_id,
           });
           if (error) throw error;
-          if (reel && reel.length > 0) {
+          if (reelRaw && reelRaw.length > 0) {
+            const reel = shuffledReel(reelRaw);
             const winnerTargets = reel
               .map((t, idx) => ({ ...t, idx }))
               .filter((t) => t.is_winner);

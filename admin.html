@@ -357,6 +357,13 @@
     .reel-countdown-number.pop {
       animation: reelCountdownPop 650ms cubic-bezier(0.34, 1.56, 0.64, 1);
     }
+    @keyframes reelCountdownFadeOut {
+      0%   { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0.92); opacity: 0; }
+    }
+    .reel-countdown-number.fade-out {
+      animation: reelCountdownFadeOut 350ms ease-in forwards;
+    }
     .admin-result { margin-top: 12px; font-size: 12.5px; line-height: 1.6; color: var(--muted); }
     .confetti-piece {
       position: absolute; top: 50%; width: 6px; height: 10px; border-radius: 2px;
@@ -886,6 +893,20 @@
         return ADMIN_REEL_PALETTE[hash % ADMIN_REEL_PALETTE.length];
       }
 
+      // Fisher–Yates shuffle — purely cosmetic, applied only to how
+      // tickets are ARRANGED in the visual reel (same as live-draw.html).
+      // Runs after is_winner is already fixed server-side, so it can
+      // never change who wins; it just stops one buyer's several
+      // tickets from clumping together in a visible run.
+      function shuffledReel(reel) {
+        const arr = reel.slice();
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
       // Winners are already decided server-side (admin_run_draw already
       // ran and returned a result) before this is ever called — this
       // only replays that already-fixed outcome as a spinning reveal,
@@ -918,18 +939,29 @@
             numberEl.classList.add('pop');
           }
 
+          // 1 second per count (3... 2... 1...), then hold "THE SPIN
+          // BEGINS!" for 1.75s with a zoom-in entrance, fading smoothly
+          // out just before the reel takes over.
+          const SPIN_BEGINS_HOLD_MS = 1750;
+          const FADE_OUT_MS = 300;
+
           show('3', true);
-          setTimeout(() => show('2', true), 700);
-          setTimeout(() => show('1', true), 1400);
+          setTimeout(() => show('2', true), 1000);
+          setTimeout(() => show('1', true), 2000);
           setTimeout(() => {
             labelEl.textContent = '';
             show('THE SPIN BEGINS! 🎉', false);
-          }, 2100);
+          }, 3000);
+          setTimeout(() => {
+            numberEl.classList.remove('pop');
+            numberEl.classList.add('fade-out');
+          }, 3000 + SPIN_BEGINS_HOLD_MS - FADE_OUT_MS);
           setTimeout(() => {
             countdownEl.style.display = 'none';
+            numberEl.classList.remove('fade-out');
             viewportEl.style.display = 'block';
             resolve();
-          }, 2750);
+          }, 3000 + SPIN_BEGINS_HOLD_MS);
         });
       }
 
@@ -1150,13 +1182,14 @@
               // live-draw.html, scoped to this exact slot/date.
               try {
                 const todayStr = new Date().toISOString().slice(0, 10);
-                const { data: reel, error: reelError } = await client.rpc('get_draw_reel', {
+                const { data: reelRaw, error: reelError } = await client.rpc('get_draw_reel', {
                   p_draw_date: todayStr,
                   p_slot_id: currentSlot.id,
                 });
                 if (reelError) throw reelError;
 
-                if (reel && reel.length > 0) {
+                if (reelRaw && reelRaw.length > 0) {
+                  const reel = shuffledReel(reelRaw);
                   const winnerTargets = reel
                     .map((t, idx) => ({ ...t, idx }))
                     .filter((t) => t.is_winner);
