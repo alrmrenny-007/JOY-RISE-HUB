@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Push Debug</title>
+</head>
+<body style="font-family:monospace; font-size:12px; padding:16px; background:#111; color:#0f0; margin:0;">
+<button id="run-btn" style="font-size:16px; padding:14px 20px; width:100%;">▶ Run Diagnostics</button>
+<pre id="log" style="white-space:pre-wrap; margin-top:16px; word-break:break-all;"></pre>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = "https://ijkcqsodtmmavnveflgj.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlqa2Nxc29kdG1tYXZudmVmbGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3OTE5ODQsImV4cCI6MjEwMTM2Nzk4NH0.b-R-yhNk00Gfc3zNasa-yb08huMc5kTu0zXdMMXNByo";
+const VAPID_PUBLIC_KEY = "BEyoNhoZ0IZ6mfSZm0PORSNSSfOsE6PZyLqbVyeZ0lbR1_7gaCjYJiF087f3tm0kv4Yo7x0sc_RXXOzzaS9cFTM";
+
+const logEl = document.getElementById('log');
+function log(msg) {
+  logEl.textContent += msg + "\n";
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+document.getElementById('run-btn').addEventListener('click', async () => {
+  logEl.textContent = '';
+  log('=== Push Diagnostics ===');
+  log('Time: ' + new Date().toString());
+  log('User agent: ' + navigator.userAgent);
+  log('');
+
+  try {
+    log('1. Creating Supabase client...');
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    log('   OK');
+
+    log('2. Checking login session...');
+    const { data: { user }, error: userErr } = await client.auth.getUser();
+    if (userErr) log('   ERROR: ' + userErr.message);
+    if (!user) {
+      log('   NOT LOGGED IN. Log in on the main site in THIS SAME browser first, then reopen this page.');
+      return;
+    }
+    log('   Logged in. user_id = ' + user.id);
+
+    log('3. serviceWorker in navigator? ' + ('serviceWorker' in navigator));
+    log('4. PushManager in window? ' + ('PushManager' in window));
+    log('5. Notification in window? ' + ('Notification' in window));
+    if ('Notification' in window) log('   Notification.permission = ' + Notification.permission);
+
+    log('6. Existing service worker registrations:');
+    const regs = await navigator.serviceWorker.getRegistrations();
+    log('   Count: ' + regs.length);
+    regs.forEach((r, i) => {
+      log('   [' + i + '] scope=' + r.scope);
+      log('       active=' + (r.active ? r.active.state : 'none'));
+      log('       installing=' + (r.installing ? r.installing.state : 'none'));
+      log('       waiting=' + (r.waiting ? r.waiting.state : 'none'));
+    });
+
+    log('7. Registering service-worker.js explicitly...');
+    try {
+      const reg = await navigator.serviceWorker.register('service-worker.js');
+      log('   register() resolved. scope=' + reg.scope);
+    } catch (err) {
+      log('   register() FAILED: ' + err.name + ': ' + err.message);
+    }
+
+    log('8. Waiting for navigator.serviceWorker.ready (10s timeout)...');
+    const t0 = Date.now();
+    const registration = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT after 10 seconds')), 10000))
+    ]);
+    log('   READY after ' + (Date.now() - t0) + 'ms. active state=' + (registration.active ? registration.active.state : 'none'));
+
+    log('9. Requesting Notification permission...');
+    const perm = await Notification.requestPermission();
+    log('   permission = ' + perm);
+
+    if (perm !== 'granted') {
+      log('   STOPPED: permission not granted.');
+      return;
+    }
+
+    log('10. Checking existing push subscription...');
+    let sub = await registration.pushManager.getSubscription();
+    log('    existing sub: ' + (sub ? 'YES (endpoint: ' + sub.endpoint.slice(0, 50) + '...)' : 'none'));
+
+    if (!sub) {
+      log('11. Subscribing via pushManager.subscribe()...');
+      try {
+        sub = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        });
+        log('    Subscribed OK. endpoint=' + sub.endpoint.slice(0, 60) + '...');
+      } catch (err) {
+        log('    SUBSCRIBE FAILED: ' + err.name + ': ' + err.message);
+        log('');
+        log('=== STOPPED HERE — this is the real problem ===');
+        return;
+      }
+    }
+
+    log('12. Saving subscription to database...');
+    const subJson = sub.toJSON();
+    const { error: dbErr } = await client.from('push_subscriptions').upsert({
+      user_id: user.id,
+      endpoint: subJson.endpoint,
+      p256dh: subJson.keys.p256dh,
+      auth_key: subJson.keys.auth,
+    }, { onConflict: 'endpoint' });
+
+    if (dbErr) {
+      log('    DB SAVE FAILED: ' + JSON.stringify(dbErr));
+      log('');
+      log('=== STOPPED HERE — this is the real problem ===');
+    } else {
+      log('    SAVED SUCCESSFULLY!');
+      log('');
+      log('=== ALL STEPS PASSED — push notifications are fully working ===');
+    }
+  } catch (err) {
+    log('');
+    log('UNEXPECTED ERROR: ' + err.name + ': ' + err.message);
+    log('=== STOPPED HERE — this is the real problem ===');
+  }
+});
+</script>
+</body>
+</html>
