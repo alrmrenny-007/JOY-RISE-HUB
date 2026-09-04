@@ -186,12 +186,24 @@
     return outputArray;
   }
 
+  // Wraps a promise with a timeout so a step that never resolves
+  // (e.g. a service worker stuck installing) can't hang the whole
+  // flow forever — it fails with a clear, specific message instead.
+  function withTimeout(promise, ms, message) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+    ]);
+  }
+
   // Registers (or re-registers) this browser's push subscription and
   // saves it against the logged-in user. Safe to call more than once
   // — getSubscription() returns the existing one if already subscribed.
   // Returns { success, error } instead of swallowing failures, so
   // anything calling this (the auto-banner, or a manual button) can
-  // show the person what actually went wrong.
+  // show the person what actually went wrong. Every async step has
+  // its own timeout, so this can never get stuck showing "Enabling..."
+  // forever — it always resolves with a specific, actionable error.
   async function subscribeToPush() {
     try {
       const client = window.getSupabaseClient();
@@ -204,24 +216,46 @@
         return { success: false, error: "Service workers not supported in this browser" };
       }
 
-      const registration = await navigator.serviceWorker.ready;
+      let registration;
+      try {
+        registration = await withTimeout(
+          navigator.serviceWorker.ready,
+          8000,
+          "Timed out waiting for the service worker to activate. Try fully closing this browser tab (not just navigating away) and reopening the site, then try again."
+        );
+      } catch (swErr) {
+        return { success: false, error: swErr.message };
+      }
+
       let subscription = await registration.pushManager.getSubscription();
       if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
+        try {
+          subscription = await withTimeout(
+            registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+            }),
+            8000,
+            "Timed out subscribing with the browser's push service."
+          );
+        } catch (subErr) {
+          return { success: false, error: "Subscribe failed: " + (subErr.message || "unknown error") };
+        }
       }
 
       const subJson = subscription.toJSON();
-      const { error: dbError } = await client.from("push_subscriptions").upsert(
-        {
-          user_id: user.id,
-          endpoint: subJson.endpoint,
-          p256dh: subJson.keys.p256dh,
-          auth_key: subJson.keys.auth,
-        },
-        { onConflict: "endpoint" }
+      const { error: dbError } = await withTimeout(
+        client.from("push_subscriptions").upsert(
+          {
+            user_id: user.id,
+            endpoint: subJson.endpoint,
+            p256dh: subJson.keys.p256dh,
+            auth_key: subJson.keys.auth,
+          },
+          { onConflict: "endpoint" }
+        ),
+        8000,
+        "Timed out saving your subscription — check your connection."
       );
 
       if (dbError) {
@@ -242,7 +276,9 @@
   // previously denied (browsers won't let JS re-prompt — the person
   // has to change it in their browser's own site settings), or a
   // genuine subscription/save failure. Always returns a result object
-  // so the caller can show accurate feedback instead of guessing.
+  // so the caller can show accurate feedback instead of guessing. The
+  // outer 15s timeout is a last-resort safety net on top of
+  // subscribeToPush()'s own internal per-step timeouts.
   window.enablePushNotifications = async function () {
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
       return { success: false, error: "Push notifications aren't supported in this browser. On iPhone, you must add this app to your Home Screen first." };
@@ -252,14 +288,26 @@
       return { success: false, error: "Notifications are blocked for this site. Enable them in your browser's site settings, then try again." };
     }
 
-    if (Notification.permission === "default") {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        return { success: false, error: "Permission was not granted." };
+    try {
+      if (Notification.permission === "default") {
+        const permission = await withTimeout(
+          Notification.requestPermission(),
+          15000,
+          "Timed out waiting for you to respond to the permission prompt."
+        );
+        if (permission !== "granted") {
+          return { success: false, error: "Permission was not granted." };
+        }
       }
-    }
 
-    return subscribeToPush();
+      return await withTimeout(
+        subscribeToPush(),
+        15000,
+        "This is taking too long — something is likely stuck at the service-worker level. Try fully closing this browser tab and reopening the site."
+      );
+    } catch (err) {
+      return { success: false, error: err.message || "Unknown error" };
+    }
   };
 
   // Shows a one-time opt-in banner (same visual style as the cookie
