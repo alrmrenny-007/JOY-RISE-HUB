@@ -1,4 +1,4 @@
-const CACHE_NAME = "joyrise-shell-v5";
+const CACHE_NAME = "joyrise-shell-v6";
 
 const SHELL_FILES = [
   "index.html",
@@ -33,9 +33,25 @@ const SHELL_FILES = [
   "icons/icon-512.png"
 ];
 
+// IMPORTANT: cache.addAll() is all-or-nothing — if even ONE file in
+// SHELL_FILES 404s, the entire install silently fails and the
+// service worker never activates (this was the actual root cause of
+// push notifications never working — navigator.serviceWorker.ready
+// waits forever for an active worker that never existed). Caching
+// each file independently means one missing/renamed file can never
+// break the whole service worker again — it just gets skipped, with
+// a console warning, while everything else still installs fine.
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(
+        SHELL_FILES.map((file) =>
+          cache.add(file).catch((err) => {
+            console.warn("Service worker: skipping missing shell file:", file, err.message);
+          })
+        )
+      )
+    )
   );
   self.skipWaiting();
 });
