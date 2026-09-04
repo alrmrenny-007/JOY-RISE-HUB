@@ -189,13 +189,20 @@
   // Registers (or re-registers) this browser's push subscription and
   // saves it against the logged-in user. Safe to call more than once
   // — getSubscription() returns the existing one if already subscribed.
+  // Returns { success, error } instead of swallowing failures, so
+  // anything calling this (the auto-banner, or a manual button) can
+  // show the person what actually went wrong.
   async function subscribeToPush() {
     try {
       const client = window.getSupabaseClient();
-      if (!client) return;
+      if (!client) return { success: false, error: "Supabase client not ready" };
 
       const { data: { user } } = await client.auth.getUser();
-      if (!user) return; // only logged-in users can subscribe
+      if (!user) return { success: false, error: "Not logged in" };
+
+      if (!("serviceWorker" in navigator)) {
+        return { success: false, error: "Service workers not supported in this browser" };
+      }
 
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
@@ -207,7 +214,7 @@
       }
 
       const subJson = subscription.toJSON();
-      await client.from("push_subscriptions").upsert(
+      const { error: dbError } = await client.from("push_subscriptions").upsert(
         {
           user_id: user.id,
           endpoint: subJson.endpoint,
@@ -216,10 +223,44 @@
         },
         { onConflict: "endpoint" }
       );
+
+      if (dbError) {
+        console.warn("Saving push subscription failed:", dbError);
+        return { success: false, error: "Couldn't save subscription: " + dbError.message };
+      }
+
+      return { success: true };
     } catch (err) {
       console.warn("Push subscription failed:", err);
+      return { success: false, error: err.message || "Unknown error" };
     }
   }
+
+  // Manual trigger — call this from any "Enable Notifications" button
+  // anywhere in the app (e.g. inside the notification bell dropdown).
+  // Handles every case: browser doesn't support push, permission
+  // previously denied (browsers won't let JS re-prompt — the person
+  // has to change it in their browser's own site settings), or a
+  // genuine subscription/save failure. Always returns a result object
+  // so the caller can show accurate feedback instead of guessing.
+  window.enablePushNotifications = async function () {
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+      return { success: false, error: "Push notifications aren't supported in this browser. On iPhone, you must add this app to your Home Screen first." };
+    }
+
+    if (Notification.permission === "denied") {
+      return { success: false, error: "Notifications are blocked for this site. Enable them in your browser's site settings, then try again." };
+    }
+
+    if (Notification.permission === "default") {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        return { success: false, error: "Permission was not granted." };
+      }
+    }
+
+    return subscribeToPush();
+  };
 
   // Shows a one-time opt-in banner (same visual style as the cookie
   // banner) to logged-in users who haven't decided yet. Never nags

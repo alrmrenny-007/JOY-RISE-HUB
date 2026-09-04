@@ -811,6 +811,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Wires the manual "Turn On Notifications" button inside the bell
+  // dropdown. This exists alongside the auto-popup banner in auth.js
+  // as a reliable fallback — if the banner was dismissed, or the
+  // browser's permission was granted through some other route without
+  // ever actually completing the subscribe step, this button lets the
+  // person (or you, while testing) force it and see the real result
+  // instead of guessing why nothing got saved.
+  function wireEnablePushButton() {
+    const btn = document.getElementById("enable-push-btn");
+    const label = document.getElementById("enable-push-label");
+    if (!btn) return;
+
+    function refreshLabel() {
+      if (!("Notification" in window)) {
+        label.textContent = "Notifications Not Supported";
+        btn.disabled = true;
+        return;
+      }
+      if (Notification.permission === "granted") {
+        label.textContent = "Notifications On";
+      } else if (Notification.permission === "denied") {
+        label.textContent = "Notifications Blocked (check browser settings)";
+      } else {
+        label.textContent = "Turn On Notifications";
+      }
+    }
+    refreshLabel();
+
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      label.textContent = "Enabling...";
+
+      const result = await window.enablePushNotifications();
+
+      if (result.success) {
+        showToast("Notifications enabled!");
+      } else {
+        showToast(result.error || "Couldn't enable notifications.", "error", 5000);
+      }
+
+      refreshLabel();
+      btn.disabled = false;
+    });
+  }
+
   function movePillToActiveNav() {
     if (!navPill || !bottomNavbar) return;
     const active = document.querySelector(".nav-item.active");
@@ -852,6 +897,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadUserData();
   loadDashboardDrawBanner();
   setInterval(loadDashboardDrawBanner, 20000);
+  wireEnablePushButton();
 
   // Check admin status separately (doesn't block the main dashboard load)
   if (supabaseClient) {
