@@ -25,12 +25,12 @@ const SHELL_FILES = [
   "app.js",
   "auth.js",
   "manifest.json",
-  "favicon.ico",
-  "icons/favicon-32.png",
-  "icons/favicon-16.png",
-  "icons/apple-touch-icon.png",
-  "icons/icon-192.png",
-  "icons/icon-512.png"
+  "favicon.webp",
+  "favicon-32.png",
+  "favicon-16.png",
+  "apple-touch-icon.png",
+  "icon-192.png",
+  "icon-512.png"
 ];
 
 // IMPORTANT: cache.addAll() is all-or-nothing — if even ONE file in
@@ -125,8 +125,8 @@ self.addEventListener("push", (event) => {
   const title = payload.title || "Joy-Rise Hub";
   const options = {
     body: payload.body || "",
-    icon: "icons/icon-192.png",
-    badge: "icons/icon-192.png",
+    icon: "icon-192.png",
+    badge: "icon-192.png",
     data: { url: payload.url || "index.html" },
   };
 
