@@ -596,21 +596,43 @@
           // 6-8s and winner 2's always takes 4-5s. Lap count is picked
           // separately, purely to fill that fixed time with visible
           // motion — it never changes how long the spin actually runs.
+          //
+          // A ticket that already won in an earlier segment of THIS
+          // draw is removed from the pool for every later segment —
+          // it can no longer even visually appear as a candidate card
+          // while spinning for winner 2+, since it's already locked
+          // in as a winner and can't win again. Only its own segment
+          // (where it's the actual revealed target) ever shows it.
+          const excludedIndices = new Set();
           const displaySeq = [];
           const landings = [];
           const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
             const isFirst = i === 0;
+
+            // Pool of tickets still eligible to appear as filler cards
+            // in this segment — the full reel minus every ticket that
+            // already won in a previous segment.
+            const pool = [];
+            let targetPosInPool = -1;
+            reel.forEach((t, idx) => {
+              if (excludedIndices.has(idx)) return;
+              if (idx === target.idx) targetPosInPool = pool.length;
+              pool.push(t);
+            });
+
             const loopsToAdd = isFirst
               ? randomBetween(REEL_CONFIG.LOOPS_FIRST_MIN, REEL_CONFIG.LOOPS_FIRST_MAX)
               : randomBetween(REEL_CONFIG.LOOPS_BETWEEN_MIN, REEL_CONFIG.LOOPS_BETWEEN_MAX);
             const duration = isFirst
               ? randomBetween(REEL_CONFIG.FIRST_SPIN_MIN_MS, REEL_CONFIG.FIRST_SPIN_MAX_MS)
               : randomBetween(REEL_CONFIG.BETWEEN_SPIN_MIN_MS, REEL_CONFIG.BETWEEN_SPIN_MAX_MS);
-            for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
-            displaySeq.push(...reel.slice(0, target.idx + 1));
+            for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...pool);
+            displaySeq.push(...pool.slice(0, targetPosInPool + 1));
             landings.push(displaySeq.length - 1);
             segmentDurations.push(duration);
+
+            excludedIndices.add(target.idx);
           });
 
           displaySeq.forEach((t) => {

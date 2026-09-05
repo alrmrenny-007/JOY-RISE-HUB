@@ -1059,21 +1059,38 @@
           }
 
           // Fixed time budget per spin type — matches live-draw.html.
+          // A ticket that already won in an earlier segment is removed
+          // from the pool for every later segment, so it can no longer
+          // even visually appear as a candidate while spinning for
+          // winner 2+ — see live-draw.html for the full explanation.
+          const excludedIndices = new Set();
           const displaySeq = [];
           const landings = [];
           const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
             const isFirst = i === 0;
+
+            const pool = [];
+            let targetPosInPool = -1;
+            reel.forEach((t, idx) => {
+              if (excludedIndices.has(idx)) return;
+              if (idx === target.idx) targetPosInPool = pool.length;
+              pool.push(t);
+            });
+
             const loopsToAdd = isFirst
               ? randomBetween(ADMIN_REEL_CONFIG.LOOPS_FIRST_MIN, ADMIN_REEL_CONFIG.LOOPS_FIRST_MAX)
               : randomBetween(ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MIN, ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MAX);
             const duration = isFirst
               ? randomBetween(ADMIN_REEL_CONFIG.FIRST_SPIN_MIN_MS, ADMIN_REEL_CONFIG.FIRST_SPIN_MAX_MS)
               : randomBetween(ADMIN_REEL_CONFIG.BETWEEN_SPIN_MIN_MS, ADMIN_REEL_CONFIG.BETWEEN_SPIN_MAX_MS);
-            for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
-            displaySeq.push(...reel.slice(0, target.idx + 1));
+            for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...pool);
+            displaySeq.push(...pool.slice(0, targetPosInPool + 1));
             landings.push(displaySeq.length - 1);
             segmentDurations.push(duration);
+
+            excludedIndices.add(target.idx);
+
           });
 
           displaySeq.forEach((t) => {
