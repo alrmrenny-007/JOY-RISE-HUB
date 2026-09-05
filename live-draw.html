@@ -384,22 +384,31 @@
 
 
       // ---- REEL TUNING KNOBS ----
-      // Change any of these numbers to adjust the feel of the draw
-      // reel — nothing else in the code below needs to be touched.
+      // This mirrors the original design brief: a FIXED time budget
+      // for each spin (not a duration that grows with ticket count or
+      // lap count), so the draw feels the same length whether there
+      // are 10 tickets or 500 — the number of laps is just cosmetic
+      // "filler" distance to make that fixed time feel full, easing
+      // out smoothly with a slot-machine deceleration curve.
       const REEL_CONFIG = {
         CARD_HEIGHT: 56,
         CARD_GAP: 6,
-        LOOPS_MIN: 7,   // fewest full laps around the reel before landing — same for every spin
-        LOOPS_MAX: 8,   // most full laps — a random number in [MIN, MAX] is picked per spin
-        MS_PER_CARD: 13,   // speed: lower = faster blur across each card
-        SPIN_MIN_MS: 4000,  // floor, so a tiny ticket pool doesn't finish instantly
-        SPIN_MAX_MS: 10000, // ceiling, so a huge ticket pool doesn't drag on forever
-        REST_BETWEEN_WINNERS_MS: 10000, // "Getting ready for the next draw" hold, before the countdown
-        BETWEEN_COUNTDOWN_STEP_MS: 2000, // seconds-per-count for the 3-2-1 before winner 2+ (slower/longer than the opening one)
-        BETWEEN_COUNTDOWN_HOLD_MS: 3000, // how long "THE SPIN BEGINS!" holds before winner 2+'s spin
-        PAUSE_AFTER_WIN_MS: 3000, // how long the winner's name/prize stays on screen before the rest screen appears
-        PAUSE_AFTER_LAST_MS: 900, // pause on the final winner before the reel hides
-        BLUR_CLEAR_BEFORE_LANDING_MS: 450, // motion blur clears this long before it stops
+
+        // Winner 1: full 6-8s spin, 5-6 laps around the reel.
+        LOOPS_FIRST_MIN: 5,
+        LOOPS_FIRST_MAX: 6,
+        FIRST_SPIN_MIN_MS: 6000,
+        FIRST_SPIN_MAX_MS: 8000,
+
+        // Winner 2+: a noticeably quicker spin (fewer laps, shorter
+        // time) since the audience already knows the format by now.
+        LOOPS_BETWEEN_MIN: 3,
+        LOOPS_BETWEEN_MAX: 4,
+        BETWEEN_SPIN_MIN_MS: 4000,
+        BETWEEN_SPIN_MAX_MS: 5000,
+
+        DRAMATIC_PAUSE_MS: 3000, // short "Drawing winner 2 in 3...2...1..." beat before the next spin auto-starts
+        PAUSE_AFTER_LAST_MS: 1200, // pause on the final winner before the reel hides
       };
       // ---- END REEL TUNING KNOBS ----
 
@@ -531,33 +540,31 @@
           const { CARD_HEIGHT: CARD_H, CARD_GAP: GAP } = REEL_CONFIG;
           const STEP = CARD_H + GAP;
 
-          // Build one continuous sequence of cards covering every
-          // winner's reveal, one after another, always moving forward
-          // (never jumping backward through the strip). A fresh random
-          // lap count AND duration is picked per segment — purely
-          // cosmetic, the winner is already fixed regardless of how
-          // many laps or how long the reel spins to get there.
           function randomBetween(min, max) {
             return min + Math.floor(Math.random() * (max - min + 1));
           }
 
+          // Time budget is FIXED per spin type (not derived from lap
+          // count or ticket count) — this is the key fix: whether
+          // there are 10 tickets or 500, winner 1's spin always takes
+          // 6-8s and winner 2's always takes 4-5s. Lap count is picked
+          // separately, purely to fill that fixed time with visible
+          // motion — it never changes how long the spin actually runs.
           const displaySeq = [];
           const landings = [];
           const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
-            const loopsToAdd = randomBetween(REEL_CONFIG.LOOPS_MIN, REEL_CONFIG.LOOPS_MAX);
-            // Cards actually traveled in THIS segment (from wherever the
-            // reel currently sits to this winner's card) — not the
-            // cumulative position in the whole strip. Using the
-            // cumulative index here would make later winners' spins
-            // balloon to absurd durations as more winners get added.
-            const cardsThisSegment = loopsToAdd * reel.length + (target.idx + 1);
+            const isFirst = i === 0;
+            const loopsToAdd = isFirst
+              ? randomBetween(REEL_CONFIG.LOOPS_FIRST_MIN, REEL_CONFIG.LOOPS_FIRST_MAX)
+              : randomBetween(REEL_CONFIG.LOOPS_BETWEEN_MIN, REEL_CONFIG.LOOPS_BETWEEN_MAX);
+            const duration = isFirst
+              ? randomBetween(REEL_CONFIG.FIRST_SPIN_MIN_MS, REEL_CONFIG.FIRST_SPIN_MAX_MS)
+              : randomBetween(REEL_CONFIG.BETWEEN_SPIN_MIN_MS, REEL_CONFIG.BETWEEN_SPIN_MAX_MS);
             for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
             displaySeq.push(...reel.slice(0, target.idx + 1));
             landings.push(displaySeq.length - 1);
-            segmentDurations.push(
-              Math.min(REEL_CONFIG.SPIN_MAX_MS, Math.max(REEL_CONFIG.SPIN_MIN_MS, cardsThisSegment * REEL_CONFIG.MS_PER_CARD))
-            );
+            segmentDurations.push(duration);
           });
 
           displaySeq.forEach((t) => {
@@ -576,7 +583,26 @@
           void track.offsetHeight;
 
           const allCards = track.querySelectorAll('.reel-card');
-          const ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
+
+          // A short, low-key "Drawing winner 2 in 3...2...1..." beat
+          // shown right under the winner's name — no full-screen
+          // overlay, no hiding the reel, just enough of a pause for
+          // viewers to register the win before it auto-continues.
+          function microCountdown(baseHtml, nextWinnerNum) {
+            return new Promise((resolve) => {
+              let n = 3;
+              const tick = () => {
+                titleEl.innerHTML = `${baseHtml}<br><span style="font-size:12.5px; opacity:0.8; font-weight:700;">Drawing winner ${nextWinnerNum} in ${n}...</span>`;
+                n--;
+                if (n >= 0) {
+                  setTimeout(tick, 1000);
+                } else {
+                  resolve();
+                }
+              };
+              setTimeout(tick, REEL_CONFIG.DRAMATIC_PAUSE_MS - 3000);
+            });
+          }
 
           function runSegment(segmentIdx) {
             if (segmentIdx >= landings.length) {
@@ -592,16 +618,10 @@
               titleEl.textContent = `Picking winner ${segmentIdx + 1} of ${winnerTargets.length}...`;
             }
 
-            // Motion blur while it's flying past cards, clearing to
-            // sharp focus just before it settles on the winner — this
-            // is what makes it read as "fast" rather than just "sliding".
-            track.classList.add('spinning');
-            const blurClearAt = Math.max(0, duration - REEL_CONFIG.BLUR_CLEAR_BEFORE_LANDING_MS);
-            setTimeout(() => track.classList.remove('spinning'), blurClearAt);
-
             // easeOutExpo — a fast start with a long, satisfying
             // slowdown. This is the standard curve for slot-machine /
-            // prize-reveal style animations.
+            // prize-reveal style animations. No blur filter — cards
+            // stay sharp and readable throughout the whole spin.
             track.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1)`;
             requestAnimationFrame(() => {
               track.style.transform = `translateY(${finalOffset}px)`;
@@ -615,7 +635,8 @@
 
               const target = winnerTargets[segmentIdx];
               const prizeStr = Number(target.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 });
-              titleEl.textContent = `🎉 ${target.display_name || 'A Winner'} — ₦${prizeStr}`;
+              const winnerHtml = `🎉 ${escapeHtml(target.display_name || 'A Winner')} — ₦${prizeStr}`;
+              titleEl.innerHTML = winnerHtml;
 
               const isLast = segmentIdx === winnerTargets.length - 1;
 
@@ -624,21 +645,11 @@
                 return;
               }
 
-              // Hold on this winner's name/prize for a few seconds,
-              // then a distinct 10s "intermission" screen, then a
-              // slower 3-2-1 countdown, before the next winner's spin.
-              setTimeout(() => {
-                const nextOrdinal = ORDINALS[segmentIdx + 1] || `${segmentIdx + 2}th`;
-                showRestScreen(
-                  section,
-                  `Getting ready for the ${nextOrdinal} draw`,
-                  REEL_CONFIG.REST_BETWEEN_WINNERS_MS
-                ).then(() => showPreSpinCountdown(section, {
-                  stepMs: REEL_CONFIG.BETWEEN_COUNTDOWN_STEP_MS,
-                  holdMs: REEL_CONFIG.BETWEEN_COUNTDOWN_HOLD_MS,
-                  label: `Draw ${segmentIdx + 2} starting in`,
-                })).then(() => runSegment(segmentIdx + 1));
-              }, REEL_CONFIG.PAUSE_AFTER_WIN_MS);
+              // Short dramatic beat with a ticking "Drawing winner N
+              // in 3...2...1..." line, then the next spin auto-starts
+              // immediately — no separate rest screen, no second
+              // full-screen countdown box.
+              microCountdown(winnerHtml, segmentIdx + 2).then(() => runSegment(segmentIdx + 1));
             }, duration + 150);
           }
 

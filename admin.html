@@ -872,17 +872,16 @@
       const ADMIN_REEL_CONFIG = {
         CARD_HEIGHT: 56,
         CARD_GAP: 6,
-        LOOPS_MIN: 7,
-        LOOPS_MAX: 8,
-        MS_PER_CARD: 13,
-        SPIN_MIN_MS: 4000,
-        SPIN_MAX_MS: 10000,
-        REST_BETWEEN_WINNERS_MS: 10000,
-        BETWEEN_COUNTDOWN_STEP_MS: 2000,
-        BETWEEN_COUNTDOWN_HOLD_MS: 3000,
-        PAUSE_AFTER_WIN_MS: 3000,
-        PAUSE_AFTER_LAST_MS: 900,
-        BLUR_CLEAR_BEFORE_LANDING_MS: 450,
+        LOOPS_FIRST_MIN: 5,
+        LOOPS_FIRST_MAX: 6,
+        FIRST_SPIN_MIN_MS: 6000,
+        FIRST_SPIN_MAX_MS: 8000,
+        LOOPS_BETWEEN_MIN: 3,
+        LOOPS_BETWEEN_MAX: 4,
+        BETWEEN_SPIN_MIN_MS: 4000,
+        BETWEEN_SPIN_MAX_MS: 5000,
+        DRAMATIC_PAUSE_MS: 3000,
+        PAUSE_AFTER_LAST_MS: 1200,
       };
 
       const ADMIN_REEL_PALETTE = ['#3ec6e0', '#ff6b5b', '#8bc34a', '#a839c4', '#f5a623', '#4a7cff', '#ff4fa3'];
@@ -1021,24 +1020,26 @@
           const { CARD_HEIGHT: CARD_H, CARD_GAP: GAP } = ADMIN_REEL_CONFIG;
           const STEP = CARD_H + GAP;
 
-          // A fresh random lap count AND duration per segment — purely
-          // cosmetic, matches live-draw.html's behavior.
           function randomBetween(min, max) {
             return min + Math.floor(Math.random() * (max - min + 1));
           }
 
+          // Fixed time budget per spin type — matches live-draw.html.
           const displaySeq = [];
           const landings = [];
           const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
-            const loopsToAdd = randomBetween(ADMIN_REEL_CONFIG.LOOPS_MIN, ADMIN_REEL_CONFIG.LOOPS_MAX);
-            const cardsThisSegment = loopsToAdd * reel.length + (target.idx + 1);
+            const isFirst = i === 0;
+            const loopsToAdd = isFirst
+              ? randomBetween(ADMIN_REEL_CONFIG.LOOPS_FIRST_MIN, ADMIN_REEL_CONFIG.LOOPS_FIRST_MAX)
+              : randomBetween(ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MIN, ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MAX);
+            const duration = isFirst
+              ? randomBetween(ADMIN_REEL_CONFIG.FIRST_SPIN_MIN_MS, ADMIN_REEL_CONFIG.FIRST_SPIN_MAX_MS)
+              : randomBetween(ADMIN_REEL_CONFIG.BETWEEN_SPIN_MIN_MS, ADMIN_REEL_CONFIG.BETWEEN_SPIN_MAX_MS);
             for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
             displaySeq.push(...reel.slice(0, target.idx + 1));
             landings.push(displaySeq.length - 1);
-            segmentDurations.push(
-              Math.min(ADMIN_REEL_CONFIG.SPIN_MAX_MS, Math.max(ADMIN_REEL_CONFIG.SPIN_MIN_MS, cardsThisSegment * ADMIN_REEL_CONFIG.MS_PER_CARD))
-            );
+            segmentDurations.push(duration);
           });
 
           displaySeq.forEach((t) => {
@@ -1055,7 +1056,22 @@
           void track.offsetHeight;
 
           const allCards = track.querySelectorAll('.reel-card');
-          const ADMIN_ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
+
+          function microCountdown(baseHtml, nextWinnerNum) {
+            return new Promise((resolve) => {
+              let n = 3;
+              const tick = () => {
+                titleEl.innerHTML = `${baseHtml}<br><span style="font-size:12.5px; opacity:0.8; font-weight:700;">Drawing winner ${nextWinnerNum} in ${n}...</span>`;
+                n--;
+                if (n >= 0) {
+                  setTimeout(tick, 1000);
+                } else {
+                  resolve();
+                }
+              };
+              setTimeout(tick, ADMIN_REEL_CONFIG.DRAMATIC_PAUSE_MS - 3000);
+            });
+          }
 
           function runSegment(segmentIdx) {
             if (segmentIdx >= landings.length) {
@@ -1071,10 +1087,6 @@
               titleEl.textContent = `Picking winner ${segmentIdx + 1} of ${winnerTargets.length}...`;
             }
 
-            track.classList.add('spinning');
-            const blurClearAt = Math.max(0, duration - ADMIN_REEL_CONFIG.BLUR_CLEAR_BEFORE_LANDING_MS);
-            setTimeout(() => track.classList.remove('spinning'), blurClearAt);
-
             track.style.transition = `transform ${duration}ms cubic-bezier(0.16, 1, 0.3, 1)`;
             requestAnimationFrame(() => {
               track.style.transform = `translateY(${finalOffset}px)`;
@@ -1088,7 +1100,8 @@
 
               const target = winnerTargets[segmentIdx];
               const prizeStr = Number(target.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 });
-              titleEl.textContent = `🎉 ${target.display_name || 'A Winner'} — ₦${prizeStr}`;
+              const winnerHtml = `🎉 ${escapeHtml(target.display_name || 'A Winner')} — ₦${prizeStr}`;
+              titleEl.innerHTML = winnerHtml;
 
               const isLast = segmentIdx === winnerTargets.length - 1;
 
@@ -1097,20 +1110,7 @@
                 return;
               }
 
-              // Hold on this winner, then a 10s intermission screen,
-              // then a slower 3-2-1 countdown, before the next spin.
-              setTimeout(() => {
-                const nextOrdinal = ADMIN_ORDINALS[segmentIdx + 1] || `${segmentIdx + 2}th`;
-                showRestScreen(
-                  section,
-                  `Getting ready for the ${nextOrdinal} draw`,
-                  ADMIN_REEL_CONFIG.REST_BETWEEN_WINNERS_MS
-                ).then(() => showPreSpinCountdown(section, {
-                  stepMs: ADMIN_REEL_CONFIG.BETWEEN_COUNTDOWN_STEP_MS,
-                  holdMs: ADMIN_REEL_CONFIG.BETWEEN_COUNTDOWN_HOLD_MS,
-                  label: `Draw ${segmentIdx + 2} starting in`,
-                })).then(() => runSegment(segmentIdx + 1));
-              }, ADMIN_REEL_CONFIG.PAUSE_AFTER_WIN_MS);
+              microCountdown(winnerHtml, segmentIdx + 2).then(() => runSegment(segmentIdx + 1));
             }, duration + 150);
           }
 
