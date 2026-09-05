@@ -80,8 +80,54 @@
       height: 340px;
       overflow: hidden;
       border-radius: 12px;
-      mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
-      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+      /* Focused-vignette effect: the centered card (aligned with the
+         pointer) reads at full opacity, immediate neighbors dim to
+         ~60%, and only the outer edge cards fade toward transparent —
+         this is done as a viewport-level mask, not per-card JS, so it
+         costs nothing extra and works automatically at every scroll
+         position, spinning or landed. */
+      mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(0,0,0,0.25) 15%,
+        rgba(0,0,0,0.6) 32%,
+        #000 42%,
+        #000 58%,
+        rgba(0,0,0,0.6) 68%,
+        rgba(0,0,0,0.25) 85%,
+        transparent 100%
+      );
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(0,0,0,0.25) 15%,
+        rgba(0,0,0,0.6) 32%,
+        #000 42%,
+        #000 58%,
+        rgba(0,0,0,0.6) 68%,
+        rgba(0,0,0,0.25) 85%,
+        transparent 100%
+      );
+    }
+    /* Soft blurred "glass" strips at the very top/bottom of the
+       viewport — tinted to match the reel's dark background and
+       fading toward the center, giving the outermost cards a gentle
+       out-of-focus look without ever touching the moving cards
+       themselves (which stay crisp, per the earlier no-motion-blur
+       request — this is a static depth cue, not motion blur). */
+    .reel-viewport::before,
+    .reel-viewport::after {
+      content: ''; position: absolute; left: 0; right: 0; height: 22%;
+      z-index: 4; pointer-events: none;
+      backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+    }
+    .reel-viewport::before {
+      top: 0;
+      background: linear-gradient(to bottom, rgba(30,30,47,0.35), transparent);
+    }
+    .reel-viewport::after {
+      bottom: 0;
+      background: linear-gradient(to top, rgba(30,30,47,0.35), transparent);
     }
     .reel-pointer {
       position: absolute; left: 0; top: 50%; transform: translateY(-50%);
