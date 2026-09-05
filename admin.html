@@ -286,7 +286,7 @@
       transition: filter 280ms ease-out;
     }
     .reel-track.spinning .reel-card {
-      filter: blur(1.4px);
+      filter: blur(0px);
     }
     .reel-card img {
       width: 32px; height: 32px; border-radius: 50%;
@@ -872,12 +872,11 @@
       const ADMIN_REEL_CONFIG = {
         CARD_HEIGHT: 56,
         CARD_GAP: 6,
-        LOOPS_FIRST_MIN: 3,
-        LOOPS_FIRST_MAX: 5,
-        LOOPS_BETWEEN_MIN: 6,
-        LOOPS_BETWEEN_MAX: 10,
-        SPIN_MIN_MS: 20000,
-        SPIN_MAX_MS: 30000,
+        LOOPS_MIN: 7,
+        LOOPS_MAX: 8,
+        MS_PER_CARD: 13,
+        SPIN_MIN_MS: 4000,
+        SPIN_MAX_MS: 10000,
         REST_BETWEEN_WINNERS_MS: 10000,
         BETWEEN_COUNTDOWN_STEP_MS: 2000,
         BETWEEN_COUNTDOWN_HOLD_MS: 3000,
@@ -1032,13 +1031,14 @@
           const landings = [];
           const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
-            const loopsToAdd = i === 0
-              ? randomBetween(ADMIN_REEL_CONFIG.LOOPS_FIRST_MIN, ADMIN_REEL_CONFIG.LOOPS_FIRST_MAX)
-              : randomBetween(ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MIN, ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MAX);
+            const loopsToAdd = randomBetween(ADMIN_REEL_CONFIG.LOOPS_MIN, ADMIN_REEL_CONFIG.LOOPS_MAX);
+            const cardsThisSegment = loopsToAdd * reel.length + (target.idx + 1);
             for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
             displaySeq.push(...reel.slice(0, target.idx + 1));
             landings.push(displaySeq.length - 1);
-            segmentDurations.push(randomBetween(ADMIN_REEL_CONFIG.SPIN_MIN_MS, ADMIN_REEL_CONFIG.SPIN_MAX_MS));
+            segmentDurations.push(
+              Math.min(ADMIN_REEL_CONFIG.SPIN_MAX_MS, Math.max(ADMIN_REEL_CONFIG.SPIN_MIN_MS, cardsThisSegment * ADMIN_REEL_CONFIG.MS_PER_CARD))
+            );
           });
 
           displaySeq.forEach((t) => {

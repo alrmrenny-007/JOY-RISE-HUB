@@ -120,7 +120,7 @@
       transition: filter 280ms ease-out;
     }
     .reel-track.spinning .reel-card {
-      filter: blur(1.4px);
+      filter: blur(0px);
     }
     .reel-card img {
       width: 32px; height: 32px; border-radius: 50%;
@@ -389,13 +389,11 @@
       const REEL_CONFIG = {
         CARD_HEIGHT: 56,
         CARD_GAP: 6,
-        LOOPS_FIRST_MIN: 3,    // fewest full laps around the reel before the first winner lands
-        LOOPS_FIRST_MAX: 5,    // most full laps — a random number in [MIN, MAX] is picked each draw
-        LOOPS_BETWEEN_MIN: 6,  // fewest laps for a follow-up spin (2nd winner onward) — higher
-        LOOPS_BETWEEN_MAX: 10, // than the first spin's laps since it now runs just as long (20-30s)
-        SPIN_MIN_MS: 20000,    // shortest any single spin (first OR follow-up) can take
-        SPIN_MAX_MS: 30000,    // longest any single spin can take — a random value in this
-                                // range is picked independently for every winner's spin
+        LOOPS_MIN: 7,   // fewest full laps around the reel before landing — same for every spin
+        LOOPS_MAX: 8,   // most full laps — a random number in [MIN, MAX] is picked per spin
+        MS_PER_CARD: 13,   // speed: lower = faster blur across each card
+        SPIN_MIN_MS: 4000,  // floor, so a tiny ticket pool doesn't finish instantly
+        SPIN_MAX_MS: 10000, // ceiling, so a huge ticket pool doesn't drag on forever
         REST_BETWEEN_WINNERS_MS: 10000, // "Getting ready for the next draw" hold, before the countdown
         BETWEEN_COUNTDOWN_STEP_MS: 2000, // seconds-per-count for the 3-2-1 before winner 2+ (slower/longer than the opening one)
         BETWEEN_COUNTDOWN_HOLD_MS: 3000, // how long "THE SPIN BEGINS!" holds before winner 2+'s spin
@@ -547,15 +545,19 @@
           const landings = [];
           const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
-            const loopsToAdd = i === 0
-              ? randomBetween(REEL_CONFIG.LOOPS_FIRST_MIN, REEL_CONFIG.LOOPS_FIRST_MAX)
-              : randomBetween(REEL_CONFIG.LOOPS_BETWEEN_MIN, REEL_CONFIG.LOOPS_BETWEEN_MAX);
+            const loopsToAdd = randomBetween(REEL_CONFIG.LOOPS_MIN, REEL_CONFIG.LOOPS_MAX);
+            // Cards actually traveled in THIS segment (from wherever the
+            // reel currently sits to this winner's card) — not the
+            // cumulative position in the whole strip. Using the
+            // cumulative index here would make later winners' spins
+            // balloon to absurd durations as more winners get added.
+            const cardsThisSegment = loopsToAdd * reel.length + (target.idx + 1);
             for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
             displaySeq.push(...reel.slice(0, target.idx + 1));
             landings.push(displaySeq.length - 1);
-            // Every winner's spin — first or follow-up — gets its own
-            // independent random duration in the same 20-30s range.
-            segmentDurations.push(randomBetween(REEL_CONFIG.SPIN_MIN_MS, REEL_CONFIG.SPIN_MAX_MS));
+            segmentDurations.push(
+              Math.min(REEL_CONFIG.SPIN_MAX_MS, Math.max(REEL_CONFIG.SPIN_MIN_MS, cardsThisSegment * REEL_CONFIG.MS_PER_CARD))
+            );
           });
 
           displaySeq.forEach((t) => {
