@@ -391,11 +391,15 @@
         CARD_GAP: 6,
         LOOPS_FIRST_MIN: 3,    // fewest full laps around the reel before the first winner lands
         LOOPS_FIRST_MAX: 5,    // most full laps — a random number in [MIN, MAX] is picked each draw
-        LOOPS_BETWEEN: 1,      // laps between each additional winner (for multi-winner draws)
-        FIRST_SPIN_MIN_MS: 3000,  // shortest the opening spin can be (small draws)
-        FIRST_SPIN_MAX_MS: 7500,  // longest the opening spin can be (big draws / more laps)
-        BETWEEN_SPIN_MS: 1300,    // duration of each follow-up spin to the next winner
-        PAUSE_AFTER_WIN_MS: 1100, // pause on a winner before spinning to the next one
+        LOOPS_BETWEEN_MIN: 6,  // fewest laps for a follow-up spin (2nd winner onward) — higher
+        LOOPS_BETWEEN_MAX: 10, // than the first spin's laps since it now runs just as long (20-30s)
+        SPIN_MIN_MS: 20000,    // shortest any single spin (first OR follow-up) can take
+        SPIN_MAX_MS: 30000,    // longest any single spin can take — a random value in this
+                                // range is picked independently for every winner's spin
+        REST_BETWEEN_WINNERS_MS: 10000, // "Getting ready for the next draw" hold, before the countdown
+        BETWEEN_COUNTDOWN_STEP_MS: 2000, // seconds-per-count for the 3-2-1 before winner 2+ (slower/longer than the opening one)
+        BETWEEN_COUNTDOWN_HOLD_MS: 3000, // how long "THE SPIN BEGINS!" holds before winner 2+'s spin
+        PAUSE_AFTER_WIN_MS: 3000, // how long the winner's name/prize stays on screen before the rest screen appears
         PAUSE_AFTER_LAST_MS: 900, // pause on the final winner before the reel hides
         BLUR_CLEAR_BEFORE_LANDING_MS: 450, // motion blur clears this long before it stops
       };
@@ -428,7 +432,10 @@
       // draw already ran server-side) — this just delays the reveal
       // for effect, the same way a live TV draw holds a beat before
       // showing the ball.
-      function showPreSpinCountdown(section) {
+      function showPreSpinCountdown(section, opts) {
+        const stepMs = (opts && opts.stepMs) || 1000;
+        const holdMs = (opts && opts.holdMs) || 1750;
+        const label = (opts && opts.label) || 'Draw starting in';
         return new Promise((resolve) => {
           const countdownEl = document.getElementById('reel-countdown');
           const labelEl = document.getElementById('reel-countdown-label');
@@ -438,7 +445,7 @@
           section.style.display = 'block';
           viewportEl.style.display = 'none';
           countdownEl.style.display = 'flex';
-          labelEl.textContent = 'Draw starting in';
+          labelEl.textContent = label;
           numberEl.classList.remove('small-text');
 
           function show(text, isBig) {
@@ -449,29 +456,62 @@
             numberEl.classList.add('pop');
           }
 
-          // 1 second per count (3... 2... 1...), then hold "THE SPIN
-          // BEGINS!" for 1.75s with a zoom-in entrance, fading smoothly
-          // out just before the reel takes over.
-          const SPIN_BEGINS_HOLD_MS = 1750;
+          // stepMs per count (3... 2... 1...), then hold "THE SPIN
+          // BEGINS!" for holdMs with a zoom-in entrance, fading smoothly
+          // out just before the reel takes over. Both are configurable
+          // per call — the opening countdown uses the quick defaults,
+          // the countdown before winner 2+ passes slower values.
           const FADE_OUT_MS = 300;
 
           show('3', true);
-          setTimeout(() => show('2', true), 1000);
-          setTimeout(() => show('1', true), 2000);
+          setTimeout(() => show('2', true), stepMs);
+          setTimeout(() => show('1', true), stepMs * 2);
           setTimeout(() => {
             labelEl.textContent = '';
             show('THE SPIN BEGINS! 🎉', false);
-          }, 3000);
+          }, stepMs * 3);
           setTimeout(() => {
             numberEl.classList.remove('pop');
             numberEl.classList.add('fade-out');
-          }, 3000 + SPIN_BEGINS_HOLD_MS - FADE_OUT_MS);
+          }, stepMs * 3 + holdMs - FADE_OUT_MS);
           setTimeout(() => {
             countdownEl.style.display = 'none';
             numberEl.classList.remove('fade-out');
             viewportEl.style.display = 'block';
             resolve();
-          }, 3000 + SPIN_BEGINS_HOLD_MS);
+          }, stepMs * 3 + holdMs);
+        });
+      }
+
+      // A quiet "intermission" screen shown between winners on a
+      // multi-winner draw — reuses the same countdown box, but just
+      // holds a static message with no ticking numbers, giving
+      // viewers a clear breather before the next countdown starts.
+      function showRestScreen(section, message, ms) {
+        return new Promise((resolve) => {
+          const countdownEl = document.getElementById('reel-countdown');
+          const labelEl = document.getElementById('reel-countdown-label');
+          const numberEl = document.getElementById('reel-countdown-number');
+          const viewportEl = section.querySelector('.reel-viewport');
+
+          section.style.display = 'block';
+          viewportEl.style.display = 'none';
+          countdownEl.style.display = 'flex';
+          labelEl.textContent = '';
+          numberEl.classList.remove('pop', 'fade-out');
+          numberEl.classList.add('small-text');
+          numberEl.textContent = message;
+          void numberEl.offsetWidth;
+          numberEl.classList.add('pop');
+
+          setTimeout(() => {
+            numberEl.classList.remove('pop');
+            numberEl.classList.add('fade-out');
+          }, ms - 300);
+          setTimeout(() => {
+            numberEl.classList.remove('fade-out');
+            resolve();
+          }, ms);
         });
       }
 
@@ -495,21 +535,27 @@
 
           // Build one continuous sequence of cards covering every
           // winner's reveal, one after another, always moving forward
-          // (never jumping backward through the strip).
-          // A fresh random lap count each draw (3, 4, or 5 full laps)
-          // so the opening spin doesn't feel identical every night —
-          // purely cosmetic, the winner is already fixed regardless of
-          // how many laps the reel takes to get there.
-          const loopsFirst = REEL_CONFIG.LOOPS_FIRST_MIN +
-            Math.floor(Math.random() * (REEL_CONFIG.LOOPS_FIRST_MAX - REEL_CONFIG.LOOPS_FIRST_MIN + 1));
+          // (never jumping backward through the strip). A fresh random
+          // lap count AND duration is picked per segment — purely
+          // cosmetic, the winner is already fixed regardless of how
+          // many laps or how long the reel spins to get there.
+          function randomBetween(min, max) {
+            return min + Math.floor(Math.random() * (max - min + 1));
+          }
 
           const displaySeq = [];
           const landings = [];
+          const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
-            const loopsToAdd = i === 0 ? loopsFirst : REEL_CONFIG.LOOPS_BETWEEN;
+            const loopsToAdd = i === 0
+              ? randomBetween(REEL_CONFIG.LOOPS_FIRST_MIN, REEL_CONFIG.LOOPS_FIRST_MAX)
+              : randomBetween(REEL_CONFIG.LOOPS_BETWEEN_MIN, REEL_CONFIG.LOOPS_BETWEEN_MAX);
             for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
             displaySeq.push(...reel.slice(0, target.idx + 1));
             landings.push(displaySeq.length - 1);
+            // Every winner's spin — first or follow-up — gets its own
+            // independent random duration in the same 20-30s range.
+            segmentDurations.push(randomBetween(REEL_CONFIG.SPIN_MIN_MS, REEL_CONFIG.SPIN_MAX_MS));
           });
 
           displaySeq.forEach((t) => {
@@ -528,6 +574,7 @@
           void track.offsetHeight;
 
           const allCards = track.querySelectorAll('.reel-card');
+          const ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
 
           function runSegment(segmentIdx) {
             if (segmentIdx >= landings.length) {
@@ -536,11 +583,8 @@
             }
 
             const landingIndex = landings[segmentIdx];
-            const isFirst = segmentIdx === 0;
+            const duration = segmentDurations[segmentIdx];
             const finalOffset = -(landingIndex * STEP + CARD_H / 2);
-            const duration = isFirst
-              ? Math.min(REEL_CONFIG.FIRST_SPIN_MAX_MS, Math.max(REEL_CONFIG.FIRST_SPIN_MIN_MS, landingIndex * 14))
-              : REEL_CONFIG.BETWEEN_SPIN_MS;
 
             if (winnerTargets.length > 1 && segmentIdx > 0) {
               titleEl.textContent = `Picking winner ${segmentIdx + 1} of ${winnerTargets.length}...`;
@@ -571,10 +615,28 @@
               const prizeStr = Number(target.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 });
               titleEl.textContent = `🎉 ${target.display_name || 'A Winner'} — ₦${prizeStr}`;
 
-              const pause = segmentIdx === winnerTargets.length - 1
-                ? REEL_CONFIG.PAUSE_AFTER_LAST_MS
-                : REEL_CONFIG.PAUSE_AFTER_WIN_MS;
-              setTimeout(() => runSegment(segmentIdx + 1), pause);
+              const isLast = segmentIdx === winnerTargets.length - 1;
+
+              if (isLast) {
+                setTimeout(resolve, REEL_CONFIG.PAUSE_AFTER_LAST_MS);
+                return;
+              }
+
+              // Hold on this winner's name/prize for a few seconds,
+              // then a distinct 10s "intermission" screen, then a
+              // slower 3-2-1 countdown, before the next winner's spin.
+              setTimeout(() => {
+                const nextOrdinal = ORDINALS[segmentIdx + 1] || `${segmentIdx + 2}th`;
+                showRestScreen(
+                  section,
+                  `Getting ready for the ${nextOrdinal} draw`,
+                  REEL_CONFIG.REST_BETWEEN_WINNERS_MS
+                ).then(() => showPreSpinCountdown(section, {
+                  stepMs: REEL_CONFIG.BETWEEN_COUNTDOWN_STEP_MS,
+                  holdMs: REEL_CONFIG.BETWEEN_COUNTDOWN_HOLD_MS,
+                  label: `Draw ${segmentIdx + 2} starting in`,
+                })).then(() => runSegment(segmentIdx + 1));
+              }, REEL_CONFIG.PAUSE_AFTER_WIN_MS);
             }, duration + 150);
           }
 

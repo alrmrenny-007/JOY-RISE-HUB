@@ -874,11 +874,14 @@
         CARD_GAP: 6,
         LOOPS_FIRST_MIN: 3,
         LOOPS_FIRST_MAX: 5,
-        LOOPS_BETWEEN: 1,
-        FIRST_SPIN_MIN_MS: 3000,
-        FIRST_SPIN_MAX_MS: 7500,
-        BETWEEN_SPIN_MS: 1300,
-        PAUSE_AFTER_WIN_MS: 1100,
+        LOOPS_BETWEEN_MIN: 6,
+        LOOPS_BETWEEN_MAX: 10,
+        SPIN_MIN_MS: 20000,
+        SPIN_MAX_MS: 30000,
+        REST_BETWEEN_WINNERS_MS: 10000,
+        BETWEEN_COUNTDOWN_STEP_MS: 2000,
+        BETWEEN_COUNTDOWN_HOLD_MS: 3000,
+        PAUSE_AFTER_WIN_MS: 3000,
         PAUSE_AFTER_LAST_MS: 900,
         BLUR_CLEAR_BEFORE_LANDING_MS: 450,
       };
@@ -917,7 +920,10 @@
       // (admin_run_draw already ran) — this just delays the reveal
       // for effect, the same way a live TV draw holds a beat before
       // showing the ball.
-      function showPreSpinCountdown(section) {
+      function showPreSpinCountdown(section, opts) {
+        const stepMs = (opts && opts.stepMs) || 1000;
+        const holdMs = (opts && opts.holdMs) || 1750;
+        const label = (opts && opts.label) || 'Draw starting in';
         return new Promise((resolve) => {
           const countdownEl = document.getElementById('admin-reel-countdown');
           const labelEl = document.getElementById('admin-countdown-label');
@@ -928,7 +934,7 @@
           section.scrollIntoView({ behavior: 'smooth', block: 'center' });
           viewportEl.style.display = 'none';
           countdownEl.style.display = 'flex';
-          labelEl.textContent = 'Draw starting in';
+          labelEl.textContent = label;
           numberEl.classList.remove('small-text');
 
           function show(text, isBig) {
@@ -939,29 +945,61 @@
             numberEl.classList.add('pop');
           }
 
-          // 1 second per count (3... 2... 1...), then hold "THE SPIN
-          // BEGINS!" for 1.75s with a zoom-in entrance, fading smoothly
-          // out just before the reel takes over.
-          const SPIN_BEGINS_HOLD_MS = 1750;
+          // stepMs per count (3... 2... 1...), then hold "THE SPIN
+          // BEGINS!" for holdMs — both configurable per call, matching
+          // live-draw.html's slower timing for winner 2+.
           const FADE_OUT_MS = 300;
 
           show('3', true);
-          setTimeout(() => show('2', true), 1000);
-          setTimeout(() => show('1', true), 2000);
+          setTimeout(() => show('2', true), stepMs);
+          setTimeout(() => show('1', true), stepMs * 2);
           setTimeout(() => {
             labelEl.textContent = '';
             show('THE SPIN BEGINS! 🎉', false);
-          }, 3000);
+          }, stepMs * 3);
           setTimeout(() => {
             numberEl.classList.remove('pop');
             numberEl.classList.add('fade-out');
-          }, 3000 + SPIN_BEGINS_HOLD_MS - FADE_OUT_MS);
+          }, stepMs * 3 + holdMs - FADE_OUT_MS);
           setTimeout(() => {
             countdownEl.style.display = 'none';
             numberEl.classList.remove('fade-out');
             viewportEl.style.display = 'block';
             resolve();
-          }, 3000 + SPIN_BEGINS_HOLD_MS);
+          }, stepMs * 3 + holdMs);
+        });
+      }
+
+      // A quiet "intermission" screen shown between winners on a
+      // multi-winner draw — reuses the same countdown box, but just
+      // holds a static message with no ticking numbers, giving
+      // viewers a clear breather before the next countdown starts.
+      function showRestScreen(section, message, ms) {
+        return new Promise((resolve) => {
+          const countdownEl = document.getElementById('admin-reel-countdown');
+          const labelEl = document.getElementById('admin-countdown-label');
+          const numberEl = document.getElementById('admin-countdown-number');
+          const viewportEl = section.querySelector('.reel-viewport');
+
+          section.style.display = 'block';
+          section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          viewportEl.style.display = 'none';
+          countdownEl.style.display = 'flex';
+          labelEl.textContent = '';
+          numberEl.classList.remove('pop', 'fade-out');
+          numberEl.classList.add('small-text');
+          numberEl.textContent = message;
+          void numberEl.offsetWidth;
+          numberEl.classList.add('pop');
+
+          setTimeout(() => {
+            numberEl.classList.remove('pop');
+            numberEl.classList.add('fade-out');
+          }, ms - 300);
+          setTimeout(() => {
+            numberEl.classList.remove('fade-out');
+            resolve();
+          }, ms);
         });
       }
 
@@ -984,18 +1022,23 @@
           const { CARD_HEIGHT: CARD_H, CARD_GAP: GAP } = ADMIN_REEL_CONFIG;
           const STEP = CARD_H + GAP;
 
-          // A fresh random lap count each draw (3, 4, or 5 full laps) —
-          // purely cosmetic, matches live-draw.html's behavior.
-          const loopsFirst = ADMIN_REEL_CONFIG.LOOPS_FIRST_MIN +
-            Math.floor(Math.random() * (ADMIN_REEL_CONFIG.LOOPS_FIRST_MAX - ADMIN_REEL_CONFIG.LOOPS_FIRST_MIN + 1));
+          // A fresh random lap count AND duration per segment — purely
+          // cosmetic, matches live-draw.html's behavior.
+          function randomBetween(min, max) {
+            return min + Math.floor(Math.random() * (max - min + 1));
+          }
 
           const displaySeq = [];
           const landings = [];
+          const segmentDurations = [];
           winnerTargets.forEach((target, i) => {
-            const loopsToAdd = i === 0 ? loopsFirst : ADMIN_REEL_CONFIG.LOOPS_BETWEEN;
+            const loopsToAdd = i === 0
+              ? randomBetween(ADMIN_REEL_CONFIG.LOOPS_FIRST_MIN, ADMIN_REEL_CONFIG.LOOPS_FIRST_MAX)
+              : randomBetween(ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MIN, ADMIN_REEL_CONFIG.LOOPS_BETWEEN_MAX);
             for (let l = 0; l < loopsToAdd; l++) displaySeq.push(...reel);
             displaySeq.push(...reel.slice(0, target.idx + 1));
             landings.push(displaySeq.length - 1);
+            segmentDurations.push(randomBetween(ADMIN_REEL_CONFIG.SPIN_MIN_MS, ADMIN_REEL_CONFIG.SPIN_MAX_MS));
           });
 
           displaySeq.forEach((t) => {
@@ -1012,6 +1055,7 @@
           void track.offsetHeight;
 
           const allCards = track.querySelectorAll('.reel-card');
+          const ADMIN_ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth'];
 
           function runSegment(segmentIdx) {
             if (segmentIdx >= landings.length) {
@@ -1020,11 +1064,8 @@
             }
 
             const landingIndex = landings[segmentIdx];
-            const isFirst = segmentIdx === 0;
+            const duration = segmentDurations[segmentIdx];
             const finalOffset = -(landingIndex * STEP + CARD_H / 2);
-            const duration = isFirst
-              ? Math.min(ADMIN_REEL_CONFIG.FIRST_SPIN_MAX_MS, Math.max(ADMIN_REEL_CONFIG.FIRST_SPIN_MIN_MS, landingIndex * 14))
-              : ADMIN_REEL_CONFIG.BETWEEN_SPIN_MS;
 
             if (winnerTargets.length > 1 && segmentIdx > 0) {
               titleEl.textContent = `Picking winner ${segmentIdx + 1} of ${winnerTargets.length}...`;
@@ -1049,10 +1090,27 @@
               const prizeStr = Number(target.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 });
               titleEl.textContent = `🎉 ${target.display_name || 'A Winner'} — ₦${prizeStr}`;
 
-              const pause = segmentIdx === winnerTargets.length - 1
-                ? ADMIN_REEL_CONFIG.PAUSE_AFTER_LAST_MS
-                : ADMIN_REEL_CONFIG.PAUSE_AFTER_WIN_MS;
-              setTimeout(() => runSegment(segmentIdx + 1), pause);
+              const isLast = segmentIdx === winnerTargets.length - 1;
+
+              if (isLast) {
+                setTimeout(() => runSegment(segmentIdx + 1), ADMIN_REEL_CONFIG.PAUSE_AFTER_LAST_MS);
+                return;
+              }
+
+              // Hold on this winner, then a 10s intermission screen,
+              // then a slower 3-2-1 countdown, before the next spin.
+              setTimeout(() => {
+                const nextOrdinal = ADMIN_ORDINALS[segmentIdx + 1] || `${segmentIdx + 2}th`;
+                showRestScreen(
+                  section,
+                  `Getting ready for the ${nextOrdinal} draw`,
+                  ADMIN_REEL_CONFIG.REST_BETWEEN_WINNERS_MS
+                ).then(() => showPreSpinCountdown(section, {
+                  stepMs: ADMIN_REEL_CONFIG.BETWEEN_COUNTDOWN_STEP_MS,
+                  holdMs: ADMIN_REEL_CONFIG.BETWEEN_COUNTDOWN_HOLD_MS,
+                  label: `Draw ${segmentIdx + 2} starting in`,
+                })).then(() => runSegment(segmentIdx + 1));
+              }, ADMIN_REEL_CONFIG.PAUSE_AFTER_WIN_MS);
             }, duration + 150);
           }
 
