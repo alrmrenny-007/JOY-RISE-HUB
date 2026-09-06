@@ -538,6 +538,26 @@
     }
     .admin-shell #admin-loading i, .admin-shell #admin-denied i { font-size: 26px; color: var(--brand-glow); }
 
+    /* ---------- Custom per-winner prize toggle ---------- */
+    #pv-custom-toggle:checked ~ #pv-custom-toggle-track {
+      background: #6c5ce7;
+    }
+    #pv-custom-toggle:checked ~ #pv-custom-toggle-knob {
+      transform: translateX(18px);
+    }
+    .pv-custom-prize-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 8px 0;
+    }
+    .pv-custom-prize-row label {
+      font-size: 13px; color: #2d3436; font-weight: 600; flex-shrink: 0;
+    }
+    .pv-custom-prize-row input {
+      width: 130px; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px;
+      font-size: 14px; text-align: right;
+    }
+    #pv-custom-total.over-budget { color: #d63031; }
+
     /* ---------- Reduced motion ---------- */
     @media (prefers-reduced-motion: reduce) {
       .admin-shell *, .admin-shell *::before, .admin-shell *::after {
@@ -1184,6 +1204,11 @@
         const confirmBtn = document.getElementById('draw-modal-confirm-btn');
         const minusBtn = document.getElementById('pv-winner-minus');
         const plusBtn = document.getElementById('pv-winner-plus');
+        const customToggle = document.getElementById('pv-custom-toggle');
+        const evenSplitBox = document.getElementById('pv-even-split-box');
+        const customBox = document.getElementById('pv-custom-prizes-box');
+        const customRowsEl = document.getElementById('pv-custom-prize-rows');
+        const customTotalEl = document.getElementById('pv-custom-total');
 
         const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 });
 
@@ -1191,12 +1216,52 @@
         let latestPreview = null;
         let overrideCount = null;
         let totalEntries = 0;
+        let customPrizeValues = []; // one entry per winner, kept in sync as winner count changes
 
         function fmtWinnerCount() {
           document.getElementById('pv-winner-count').textContent = latestPreview.winner_count;
           document.getElementById('pv-override-badge').style.display = latestPreview.is_override ? 'inline-block' : 'none';
           minusBtn.disabled = latestPreview.winner_count <= 1;
           plusBtn.disabled = latestPreview.winner_count >= totalEntries;
+        }
+
+        function renderCustomPrizeRows() {
+          const count = latestPreview.winner_count;
+          // Keep existing typed values where possible when the winner
+          // count changes; default any new/missing slot to the even
+          // split so the total starts sane instead of at zero.
+          const evenShare = latestPreview.prize_per_winner;
+          const next = [];
+          for (let i = 0; i < count; i++) {
+            next.push(customPrizeValues[i] != null ? customPrizeValues[i] : evenShare);
+          }
+          customPrizeValues = next;
+
+          customRowsEl.innerHTML = customPrizeValues.map((val, i) => `
+            <div class="pv-custom-prize-row">
+              <label>Winner ${i + 1}</label>
+              <input type="number" step="0.01" min="0" class="pv-custom-prize-input" data-idx="${i}" value="${val}" />
+            </div>
+          `).join('');
+
+          customRowsEl.querySelectorAll('.pv-custom-prize-input').forEach((input) => {
+            input.addEventListener('input', () => {
+              const idx = Number(input.dataset.idx);
+              customPrizeValues[idx] = parseFloat(input.value) || 0;
+              updateCustomTotal();
+            });
+          });
+
+          updateCustomTotal();
+        }
+
+        function updateCustomTotal() {
+          const total = customPrizeValues.reduce((sum, v) => sum + (Number(v) || 0), 0);
+          const pool = latestPreview.prize_pool;
+          customTotalEl.textContent = `${fmt(total)} of ${fmt(pool)}`;
+          const overBudget = total > pool + 0.01;
+          customTotalEl.classList.toggle('over-budget', overBudget);
+          confirmBtn.disabled = overBudget;
         }
 
         function renderPreview() {
@@ -1207,6 +1272,7 @@
           document.getElementById('pv-referral').textContent = fmt(latestPreview.referral_reserve);
           document.getElementById('pv-per-winner').textContent = fmt(latestPreview.prize_per_winner);
           fmtWinnerCount();
+          if (customToggle.checked) renderCustomPrizeRows();
         }
 
         async function loadPreview() {
@@ -1240,6 +1306,11 @@
         function openModal(slot) {
           currentSlot = slot;
           overrideCount = null;
+          customPrizeValues = [];
+          customToggle.checked = false;
+          evenSplitBox.style.display = 'block';
+          customBox.style.display = 'none';
+          confirmBtn.disabled = false;
           titleEl.textContent = `Run ${slot.label || 'Draw'}`;
           subtitleEl.textContent = `${slot.slot_time?.slice(0, 5) || ''} · Review the split before confirming`;
           overlay.classList.add('open');
@@ -1255,6 +1326,18 @@
         closeBtn.addEventListener('click', closeModal);
         cancelBtn.addEventListener('click', closeModal);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+        customToggle.addEventListener('change', () => {
+          if (customToggle.checked) {
+            evenSplitBox.style.display = 'none';
+            customBox.style.display = 'block';
+            renderCustomPrizeRows();
+          } else {
+            evenSplitBox.style.display = 'block';
+            customBox.style.display = 'none';
+            confirmBtn.disabled = false;
+          }
+        });
 
         minusBtn.addEventListener('click', () => {
           const current = latestPreview.winner_count;
@@ -1272,6 +1355,17 @@
 
         confirmBtn.addEventListener('click', async () => {
           errorEl.textContent = '';
+
+          // One last guard right before sending real money out —
+          // don't rely solely on the live total display having caught it.
+          if (customToggle.checked) {
+            const total = customPrizeValues.reduce((sum, v) => sum + (Number(v) || 0), 0);
+            if (total > latestPreview.prize_pool + 0.01) {
+              errorEl.textContent = 'Custom prize total exceeds the prize pool — adjust the amounts before running the draw.';
+              return;
+            }
+          }
+
           confirmBtn.disabled = true;
           confirmBtn.classList.add('loading');
 
@@ -1279,6 +1373,7 @@
             const { data, error } = await client.rpc('admin_run_draw', {
               p_slot_id: currentSlot.id,
               p_winner_count: overrideCount,
+              p_custom_prizes: customToggle.checked ? customPrizeValues.map(Number) : null,
             });
             if (error) throw error;
 
@@ -2112,9 +2207,26 @@
             </div>
           </div>
 
-          <div style="margin-top:14px; padding:12px 14px; background:#f3f0ff; border-radius:12px;">
+          <div style="margin-top:14px; padding:12px 14px; background:#f3f0ff; border-radius:12px;" id="pv-even-split-box">
             <div style="font-size:10px; color:#636e72; font-weight:700; text-transform:uppercase;">Prize Per Winner</div>
             <div id="pv-per-winner" style="font-size:20px; font-weight:800; color:#1e1e24;">-</div>
+          </div>
+
+          <div style="margin-top:14px; padding-top:14px; border-top:1px solid #eee; display:flex; align-items:center; justify-content:space-between;">
+            <label class="amount-label" style="margin:0;">Set custom amount per winner</label>
+            <label style="position:relative; display:inline-block; width:42px; height:24px;">
+              <input type="checkbox" id="pv-custom-toggle" style="opacity:0; width:0; height:0;" />
+              <span id="pv-custom-toggle-track" style="position:absolute; inset:0; background:#ccc; border-radius:24px; transition:0.2s; cursor:pointer;"></span>
+              <span id="pv-custom-toggle-knob" style="position:absolute; left:3px; top:3px; width:18px; height:18px; background:#fff; border-radius:50%; transition:0.2s; pointer-events:none;"></span>
+            </label>
+          </div>
+
+          <div id="pv-custom-prizes-box" style="display:none; margin-top:10px;">
+            <div id="pv-custom-prize-rows"></div>
+            <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #eee; font-size:12.5px;">
+              <span>Total allocated</span>
+              <strong id="pv-custom-total">₦0.00 of ₦0.00</strong>
+            </div>
           </div>
         </div>
 
