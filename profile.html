@@ -254,21 +254,21 @@
 
           if (avatarMode === 'photo') {
             if (selectedPhotoFile) {
-              // A brand new photo was picked this session — upload it,
-              // overwriting any previous photo this user had (upsert),
-              // so we don't pile up old photos in storage over time.
+              // A unique filename every time — avoids ever hitting a
+              // storage conflict, which is what forced Postgres to
+              // check both the INSERT and UPDATE policies together
+              // (an easy way for uploads to fail confusingly). This
+              // means old photos aren't automatically deleted, but
+              // that's a minor storage cost, not a functional problem.
               const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
-              const path = `${currentUserId}/avatar.${ext}`;
+              const path = `${currentUserId}/avatar-${Date.now()}.${ext}`;
               const { error: uploadError } = await client.storage
                 .from('avatars')
-                .upload(path, selectedPhotoFile, { upsert: true, contentType: selectedPhotoFile.type });
+                .upload(path, selectedPhotoFile, { contentType: selectedPhotoFile.type });
               if (uploadError) throw uploadError;
 
               const { data: publicUrlData } = client.storage.from('avatars').getPublicUrl(path);
-              // Cache-bust so the new photo shows immediately everywhere
-              // instead of a browser/CDN serving the old cached one at
-              // the same URL.
-              avatarUrlToSave = `${publicUrlData.publicUrl}?v=${Date.now()}`;
+              avatarUrlToSave = publicUrlData.publicUrl;
             } else {
               // Already using a saved photo, untouched this session.
               avatarUrlToSave = existingPhotoUrl;
