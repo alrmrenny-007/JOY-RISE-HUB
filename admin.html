@@ -1466,9 +1466,12 @@
           const total = customPrizeValues.reduce((sum, v) => sum + (Number(v) || 0), 0);
           const pool = latestPreview.prize_pool;
           customTotalEl.textContent = `${fmt(total)} of ${fmt(pool)}`;
+          // Over-budget still shows red as a heads-up, but no longer
+          // disables the button — some draws (jackpots, promos) are
+          // meant to pay out more than that draw's own pool. The
+          // confirm() dialog on submit is the actual safety net now.
           const overBudget = total > pool + 0.01;
           customTotalEl.classList.toggle('over-budget', overBudget);
-          confirmBtn.disabled = overBudget;
         }
 
         function renderPreview() {
@@ -1563,13 +1566,18 @@
         confirmBtn.addEventListener('click', async () => {
           errorEl.textContent = '';
 
-          // One last guard right before sending real money out —
-          // don't rely solely on the live total display having caught it.
+          // Over-budget is now allowed (jackpots/promos can pay out
+          // more than that draw's own pool) — but a native confirm()
+          // still catches an accidental typo before real money moves.
           if (customToggle.checked) {
             const total = customPrizeValues.reduce((sum, v) => sum + (Number(v) || 0), 0);
-            if (total > latestPreview.prize_pool + 0.01) {
-              errorEl.textContent = 'Custom prize total exceeds the prize pool — adjust the amounts before running the draw.';
-              return;
+            const pool = latestPreview.prize_pool;
+            if (total > pool + 0.01) {
+              const proceed = window.confirm(
+                `Total prizes (${fmt(total)}) exceed this draw's pool (${fmt(pool)}). ` +
+                `This will pay out more than the draw itself brought in. Continue anyway?`
+              );
+              if (!proceed) return;
             }
           }
 
