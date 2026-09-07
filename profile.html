@@ -6,10 +6,10 @@
   <title>Edit Profile — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6c5ce7" />
-    <link rel="icon" type="image/webp" href="favicon.webp" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
@@ -41,7 +41,20 @@
       </div>
 
       <div class="admin-section">
-        <h3 class="admin-section-title"><i class="fa-solid fa-images"></i> Choose an Avatar</h3>
+        <h3 class="admin-section-title"><i class="fa-solid fa-camera"></i> Upload Your Own Photo</h3>
+        <p style="font-size:12px; color:#636e72; margin:6px 0 12px;">
+          Use a real photo instead of a cartoon avatar — it'll show up
+          everywhere your avatar does now, including if you win a draw.
+        </p>
+        <input type="file" id="photo-upload-input" accept="image/*" style="display:none;" />
+        <button type="button" id="photo-upload-btn" style="width:100%; padding:12px; border-radius:10px; border:1.5px solid #6c5ce7; background:#f3f0ff; color:#6c5ce7; font-weight:700; font-size:14px; cursor:pointer;">
+          <i class="fa-solid fa-image"></i> Choose or Take a Photo
+        </button>
+        <div class="modal-error" id="photo-error"></div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-images"></i> Or Choose a Cartoon Avatar</h3>
         <div id="avatar-grid" class="avatar-grid"></div>
       </div>
 
@@ -82,9 +95,16 @@
 
       const AVATAR_SEEDS = ['Felix', 'Aneka', 'Milo', 'Zoe', 'Leo', 'Mia', 'Kai', 'Nora', 'Theo', 'Ivy', 'Max', 'Ruby'];
       const avatarUrl = (seed) => `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+      const isDicebearUrl = (url) => !!url && url.includes('dicebear.com');
 
       let currentUserId = null;
       let selectedAvatarSeed = AVATAR_SEEDS[0];
+      // 'preset' = using one of the cartoon avatars below.
+      // 'photo'  = using a real uploaded photo (either one already
+      // saved on the profile, or a brand new file picked just now).
+      let avatarMode = 'preset';
+      let existingPhotoUrl = null;   // the photo URL already saved on this profile, if any
+      let selectedPhotoFile = null;  // a NEW file picked this session, not yet uploaded
       let toastTimer = null;
 
       const toast = document.getElementById('toast');
@@ -110,7 +130,7 @@
       function renderAvatarGrid() {
         const grid = document.getElementById('avatar-grid');
         grid.innerHTML = AVATAR_SEEDS.map(seed => `
-          <button class="avatar-option ${seed === selectedAvatarSeed ? 'selected' : ''}" data-seed="${seed}">
+          <button class="avatar-option ${avatarMode === 'preset' && seed === selectedAvatarSeed ? 'selected' : ''}" data-seed="${seed}">
             <img src="${avatarUrl(seed)}" alt="${seed}" />
           </button>
         `).join('');
@@ -118,6 +138,8 @@
         grid.querySelectorAll('.avatar-option').forEach(btn => {
           btn.addEventListener('click', () => {
             selectedAvatarSeed = btn.dataset.seed;
+            avatarMode = 'preset';
+            selectedPhotoFile = null;
             grid.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
             updatePreview();
@@ -126,7 +148,13 @@
       }
 
       function updatePreview() {
-        document.getElementById('preview-avatar').src = avatarUrl(selectedAvatarSeed);
+        if (avatarMode === 'photo') {
+          document.getElementById('preview-avatar').src = selectedPhotoFile
+            ? URL.createObjectURL(selectedPhotoFile)
+            : existingPhotoUrl;
+        } else {
+          document.getElementById('preview-avatar').src = avatarUrl(selectedAvatarSeed);
+        }
         document.getElementById('preview-name').textContent = document.getElementById('name-input').value || 'Your Name';
       }
 
@@ -153,12 +181,40 @@
         }
 
         document.getElementById('name-input').value = profile.full_name || '';
-        selectedAvatarSeed = seedFromUrl(profile.avatar_url);
+
+        if (isDicebearUrl(profile.avatar_url)) {
+          avatarMode = 'preset';
+          selectedAvatarSeed = seedFromUrl(profile.avatar_url);
+        } else if (profile.avatar_url) {
+          avatarMode = 'photo';
+          existingPhotoUrl = profile.avatar_url;
+        }
 
         renderAvatarGrid();
         updatePreview();
 
         document.getElementById('name-input').addEventListener('input', updatePreview);
+
+        const photoInput = document.getElementById('photo-upload-input');
+        const photoError = document.getElementById('photo-error');
+        document.getElementById('photo-upload-btn').addEventListener('click', () => photoInput.click());
+        photoInput.addEventListener('change', () => {
+          const file = photoInput.files[0];
+          photoError.textContent = '';
+          if (!file) return;
+          if (!file.type.startsWith('image/')) {
+            photoError.textContent = 'Please choose an image file.';
+            return;
+          }
+          if (file.size > 5 * 1024 * 1024) {
+            photoError.textContent = 'Please choose an image under 5MB.';
+            return;
+          }
+          selectedPhotoFile = file;
+          avatarMode = 'photo';
+          document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
+          updatePreview();
+        });
       }
 
       document.getElementById('save-btn').addEventListener('click', async () => {
@@ -178,9 +234,36 @@
         btn.classList.add('loading');
 
         try {
+          let avatarUrlToSave;
+
+          if (avatarMode === 'photo') {
+            if (selectedPhotoFile) {
+              // A brand new photo was picked this session — upload it,
+              // overwriting any previous photo this user had (upsert),
+              // so we don't pile up old photos in storage over time.
+              const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
+              const path = `${currentUserId}/avatar.${ext}`;
+              const { error: uploadError } = await client.storage
+                .from('avatars')
+                .upload(path, selectedPhotoFile, { upsert: true, contentType: selectedPhotoFile.type });
+              if (uploadError) throw uploadError;
+
+              const { data: publicUrlData } = client.storage.from('avatars').getPublicUrl(path);
+              // Cache-bust so the new photo shows immediately everywhere
+              // instead of a browser/CDN serving the old cached one at
+              // the same URL.
+              avatarUrlToSave = `${publicUrlData.publicUrl}?v=${Date.now()}`;
+            } else {
+              // Already using a saved photo, untouched this session.
+              avatarUrlToSave = existingPhotoUrl;
+            }
+          } else {
+            avatarUrlToSave = avatarUrl(selectedAvatarSeed);
+          }
+
           const { error } = await client
             .from('profiles')
-            .update({ full_name: name, avatar_url: avatarUrl(selectedAvatarSeed) })
+            .update({ full_name: name, avatar_url: avatarUrlToSave })
             .eq('id', currentUserId);
 
           if (error) throw error;
