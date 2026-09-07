@@ -18,10 +18,10 @@
   <title>Winners — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6c5ce7" />
-    <link rel="icon" type="image/webp" href="favicon.webp" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
@@ -70,10 +70,21 @@
       border-top: none; padding-top: 0;
     }
     .draw-winner-avatar {
-      width: 32px; height: 32px; border-radius: 50%;
-      background: #fff3cd; color: #f59f00;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: #fff3cd; flex-shrink: 0;
+      position: relative;
+      border: 2px solid #fdcb6e;
+    }
+    .draw-winner-avatar img {
+      width: 100%; height: 100%; border-radius: 50%; object-fit: cover;
+      background: #fff;
+    }
+    .draw-winner-avatar .trophy-badge {
+      position: absolute; bottom: -3px; right: -3px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #f59f00; color: #fff;
       display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; font-size: 13px;
+      font-size: 9px; border: 2px solid #fff;
     }
     .draw-winner-info { flex: 1; min-width: 0; }
     .draw-winner-info strong { font-size: 12.5px; display: block; }
@@ -204,16 +215,23 @@
               </div>
             ` : ''}
 
-            ${winners.map(w => `
+            ${winners.map(w => {
+              const seed = encodeURIComponent(w.display_name || 'Player');
+              const avatarSrc = w.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;
+              return `
               <div class="draw-winner-row">
-                <div class="draw-winner-avatar"><i class="fa-solid fa-trophy"></i></div>
+                <div class="draw-winner-avatar">
+                  <img src="${avatarSrc}" alt="" />
+                  <span class="trophy-badge"><i class="fa-solid fa-trophy"></i></span>
+                </div>
                 <div class="draw-winner-info">
                   <strong>${escapeHtml(w.display_name || 'A Winner')}</strong>
                   <small>${ticketCode(w.ticket_number)}</small>
                 </div>
                 <div class="draw-winner-prize">&#8358;${fmt(w.prize_amount)}</div>
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           </div>
         `;
       }

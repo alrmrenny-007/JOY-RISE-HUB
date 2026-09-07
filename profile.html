@@ -6,10 +6,10 @@
   <title>Edit Profile — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6c5ce7" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico" />
-  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/webp" href="favicon.webp" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
@@ -38,6 +38,18 @@
         <h3 class="admin-section-title"><i class="fa-solid fa-user"></i> Display Name</h3>
         <input type="text" class="auth-input" id="name-input" placeholder="Your name" style="margin-top:10px;" />
         <div class="modal-error" id="name-error"></div>
+      </div>
+
+      <div class="admin-section">
+        <h3 class="admin-section-title"><i class="fa-solid fa-eye"></i> Public Name (Optional)</h3>
+        <p style="font-size:12px; color:#636e72; margin:6px 0 12px;">
+          This is what other people see if you win a draw — during the
+          live spin and in the winners history. Leave it blank and
+          we'll automatically show a shortened version of your name
+          instead of your full name (e.g. <strong id="mask-example">Tersen H.B.</strong>).
+        </p>
+        <input type="text" class="auth-input" id="public-name-input" placeholder="e.g. Tersen H. — leave blank to auto-shorten" />
+        <div class="modal-error" id="public-name-error"></div>
       </div>
 
       <div class="admin-section">
@@ -147,6 +159,21 @@
         });
       }
 
+      // Mirrors fn_public_display_name() on the backend, so the
+      // example text updates instantly as they type — the real
+      // masking that actually protects privacy still happens
+      // server-side, this is just for a live preview here.
+      function maskName(fullName) {
+        const parts = (fullName || '').trim().split(/\s+/).filter(Boolean);
+        if (parts.length <= 1) return parts[0] || '';
+        return parts[0] + ' ' + parts.slice(1).map(p => p[0].toUpperCase() + '.').join('');
+      }
+
+      function updateMaskExample() {
+        const name = document.getElementById('name-input').value;
+        document.getElementById('mask-example').textContent = maskName(name) || 'Tersen H.B.';
+      }
+
       function updatePreview() {
         if (avatarMode === 'photo') {
           document.getElementById('preview-avatar').src = selectedPhotoFile
@@ -171,7 +198,7 @@
 
         const { data: profile, error } = await client
           .from('profiles')
-          .select('full_name, avatar_url')
+          .select('full_name, avatar_url, public_display_name')
           .eq('id', currentUserId)
           .single();
 
@@ -181,6 +208,8 @@
         }
 
         document.getElementById('name-input').value = profile.full_name || '';
+        document.getElementById('public-name-input').value = profile.public_display_name || '';
+        updateMaskExample();
 
         if (isDicebearUrl(profile.avatar_url)) {
           avatarMode = 'preset';
@@ -193,7 +222,10 @@
         renderAvatarGrid();
         updatePreview();
 
-        document.getElementById('name-input').addEventListener('input', updatePreview);
+        document.getElementById('name-input').addEventListener('input', () => {
+          updatePreview();
+          updateMaskExample();
+        });
 
         const photoInput = document.getElementById('photo-upload-input');
         const photoError = document.getElementById('photo-error');
@@ -277,9 +309,11 @@
             avatarUrlToSave = avatarUrl(selectedAvatarSeed);
           }
 
+          const publicName = document.getElementById('public-name-input').value.trim();
+
           const { error } = await client
             .from('profiles')
-            .update({ full_name: name, avatar_url: avatarUrlToSave })
+            .update({ full_name: name, avatar_url: avatarUrlToSave, public_display_name: publicName || null })
             .eq('id', currentUserId);
 
           if (error) throw error;
