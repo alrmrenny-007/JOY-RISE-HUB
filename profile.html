@@ -202,6 +202,14 @@
           const file = photoInput.files[0];
           photoError.textContent = '';
           if (!file) return;
+
+          const nameLower = (file.name || '').toLowerCase();
+          const isHeic = file.type === 'image/heic' || file.type === 'image/heif'
+            || nameLower.endsWith('.heic') || nameLower.endsWith('.heif');
+          if (isHeic) {
+            photoError.textContent = 'iPhone HEIC photos can\'t be previewed here yet. In your phone\'s Camera settings, switch photo format to "Most Compatible" (JPEG), or choose an existing JPEG/PNG from your gallery instead.';
+            return;
+          }
           if (!file.type.startsWith('image/')) {
             photoError.textContent = 'Please choose an image file.';
             return;
@@ -214,6 +222,14 @@
           avatarMode = 'photo';
           document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
           updatePreview();
+        });
+
+        // If a preview image ever fails to actually render (corrupt
+        // file, unsupported format that slipped past the check above,
+        // or a broken/expired photo URL from a previous session),
+        // show a clear message instead of a silently broken circle.
+        document.getElementById('preview-avatar').addEventListener('error', () => {
+          photoError.textContent = 'That photo couldn\'t be displayed — please try a different one (JPEG or PNG work best).';
         });
       }
 
@@ -271,7 +287,15 @@
           showToast('Profile updated!');
           setTimeout(() => { window.location.href = 'index.html'; }, 900);
         } catch (err) {
-          errorEl.textContent = err.message || 'Failed to save changes.';
+          // A raw "Failed to fetch" almost always means the request
+          // never reached the server at all — for photo uploads
+          // specifically, that's most often a missing/misconfigured
+          // storage bucket rather than a real network problem.
+          if (err.message === 'Failed to fetch' && avatarMode === 'photo' && selectedPhotoFile) {
+            errorEl.textContent = 'Could not upload your photo. Check your connection, or ask the app admin to confirm photo uploads are set up correctly.';
+          } else {
+            errorEl.textContent = err.message || 'Failed to save changes.';
+          }
         } finally {
           btn.disabled = false;
           btn.classList.remove('loading');
