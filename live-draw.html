@@ -136,38 +136,8 @@
       padding: 0 6px;
       pointer-events: none;
     }
-    .reel-pointer::before {
-      content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: 0;
-      border-top: 2px solid #fdcb6e; border-bottom: 2px solid #fdcb6e;
-      box-shadow: 0 0 10px #fdcb6e;
-    }
     .reel-pointer-arrow {
       color: #fdcb6e; font-size: 16px; z-index: 6; text-shadow: 0 0 6px rgba(253,203,110,0.8);
-    }
-    /* The flapper: a small flexible-looking peg that flicks each time
-       a card crosses under the pointer, like a real prize-wheel
-       pointer bouncing off pegs between segments. Driven by JS
-       (triggered exactly when the reel's actual position crosses a
-       card boundary), not a fixed timer, so it stays in sync at any
-       spin speed. */
-    .reel-flapper {
-      position: absolute; top: -7px; left: 50%;
-      width: 0; height: 0;
-      border-left: 7px solid transparent;
-      border-right: 7px solid transparent;
-      border-top: 11px solid #fdcb6e;
-      transform-origin: top center;
-      transform: translateX(-50%) rotate(0deg);
-      filter: drop-shadow(0 0 4px rgba(253,203,110,0.85));
-      z-index: 7;
-    }
-    .reel-flapper.tick {
-      animation: reelFlapTick 150ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
-    }
-    @keyframes reelFlapTick {
-      0%   { transform: translateX(-50%) rotate(0deg); }
-      35%  { transform: translateX(-50%) rotate(20deg); }
-      100% { transform: translateX(-50%) rotate(0deg); }
     }
     .reel-spin-badge {
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -388,7 +358,6 @@
           <div class="reel-pointer">
             <i class="fa-solid fa-caret-right reel-pointer-arrow"></i>
             <i class="fa-solid fa-caret-left reel-pointer-arrow"></i>
-            <div class="reel-flapper" id="reel-flapper"></div>
           </div>
           <div class="reel-spin-badge">SPIN</div>
           <div class="reel-confetti-layer" id="reel-confetti-layer"></div>
@@ -682,7 +651,6 @@
           const section = document.getElementById('reel-section');
           const titleEl = section.querySelector('.reel-title');
           const pointerEl = section.querySelector('.reel-pointer');
-          const flapperEl = section.querySelector('.reel-flapper');
           const spinBadgeEl = section.querySelector('.reel-spin-badge');
           const confettiLayerEl = section.querySelector('.reel-confetti-layer');
           const winnerPopupEl = section.querySelector('.reel-winner-popup');
@@ -877,13 +845,8 @@
             let lastCardsPassed = 0;
 
             function tickFlapper() {
-              flapperEl.classList.remove('tick');
-              void flapperEl.offsetWidth;
-              flapperEl.classList.add('tick');
-
-              // The little tail on the SPIN circle wiggles in the
-              // exact same instant — same physical idea as the pointer
-              // flapper, so both react together like one mechanism.
+              // The little tail on the SPIN circle wiggles each time a
+              // card crosses under the pointer.
               spinBadgeEl.classList.remove('tail-shake');
               void spinBadgeEl.offsetWidth;
               spinBadgeEl.classList.add('tail-shake');
