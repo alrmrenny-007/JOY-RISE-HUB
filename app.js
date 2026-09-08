@@ -757,8 +757,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   function startDashCountdown(targetDate) {
     if (dashCountdownTimer) clearInterval(dashCountdownTimer);
     const el = document.getElementById("dash-draw-countdown");
+    const subtextEl = document.getElementById("dash-draw-subtext");
+    let announcedPassed = false;
+
     function tick() {
-      const diff = Math.max(0, targetDate.getTime() - Date.now());
+      const diff = targetDate.getTime() - Date.now();
+
+      if (diff <= 0) {
+        // The scheduled time has passed but the admin hasn't run this
+        // draw yet — rather than freezing at 00:00:00 forever, say so
+        // clearly, then periodically check back to pick up the real
+        // next slot automatically once this one actually completes.
+        if (el) el.textContent = "Starting soon";
+        if (subtextEl && !announcedPassed) {
+          subtextEl.textContent = "Waiting for the draw to begin...";
+          announcedPassed = true;
+        }
+        clearInterval(dashCountdownTimer);
+        dashCountdownTimer = setTimeout(() => loadDashboardDrawBanner(), 15000);
+        return;
+      }
+
       const h = String(Math.floor(diff / 3600000)).padStart(2, "0");
       const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
       const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
