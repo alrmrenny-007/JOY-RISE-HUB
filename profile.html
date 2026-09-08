@@ -46,9 +46,9 @@
           This is what other people see if you win a draw — during the
           live spin and in the winners history. Leave it blank and
           we'll automatically show a shortened version of your name
-          instead of your full name (e.g. <strong id="mask-example">Tersen H.B.</strong>).
+          instead of your full name (e.g. <strong id="mask-example">John D.</strong>).
         </p>
-        <input type="text" class="auth-input" id="public-name-input" placeholder="e.g. Tersen H. — leave blank to auto-shorten" />
+        <input type="text" class="auth-input" id="public-name-input" placeholder="e.g. John D. — leave blank to auto-shorten" />
         <div class="modal-error" id="public-name-error"></div>
       </div>
 
@@ -171,7 +171,7 @@
 
       function updateMaskExample() {
         const name = document.getElementById('name-input').value;
-        document.getElementById('mask-example').textContent = maskName(name) || 'Tersen H.B.';
+        document.getElementById('mask-example').textContent = maskName(name) || 'John D.';
       }
 
       function updatePreview() {
