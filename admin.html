@@ -1783,7 +1783,32 @@
                   loadSlotsList();
                   wireTodaySlots(client);
                 } catch (err) {
-                  alert(err.message || 'Failed to delete this draw time.');
+                  const msg = err.message || 'Failed to delete this draw time.';
+                  const isHardBlock = msg.includes('active tickets waiting');
+
+                  if (isHardBlock) {
+                    // Never overridable — could risk mixing real money
+                    // into the wrong draw if forced through.
+                    alert(msg);
+                    return;
+                  }
+
+                  const forceConfirmed = confirm(
+                    `${msg}\n\nDelete anyway? Past draw/winner records for this slot will be kept, just no longer linked to a schedule slot.`
+                  );
+                  if (!forceConfirmed) return;
+
+                  try {
+                    const { error: forceError } = await client.rpc('admin_delete_draw_slot', {
+                      p_id: btn.dataset.id,
+                      p_force: true,
+                    });
+                    if (forceError) throw forceError;
+                    loadSlotsList();
+                    wireTodaySlots(client);
+                  } catch (forceErr) {
+                    alert(forceErr.message || 'Failed to delete this draw time.');
+                  }
                 }
               });
             });
