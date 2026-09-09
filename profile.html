@@ -36,6 +36,9 @@
 
       <div class="admin-section">
         <h3 class="admin-section-title"><i class="fa-solid fa-user"></i> Display Name</h3>
+        <div id="name-cooldown-notice" style="display:none; font-size:12px; color:#e17055; background:#fff3e0; padding:8px 10px; border-radius:8px; margin:8px 0;">
+          <i class="fa-solid fa-lock"></i> <span id="name-cooldown-text"></span>
+        </div>
         <input type="text" class="auth-input" id="name-input" placeholder="Your name" style="margin-top:10px;" />
         <div class="modal-error" id="name-error"></div>
       </div>
@@ -198,7 +201,7 @@
 
         const { data: profile, error } = await client
           .from('profiles')
-          .select('full_name, avatar_url, public_display_name')
+          .select('full_name, avatar_url, public_display_name, last_name_change_at')
           .eq('id', currentUserId)
           .single();
 
@@ -210,6 +213,30 @@
         document.getElementById('name-input').value = profile.full_name || '';
         document.getElementById('public-name-input').value = profile.public_display_name || '';
         updateMaskExample();
+
+        // 30-day name-change cooldown — the real enforcement is a
+        // database trigger (so it can't be bypassed by calling the
+        // API directly); this just gives a clear heads-up in the UI
+        // and disables the inputs so people aren't surprised by a
+        // rejected save.
+        const NAME_COOLDOWN_DAYS = 30;
+        if (profile.last_name_change_at) {
+          const changedAt = new Date(profile.last_name_change_at);
+          const daysSince = (Date.now() - changedAt.getTime()) / 86400000;
+          const daysRemaining = Math.ceil(NAME_COOLDOWN_DAYS - daysSince);
+          if (daysRemaining > 0) {
+            const nameInputEl = document.getElementById('name-input');
+            const publicNameInputEl = document.getElementById('public-name-input');
+            nameInputEl.disabled = true;
+            publicNameInputEl.disabled = true;
+            nameInputEl.style.opacity = '0.6';
+            publicNameInputEl.style.opacity = '0.6';
+            const notice = document.getElementById('name-cooldown-notice');
+            notice.style.display = 'block';
+            document.getElementById('name-cooldown-text').textContent =
+              `You can change your name again in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}.`;
+          }
+        }
 
         if (isDicebearUrl(profile.avatar_url)) {
           avatarMode = 'preset';
