@@ -765,10 +765,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       if (diff <= 0) {
         // The scheduled time has passed but the admin hasn't run this
-        // draw yet — rather than freezing at 00:00:00 forever, say so
-        // clearly, then periodically check back to pick up the real
-        // next slot automatically once this one actually completes.
-        if (el) el.textContent = "Starting soon";
+        // draw yet — freeze the clock at 00:00:00 rather than
+        // switching to text, then periodically check back to pick up
+        // the real next slot automatically once this one completes.
+        if (el) el.textContent = "00:00:00";
         if (subtextEl && !announcedPassed) {
           subtextEl.textContent = "Waiting for the draw to begin...";
           announcedPassed = true;
