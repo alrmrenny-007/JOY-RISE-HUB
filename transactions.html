@@ -18,10 +18,10 @@
   <title>Transactions — Joy-Rise Hub</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#6c5ce7" />
-    <link rel="icon" type="image/webp" href="favicon.webp" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
-  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
@@ -88,6 +88,29 @@
         return wallet === 'winnings' ? 'main' : wallet;
       }
 
+      function fmtTicketCode(n) {
+        return 'TK-' + String(n).padStart(4, '0');
+      }
+
+      // Builds the ticket-number summary for a purchase. Ticket
+      // numbers come from a single sequence shared across ALL users,
+      // so if someone else's purchase happened in between yours, your
+      // numbers might not be perfectly back-to-back — this only shows
+      // a "→" range when the numbers are genuinely contiguous, and
+      // falls back to listing them individually otherwise, so it's
+      // never misleading about which tickets are actually yours.
+      function ticketSummary(numbers) {
+        const sorted = [...numbers].sort((a, b) => a - b);
+        if (sorted.length === 1) {
+          return { inline: `#${fmtTicketCode(sorted[0])}`, expandable: false };
+        }
+        const isContiguous = sorted.every((n, i) => i === 0 || n === sorted[i - 1] + 1);
+        const inline = isContiguous
+          ? `#${fmtTicketCode(sorted[0])} → #${fmtTicketCode(sorted[sorted.length - 1])}`
+          : `${sorted.length} tickets — tap to view`;
+        return { inline, expandable: true, all: sorted };
+      }
+
       function render(filter) {
         const listEl = document.getElementById('txn-list');
         const emptyEl = document.getElementById('txn-empty');
@@ -101,7 +124,7 @@
         }
         emptyEl.style.display = 'none';
 
-        listEl.innerHTML = rows.map(t => {
+        listEl.innerHTML = rows.map((t, idx) => {
           const meta = TYPE_META[t.type] || { icon: 'fa-circle', color: '#636e72', label: t.type, sign: '' };
           const date = new Date(t.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
           const statusBadge = t.status !== 'completed'
@@ -115,20 +138,45 @@
             extraLine = `<small style="color:#ff4757;"><i class="fa-solid fa-circle-info"></i> ${escapeHtml(t.rejection_reason)}</small>`;
           }
 
+          const ticketNumbers = (t.tickets || []).map(x => x.ticket_number).filter(n => n != null);
+          let titleLabel = meta.label;
+          let ticketLine = '';
+          let expandPanel = '';
+          let rowAttrs = '';
+
+          if (t.type === 'ticket_purchase' && ticketNumbers.length > 0) {
+            const summary = ticketSummary(ticketNumbers);
+            if (ticketNumbers.length > 1) {
+              titleLabel = `${ticketNumbers.length}x Tickets`;
+            }
+            ticketLine = `<small style="color:#6c5ce7; font-weight:700;"><i class="fa-solid fa-ticket"></i> ${summary.inline}</small>`;
+            if (summary.expandable) {
+              rowAttrs = `data-expandable="true" data-row-idx="${idx}"`;
+              expandPanel = `
+                <div class="ticket-expand-panel" id="ticket-expand-${idx}" style="display:none; padding:8px 14px 12px 62px; flex-wrap:wrap; gap:6px;">
+                  ${summary.all.map(n => `<span style="background:#f3f0ff; color:#6c5ce7; font-size:11px; font-weight:700; padding:4px 8px; border-radius:8px;">#${fmtTicketCode(n)}</span>`).join('')}
+                </div>
+              `;
+            }
+          }
+
           return `
-            <div class="winner-row">
+            <div class="winner-row" ${rowAttrs} style="${rowAttrs ? 'cursor:pointer;' : ''}">
               <div class="winner-avatar" style="background:${meta.color}1a; color:${meta.color};">
                 <i class="fa-solid ${meta.icon}"></i>
               </div>
               <div class="winner-info">
-                <strong>${meta.label} ${statusBadge}</strong>
+                <strong>${titleLabel} ${statusBadge}</strong>
                 <small>${date} &middot; ${walletLabel(t.wallet)} wallet</small>
+                ${ticketLine}
                 ${extraLine}
               </div>
               <div class="winner-prize" style="color:${meta.sign === '-' ? '#ff7675' : '#00b894'};">
                 ${meta.sign}&#8358;${Number(t.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
               </div>
+              ${rowAttrs ? '<i class="fa-solid fa-chevron-down" style="color:#b2bec3; font-size:11px;"></i>' : ''}
             </div>
+            ${expandPanel}
           `;
         }).join('');
       }
@@ -160,7 +208,7 @@
 
         const { data, error } = await client
           .from('transactions')
-          .select('id, type, wallet, amount, status, created_at, payment_reference, rejection_reason')
+          .select('id, type, wallet, amount, status, created_at, payment_reference, rejection_reason, tickets(ticket_number)')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(100);
@@ -182,6 +230,20 @@
         document.querySelectorAll('.txn-filter-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         render(chip.dataset.filter);
+      });
+
+      document.getElementById('txn-list').addEventListener('click', (e) => {
+        const row = e.target.closest('[data-expandable="true"]');
+        if (!row) return;
+        const panel = document.getElementById(`ticket-expand-${row.dataset.rowIdx}`);
+        if (!panel) return;
+        const isOpen = panel.style.display === 'flex';
+        panel.style.display = isOpen ? 'none' : 'flex';
+        const chevron = row.querySelector('.fa-chevron-down, .fa-chevron-up');
+        if (chevron) {
+          chevron.classList.toggle('fa-chevron-down', isOpen);
+          chevron.classList.toggle('fa-chevron-up', !isOpen);
+        }
       });
 
       loadTransactions();
