@@ -160,6 +160,24 @@
             }
           }
 
+          if (t.type === 'win_payout') {
+            const win = winDetailsMap.get(t.id);
+            if (win) {
+              ticketLine = `<small style="color:#f59f00; font-weight:700;"><i class="fa-solid fa-ticket"></i> ${fmtTicketCode(win.ticket_number)} &middot; Draw #${String(win.draw_number).padStart(3, '0')}</small>`;
+              rowAttrs = `data-expandable="true" data-row-idx="${idx}"`;
+              const drawTimeStr = new Date(win.draw_datetime).toLocaleString('en-NG', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+              expandPanel = `
+                <div class="ticket-expand-panel" id="ticket-expand-${idx}" style="display:none; padding:4px 14px 14px 62px; flex-direction:column; gap:4px; font-size:12.5px; color:#2d3436;">
+                  <div><strong>Draw:</strong> #${String(win.draw_number).padStart(3, '0')}</div>
+                  <div><strong>Winning Ticket:</strong> ${fmtTicketCode(win.ticket_number)}</div>
+                  <div><strong>Draw Time:</strong> ${drawTimeStr}</div>
+                  <div><strong>Prize:</strong> &#8358;${Number(win.prize_amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}</div>
+                  <div><strong>Status:</strong> ${t.status === 'completed' ? '✅ Credited to Main Wallet' : escapeHtml(t.status)}</div>
+                </div>
+              `;
+            }
+          }
+
           return `
             <div class="winner-row" ${rowAttrs} style="${rowAttrs ? 'cursor:pointer;' : ''}">
               <div class="winner-avatar" style="background:${meta.color}1a; color:${meta.color};">
@@ -194,6 +212,8 @@
         `).join('');
       }
 
+      let winDetailsMap = new Map();
+
       async function loadTransactions() {
         const client = window.getSupabaseClient();
         if (!client) return;
@@ -206,21 +226,30 @@
 
         document.getElementById('txn-list').innerHTML = skeletonRows(6);
 
-        const { data, error } = await client
-          .from('transactions')
-          .select('id, type, wallet, amount, status, created_at, payment_reference, rejection_reason, tickets(ticket_number)')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(100);
+        const [txnsResult, winsResult] = await Promise.all([
+          client
+            .from('transactions')
+            .select('id, type, wallet, amount, status, created_at, payment_reference, rejection_reason, tickets(ticket_number)')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(100),
+          client.rpc('get_my_win_transactions'),
+        ]);
 
-        if (error) {
-          console.error('Error loading transactions:', error.message);
+        if (txnsResult.error) {
+          console.error('Error loading transactions:', txnsResult.error.message);
           document.getElementById('txn-list').innerHTML = '';
           document.getElementById('txn-empty').style.display = 'flex';
           return;
         }
 
-        allTxns = data || [];
+        if (winsResult.error) {
+          console.error('Error loading win details:', winsResult.error.message);
+        } else {
+          winDetailsMap = new Map((winsResult.data || []).map(w => [w.transaction_id, w]));
+        }
+
+        allTxns = txnsResult.data || [];
         render('all');
       }
 
