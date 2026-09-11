@@ -1570,9 +1570,13 @@
               // before revealing the result — same reel logic as
               // live-draw.html, scoped to this exact slot/date.
               try {
-                const todayStr = new Date().toISOString().slice(0, 10);
+                // Use the EXACT date admin_run_draw actually used —
+                // not a separately-computed "today" — so the reel
+                // fetch can never disagree with the draw that just ran,
+                // regardless of timezone.
+                const drawDateUsed = data[0].draw_date;
                 const { data: reelRaw, error: reelError } = await client.rpc('admin_get_draw_reel', {
-                  p_draw_date: todayStr,
+                  p_draw_date: drawDateUsed,
                   p_slot_id: currentSlot.id,
                 });
                 if (reelError) throw reelError;
@@ -1590,11 +1594,13 @@
                 }
               } catch (reelErr) {
                 console.warn('Admin reel skipped:', reelErr);
+                resultEl.innerHTML = `<div style="color:#e17055; font-size:12px; margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Animation skipped (${escapeHtml(reelErr.message || 'unknown error')}) — winner was still picked correctly below.</div>`;
               }
 
               resultEl.style.color = 'var(--money)';
               const lines = data.map(w => `🎉 ${w.winner_name} won ₦${Number(w.prize).toLocaleString()}`);
-              resultEl.innerHTML = `<strong style="color:var(--text);">${data.length} winner${data.length > 1 ? 's' : ''} this draw:</strong><br>` + lines.join('<br>');
+              const reelWarningHtml = resultEl.innerHTML; // preserve any "animation skipped" notice set above
+              resultEl.innerHTML = reelWarningHtml + `<strong style="color:var(--text);">${data.length} winner${data.length > 1 ? 's' : ''} this draw:</strong><br>` + lines.join('<br>');
               celebrateBurst(card);
             }
             loadUsers(client, document.getElementById('user-search').value.trim());
