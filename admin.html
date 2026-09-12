@@ -1574,7 +1574,7 @@
                 // not a separately-computed "today" — so the reel
                 // fetch can never disagree with the draw that just ran,
                 // regardless of timezone.
-                const drawDateUsed = data[0].draw_date;
+                const drawDateUsed = data[0].result_draw_date;
                 const { data: reelRaw, error: reelError } = await client.rpc('admin_get_draw_reel', {
                   p_draw_date: drawDateUsed,
                   p_slot_id: currentSlot.id,
