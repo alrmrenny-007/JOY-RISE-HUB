@@ -140,7 +140,7 @@
       color: #fdcb6e; font-size: 16px; z-index: 6; text-shadow: 0 0 6px rgba(253,203,110,0.8);
     }
     .reel-spin-badge {
-      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      position: absolute; right: 8px; left: auto; top: 50%; transform: translateY(-50%);
       width: 52px; height: 52px; border-radius: 50%; background: #fff;
       display: flex; align-items: center; justify-content: center;
       font-size: 10px; font-weight: 800; color: #6c5ce7; letter-spacing: 0.03em;
@@ -356,8 +356,6 @@
         <div class="reel-viewport">
           <div class="reel-track" id="reel-track"></div>
           <div class="reel-pointer">
-            <i class="fa-solid fa-caret-right reel-pointer-arrow"></i>
-            <i class="fa-solid fa-caret-left reel-pointer-arrow"></i>
           </div>
           <div class="reel-spin-badge">SPIN</div>
           <div class="reel-confetti-layer" id="reel-confetti-layer"></div>
@@ -920,7 +918,7 @@
                 // in 3...2...1..." line, then the next spin auto-starts
                 // immediately — no separate rest screen, no second
                 // full-screen countdown box.
-                microCountdown(winnerHtml, segmentIdx + 2).then(() => runSegment(segmentIdx + 1));
+                showPreSpinCountdown(section, { label: `Getting ready for winner ${segmentIdx + 2}...` }).then(() => runSegment(segmentIdx + 1));
               }, 150);
             });
           }
