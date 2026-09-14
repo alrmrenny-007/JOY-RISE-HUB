@@ -1355,7 +1355,9 @@
                   return;
                 }
 
-                showPreSpinCountdown(section, { label: `Getting ready for winner ${segmentIdx + 2}...` }).then(() => runSegment(segmentIdx + 1));
+                setTimeout(() => {
+                  showPreSpinCountdown(section, { label: `Getting ready for winner ${segmentIdx + 2}...` }).then(() => runSegment(segmentIdx + 1));
+                }, 1800);
               }, 150);
             });
           }
@@ -1573,7 +1575,7 @@
                 // fetch can never disagree with the draw that just ran,
                 // regardless of timezone.
                 const drawDateUsed = data[0].result_draw_date;
-                const { data: reelRaw, error: reelError } = await client.rpc('admin_get_draw_reel', {
+                const { data: reelRaw, error: reelError } = await client.rpc('get_draw_reel', {
                   p_draw_date: drawDateUsed,
                   p_slot_id: currentSlot.id,
                 });

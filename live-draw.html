@@ -918,7 +918,14 @@
                 // in 3...2...1..." line, then the next spin auto-starts
                 // immediately — no separate rest screen, no second
                 // full-screen countdown box.
-                showPreSpinCountdown(section, { label: `Getting ready for winner ${segmentIdx + 2}...` }).then(() => runSegment(segmentIdx + 1));
+                // Let the winner popup + confetti actually be seen
+                // before the next countdown takes over the viewport
+                // (which hides them instantly) — without this pause,
+                // every winner except the last would have their
+                // reveal yanked away in the same instant it appeared.
+                setTimeout(() => {
+                  showPreSpinCountdown(section, { label: `Getting ready for winner ${segmentIdx + 2}...` }).then(() => runSegment(segmentIdx + 1));
+                }, 1800);
               }, 150);
             });
           }
