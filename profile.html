@@ -63,7 +63,7 @@
         </p>
         <input type="file" id="photo-upload-input" accept="image/*" style="display:none;" />
         <button type="button" id="photo-upload-btn" style="width:100%; padding:12px; border-radius:10px; border:1.5px solid #6c5ce7; background:#f3f0ff; color:#6c5ce7; font-weight:700; font-size:14px; cursor:pointer;">
-          <i class="fa-solid fa-image"></i> Choose or Take a Photo
+          <i class="fa-solid fa-image"></i> Choose a Photo
         </button>
         <div class="modal-error" id="photo-error"></div>
       </div>
@@ -92,6 +92,34 @@
 
     </main>
 
+    <div class="modal-overlay" id="name-confirm-modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-icon-circle" style="background:#fff3cd; color:#e6a700;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <h3>Confirm Display Name Change</h3>
+          </div>
+          <button class="modal-close-btn" id="name-confirm-close-btn">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>
+            You are setting your public name to <strong id="name-confirm-new-name"></strong>.
+            Please confirm the spelling is correct. Once saved, you cannot change this name again for 30 days.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-modal-cancel" id="name-confirm-edit-btn">Edit Spelling</button>
+          <button class="btn-modal-primary" id="name-confirm-lock-btn">
+            <span>Confirm & Lock Name</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- TOAST -->
@@ -113,6 +141,7 @@
       const isDicebearUrl = (url) => !!url && url.includes('dicebear.com');
 
       let currentUserId = null;
+      let originalPublicName = ''; // captured on load, compared at save time to detect an actual edit
       let selectedAvatarSeed = AVATAR_SEEDS[0];
       // 'preset' = using one of the cartoon avatars below.
       // 'photo'  = using a real uploaded photo (either one already
@@ -212,6 +241,7 @@
 
         document.getElementById('name-input').value = profile.full_name || '';
         document.getElementById('public-name-input').value = profile.public_display_name || '';
+        originalPublicName = profile.public_display_name || '';
         updateMaskExample();
 
         // 30-day name-change cooldown — the real enforcement is a
@@ -292,7 +322,7 @@
         });
       }
 
-      document.getElementById('save-btn').addEventListener('click', async () => {
+      async function performSave() {
         const client = window.getSupabaseClient();
         const nameInput = document.getElementById('name-input');
         const errorEl = document.getElementById('name-error');
@@ -360,6 +390,41 @@
         } finally {
           btn.disabled = false;
           btn.classList.remove('loading');
+        }
+      }
+
+      // Display name confirmation modal — only shown when the public
+      // name field was actually edited, since a 30-day lock is a real
+      // commitment and typos are otherwise easy to save by accident.
+      const nameConfirmOverlay = document.getElementById('name-confirm-modal-overlay');
+      const nameConfirmNewNameEl = document.getElementById('name-confirm-new-name');
+
+      function openNameConfirmModal(newName) {
+        nameConfirmNewNameEl.textContent = newName;
+        nameConfirmOverlay.classList.add('open');
+      }
+      function closeNameConfirmModal() {
+        nameConfirmOverlay.classList.remove('open');
+      }
+
+      document.getElementById('name-confirm-close-btn').addEventListener('click', closeNameConfirmModal);
+      document.getElementById('name-confirm-edit-btn').addEventListener('click', closeNameConfirmModal);
+      nameConfirmOverlay.addEventListener('click', (e) => {
+        if (e.target === nameConfirmOverlay) closeNameConfirmModal();
+      });
+      document.getElementById('name-confirm-lock-btn').addEventListener('click', () => {
+        closeNameConfirmModal();
+        performSave();
+      });
+
+      document.getElementById('save-btn').addEventListener('click', () => {
+        const publicName = document.getElementById('public-name-input').value.trim();
+        const publicNameChanged = publicName !== (originalPublicName || '');
+
+        if (publicNameChanged && publicName) {
+          openNameConfirmModal(publicName);
+        } else {
+          performSave();
         }
       });
 
