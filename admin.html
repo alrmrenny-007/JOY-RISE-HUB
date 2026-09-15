@@ -770,6 +770,63 @@
           <h3 class="admin-section-title"><i class="fa-solid fa-sliders"></i> Settings</h3>
           <div id="config-list" class="config-list"></div>
         </section>
+
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-paper-plane"></i> Send Test Notification</h3>
+          <p style="font-size:12px; color:#636e72; margin:6px 0 12px;">
+            Send a real push notification to one user, or to everyone subscribed.
+          </p>
+
+          <label style="font-size:12px; color:#636e72; display:block; margin-bottom:4px;">Target</label>
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+              <input type="radio" name="push-target-mode" value="user" checked id="push-target-user-radio" />
+              Specific user
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+              <input type="radio" name="push-target-mode" value="broadcast" id="push-target-broadcast-radio" />
+              Broadcast to everyone
+            </label>
+          </div>
+
+          <input
+            type="text"
+            class="auth-input"
+            id="push-test-user-id"
+            placeholder="User ID (paste from Users tab)"
+            style="margin-bottom:10px;"
+          />
+
+          <input
+            type="text"
+            class="auth-input"
+            id="push-test-title"
+            placeholder="Title (e.g. 🎉 Test Notification)"
+            style="margin-bottom:10px;"
+          />
+
+          <textarea
+            class="auth-input"
+            id="push-test-body"
+            placeholder="Body text"
+            rows="2"
+            style="margin-bottom:10px; resize:vertical;"
+          ></textarea>
+
+          <input
+            type="text"
+            class="auth-input"
+            id="push-test-url"
+            placeholder="Link when tapped (default: index.html)"
+            style="margin-bottom:12px;"
+          />
+
+          <button class="btn-auth-primary" id="push-test-send-btn" style="width:100%;">
+            <i class="fa-solid fa-paper-plane"></i> <span id="push-test-send-label">Send</span>
+          </button>
+
+          <div id="push-test-result" style="margin-top:10px; font-size:13px;"></div>
+        </section>
       </div>
 
       <!-- TICKETS -->
@@ -2516,6 +2573,111 @@
       </div>
     </div>
   </div>
+    <script>
+      // --- SEND TEST NOTIFICATION panel (Settings tab) ---
+      (function () {
+        const userRadio = document.getElementById('push-target-user-radio');
+        const broadcastRadio = document.getElementById('push-target-broadcast-radio');
+        const userIdInput = document.getElementById('push-test-user-id');
+        const titleInput = document.getElementById('push-test-title');
+        const bodyInput = document.getElementById('push-test-body');
+        const urlInput = document.getElementById('push-test-url');
+        const sendBtn = document.getElementById('push-test-send-btn');
+        const sendLabel = document.getElementById('push-test-send-label');
+        const resultEl = document.getElementById('push-test-result');
+
+        if (!sendBtn) return;
+
+        function setResult(message, isError) {
+          resultEl.textContent = message;
+          resultEl.style.color = isError ? '#d63031' : '#00b894';
+        }
+
+        function toggleTargetMode() {
+          const isBroadcast = broadcastRadio.checked;
+          userIdInput.style.display = isBroadcast ? 'none' : 'block';
+          userIdInput.disabled = isBroadcast;
+        }
+        userRadio.addEventListener('change', toggleTargetMode);
+        broadcastRadio.addEventListener('change', toggleTargetMode);
+
+        sendBtn.addEventListener('click', async () => {
+          setResult('', false);
+
+          const title = titleInput.value.trim();
+          const body = bodyInput.value.trim();
+          const url = urlInput.value.trim() || 'index.html';
+          const isBroadcast = broadcastRadio.checked;
+          const userId = userIdInput.value.trim();
+
+          if (!title) {
+            setResult('Title is required.', true);
+            return;
+          }
+          if (!isBroadcast && !userId) {
+            setResult('Enter a user ID, or switch to Broadcast.', true);
+            return;
+          }
+          if (isBroadcast) {
+            const confirmed = confirm(
+              'This will send a push notification to EVERY subscribed user right now. Continue?'
+            );
+            if (!confirmed) return;
+          }
+
+          const client = window.getSupabaseClient();
+          if (!client) {
+            setResult('Could not get Supabase client.', true);
+            return;
+          }
+
+          const { data: { session } } = await client.auth.getSession();
+          if (!session) {
+            setResult('Not logged in.', true);
+            return;
+          }
+
+          sendBtn.disabled = true;
+          sendLabel.textContent = 'Sending...';
+
+          try {
+            const functionUrl = `${client.supabaseUrl}/functions/v1/send-push-notification`;
+            const payload = isBroadcast
+              ? { broadcast: true, title, body, url }
+              : { user_id: userId, title, body, url };
+
+            const res = await fetch(functionUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify(payload),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+              setResult('Failed: ' + (data.error || res.statusText), true);
+            } else {
+              setResult(
+                `Sent to ${data.sent} device(s)` +
+                  (data.removed ? `, cleaned up ${data.removed} dead subscription(s)` : '') +
+                  '.',
+                false
+              );
+            }
+          } catch (err) {
+            setResult('Request failed: ' + err.message, true);
+          } finally {
+            sendBtn.disabled = false;
+            sendLabel.textContent = 'Send';
+          }
+        });
+
+        toggleTargetMode();
+      })();
+    </script>
 
 </body>
 </html>
