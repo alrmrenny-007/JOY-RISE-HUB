@@ -682,7 +682,7 @@
   <div class="mobile-container">
 
     <header class="admin-header">
-      <button class="icon-btn" id="back-btn"><i class="fa-solid fa-arrow-left"></i></button>
+      <button class="icon-btn" id="back-btn" aria-label="Go back"><i class="fa-solid fa-arrow-left"></i></button>
       <div class="admin-title-block">
         <span class="eyebrow">Joy-Rise Hub</span>
         <h1>Control Deck</h1>
@@ -1860,10 +1860,10 @@
                   </div>
                 </div>
                 <div style="display:flex; gap:6px;">
-                  <button class="icon-btn edit-slot-btn" data-slot='${JSON.stringify(slot).replace(/'/g, "&apos;")}'>
+                  <button class="icon-btn edit-slot-btn" data-slot='${JSON.stringify(slot).replace(/'/g, "&apos;")}' aria-label="Edit this draw slot">
                     <i class="fa-solid fa-pen"></i>
                   </button>
-                  <button class="icon-btn delete-slot-btn" data-id="${slot.id}" data-time="${fmtTime(slot.slot_time)}" style="color:#ff4757;">
+                  <button class="icon-btn delete-slot-btn" data-id="${slot.id}" data-time="${fmtTime(slot.slot_time)}" style="color:#ff4757;" aria-label="Delete this draw slot">
                     <i class="fa-solid fa-trash"></i>
                   </button>
                 </div>
@@ -2004,7 +2004,7 @@
                 <label>Price (₦)</label>
                 <input type="number" step="0.01" class="auth-input tier-price-input" value="${tier.price}" />
               </div>
-              <button class="btn-config-save tier-save-btn"><i class="fa-solid fa-check"></i></button>
+              <button class="btn-config-save tier-save-btn" aria-label="Save tier changes"><i class="fa-solid fa-check"></i></button>
             </div>
           </div>
         `).join('');
@@ -2361,7 +2361,7 @@
             <label>${CONFIG_LABELS[row.key] || escapeHtml(row.key)}</label>
             <div class="config-row-input">
               <input type="number" step="0.01" class="auth-input config-value-input" value="${row.value}" />
-              <button class="btn-config-save"><i class="fa-solid fa-check"></i></button>
+              <button class="btn-config-save" aria-label="Save ${escapeHtml(CONFIG_LABELS[row.key] || row.key)}"><i class="fa-solid fa-check"></i></button>
             </div>
           </div>
         `).join('');
@@ -2493,7 +2493,7 @@
           <h3 id="draw-modal-title">Run Draw</h3>
           <p id="draw-modal-subtitle">Review the split before confirming</p>
         </div>
-        <button class="modal-close-btn" id="draw-modal-close-btn">
+        <button class="modal-close-btn" id="draw-modal-close-btn" aria-label="Close dialog">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -2569,7 +2569,7 @@
           <h3 id="slot-modal-title">Add Draw Time</h3>
           <p>Set a recurring daily draw slot</p>
         </div>
-        <button class="modal-close-btn" id="slot-modal-close-btn">
+        <button class="modal-close-btn" id="slot-modal-close-btn" aria-label="Close dialog">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>

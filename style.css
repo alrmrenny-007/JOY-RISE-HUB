@@ -6,6 +6,30 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ---------- Accessibility: visible keyboard focus ---------- */
+/* Only shows for keyboard/assistive-tech navigation (:focus-visible),
+   never on a mouse/touch tap, so it doesn't fight the tap-feedback
+   styles above. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2.5px solid #6c5ce7;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+html[data-theme="dark"] a:focus-visible,
+html[data-theme="dark"] button:focus-visible,
+html[data-theme="dark"] input:focus-visible,
+html[data-theme="dark"] textarea:focus-visible,
+html[data-theme="dark"] select:focus-visible,
+html[data-theme="dark"] [tabindex]:focus-visible {
+  outline-color: #9B8CFF;
+}
+
+
 /* ================= GLOBAL MOTION TOOLKIT ================= */
 @keyframes fadeUpIn {
   from { opacity: 0; transform: translateY(14px); }
@@ -125,8 +149,8 @@ body {
 .icon-btn {
   background: #f4f5f9;
   border: none;
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   font-size: 16px;
   color: #2d3436;
@@ -801,6 +825,15 @@ body {
   font-size: 13px;
   cursor: pointer;
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Keeps the visual size small while giving it a full 44px tap target,
+   per accessibility guidance — the extra hit area is invisible. */
+.modal-close-btn::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
 }
 
 .amount-label {
