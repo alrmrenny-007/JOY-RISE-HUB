@@ -878,41 +878,57 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (isRunningStandalone()) {
       installBtn.style.display = "none";
-    } else if (isIos()) {
-      // iOS never fires beforeinstallprompt — show the button anyway
-      // with manual instructions, since that's the only install path
-      // Apple allows.
-      installBtn.style.display = "flex";
-    } else if (deferredInstallPrompt) {
-      // The event already fired before this function ran (it's
-      // captured at the top of the file specifically so this can
-      // happen) — show the button immediately instead of waiting for
-      // an event that already came and went.
-      installBtn.style.display = "flex";
     }
-    // Otherwise: wait for the top-level beforeinstallprompt listener
-    // to fire and flip this button's display itself.
+    // Otherwise: always visible. Clicking it uses the real native
+    // prompt when Chrome/Edge has made one available; if not (yet, or
+    // ever — e.g. iOS has no such prompt), it falls back to manual
+    // instructions instead of doing nothing.
 
     installBtn.addEventListener("click", async () => {
       document.getElementById("menu-panel")?.classList.remove("open");
 
-      if (isIos() && !deferredInstallPrompt) {
+      if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        const { outcome } = await deferredInstallPrompt.userChoice;
+        deferredInstallPrompt = null;
+        return;
+      }
+
+      if (isIos()) {
         showIosInstallInstructions();
-        return;
-      }
-
-      if (!deferredInstallPrompt) {
-        showToast("Use your browser's menu to add this app to your home screen.", "error", 5000);
-        return;
-      }
-
-      deferredInstallPrompt.prompt();
-      const { outcome } = await deferredInstallPrompt.userChoice;
-      deferredInstallPrompt = null;
-      if (outcome !== "accepted") {
-        installBtn.style.display = "flex"; // they can still try again later
+      } else {
+        showManualInstallInstructions();
       }
     });
+
+    function showManualInstallInstructions() {
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.style.display = "flex";
+      overlay.innerHTML = `
+        <div class="modal-card">
+          <div class="modal-header">
+            <div class="modal-icon-circle"><i class="fa-solid fa-download"></i></div>
+            <div><h3>Install Joy-Rise Hub</h3></div>
+            <button class="modal-close-btn" id="manual-install-close-btn"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:14px; line-height:1.6;">
+              Tap your browser's menu (usually <strong>⋮</strong> in the top right),
+              then look for <strong>"Install app"</strong> or
+              <strong>"Add to Home screen"</strong>.<br/><br/>
+              If you don't see that option yet, using the app a little more first
+              (browsing a few pages) usually makes it appear.
+            </p>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById("manual-install-close-btn").addEventListener("click", () => overlay.remove());
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) overlay.remove();
+      });
+    }
 
     function showIosInstallInstructions() {
       // Reuses the same modal styling already defined for the
