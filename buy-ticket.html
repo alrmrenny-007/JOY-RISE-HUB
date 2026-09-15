@@ -40,13 +40,13 @@
       <a href="my-tickets.html" class="icon-btn" style="text-decoration:none;"><i class="fa-solid fa-receipt"></i></a>
     </header>
 
-    <main class="main-content">
+    <main class="main-content entrance-stagger">
 
       <div class="balance-summary" id="balance-summary">
         <span>Available: <strong id="available-total">&#8358;0.00</strong></span>
       </div>
 
-      <div id="tier-grid" class="tier-grid"></div>
+      <div id="tier-grid" class="tier-grid entrance-stagger"></div>
 
       <div class="section-heading">
         <h3>Recent Session Results</h3>
@@ -171,6 +171,35 @@
         .wallet-choice-btn.insufficient strong { color: #ff4757; }
       </style>
 
+      <style>
+        /* ---- Purchase-success celebration (icon pop + confetti burst) ---- */
+        .celebrate-burst { position: relative; flex-shrink: 0; }
+        .confetti-dot {
+          position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+          border-radius: 2px; opacity: 0; pointer-events: none;
+        }
+        .modal-overlay.open .icon-celebrate {
+          animation: iconCelebratePop 550ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .modal-overlay.open .confetti-dot {
+          animation: confettiBurst 650ms ease-out forwards;
+          animation-delay: 60ms;
+        }
+        @keyframes iconCelebratePop {
+          0%   { transform: scale(0.4) rotate(-15deg); }
+          55%  { transform: scale(1.18) rotate(8deg); }
+          100% { transform: scale(1) rotate(0deg); }
+        }
+        @keyframes confettiBurst {
+          0%   { opacity: 1; transform: translate(-50%, -50%) translate(0, 0) scale(1); }
+          100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--tx), var(--ty)) scale(0.4); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .modal-overlay.open .icon-celebrate,
+          .modal-overlay.open .confetti-dot { animation: none; opacity: 0; }
+        }
+      </style>
+
       <div class="modal-footer">
         <button class="btn-modal-cancel" id="confirm-cancel-btn">Cancel</button>
         <button class="btn-modal-primary" id="confirm-buy-btn">
@@ -185,8 +214,15 @@
   <div class="modal-overlay" id="place-draw-modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <div class="modal-icon-circle" id="place-draw-icon-circle">
-          <i class="fa-solid fa-ticket"></i>
+        <div class="celebrate-burst">
+          <div class="modal-icon-circle icon-celebrate" id="place-draw-icon-circle">
+            <i class="fa-solid fa-ticket"></i>
+          </div>
+          <span class="confetti-dot" style="--tx:-26px; --ty:-22px; background:#6c5ce7;"></span>
+          <span class="confetti-dot" style="--tx:24px; --ty:-26px; background:#00b894;"></span>
+          <span class="confetti-dot" style="--tx:-30px; --ty:16px; background:#fdcb6e;"></span>
+          <span class="confetti-dot" style="--tx:30px; --ty:20px; background:#ff7675;"></span>
+          <span class="confetti-dot" style="--tx:0px; --ty:-34px; background:#00cec9;"></span>
         </div>
         <div>
           <h3>Ticket Purchased 🎟️</h3>
