@@ -6,6 +6,58 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ================= GLOBAL MOTION TOOLKIT ================= */
+@keyframes fadeUpIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Any element with .entrance-stagger fades/slides its direct children in,
+   one after another. Applied per-page to the main content wrapper. */
+.entrance-stagger > * {
+  animation: fadeUpIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.entrance-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.entrance-stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.entrance-stagger > *:nth-child(3) { animation-delay: 0.14s; }
+.entrance-stagger > *:nth-child(4) { animation-delay: 0.20s; }
+.entrance-stagger > *:nth-child(5) { animation-delay: 0.26s; }
+.entrance-stagger > *:nth-child(6) { animation-delay: 0.32s; }
+.entrance-stagger > *:nth-child(n+7) { animation-delay: 0.36s; }
+
+/* Universal tactile tap feedback for interactive elements */
+.icon-btn,
+.btn-wallet-action,
+.btn-unlock-badge,
+.qa-item,
+.act-card,
+.dropdown-panel-item,
+.btn-telegram,
+.fab-btn,
+.wallet-card,
+.nav-item {
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.icon-btn:active,
+.btn-wallet-action:active,
+.btn-unlock-badge:active,
+.qa-item:active,
+.act-card:active,
+.dropdown-panel-item:active,
+.btn-telegram:active,
+.wallet-card:active {
+  transform: scale(0.96);
+}
+.fab-btn:active { transform: scale(0.92); }
+
+@media (prefers-reduced-motion: reduce) {
+  .entrance-stagger > * { animation: none !important; }
+  .icon-btn, .btn-wallet-action, .btn-unlock-badge, .qa-item, .act-card,
+  .dropdown-panel-item, .btn-telegram, .fab-btn, .wallet-card, .nav-item {
+    transition: none !important;
+  }
+}
+
 body {
   background-color: #f3f4f9;
   display: flex;
@@ -149,6 +201,33 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.wallet-card::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -40%;
+  width: 35%;
+  height: 220%;
+  background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.28) 50%, rgba(255,255,255,0) 100%);
+  transform: rotate(20deg);
+  animation: walletShine 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.wallet-green::after { animation-delay: 1.2s; }
+
+@keyframes walletShine {
+  0%, 15% { left: -40%; }
+  55%, 100% { left: 130%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-card::after { animation: none; display: none; }
 }
 
 .wallet-purple {
@@ -361,6 +440,13 @@ body {
   box-shadow: 0 4px 15px rgba(0,0,0,0.02);
 }
 
+@media (hover: hover) {
+  .qa-item:hover, .act-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+  }
+}
+
 .qa-icon {
   width: 42px;
   height: 42px;
@@ -419,6 +505,34 @@ body {
   height: 6px;
   background: #00b894;
   border-radius: 50%;
+  position: relative;
+}
+
+.green-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #00b894;
+  animation: liveDotPulse 1.6s ease-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 184, 148, 0.6); opacity: 1; }
+  100% { box-shadow: 0 0 0 8px rgba(0, 184, 148, 0); opacity: 0; }
+}
+
+.banner-trophy {
+  animation: trophyFloat 3.2s ease-in-out infinite;
+}
+
+@keyframes trophyFloat {
+  0%, 100% { transform: translateY(0) rotate(-2deg); filter: drop-shadow(0 0 0 rgba(253, 203, 110, 0)); }
+  50%      { transform: translateY(-5px) rotate(2deg); filter: drop-shadow(0 0 10px rgba(253, 203, 110, 0.55)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .green-dot::after, .banner-trophy { animation: none; }
 }
 
 .banner-content h2 {
@@ -1461,12 +1575,27 @@ body {
   box-shadow: 0 10px 30px rgba(0,0,0,0.15);
   padding: 8px;
   z-index: 500;
-  display: none;
+  display: flex;
   flex-direction: column;
+  transform-origin: top right;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.18s;
 }
 
 .dropdown-panel.open {
-  display: flex;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-panel { transition: opacity 0.15s ease, visibility 0s linear 0.15s; transform: none; }
+  .dropdown-panel.open { transition: opacity 0.15s ease; transform: none; }
 }
 
 .dropdown-panel-title {
