@@ -8,6 +8,29 @@ if (window.getSupabaseClient) {
   supabaseClient = window.getSupabaseClient();
 }
 
+// PWA install prompt: registered here, at the very top of the file,
+// on purpose — NOT inside wireInstallButton() further down. Chrome can
+// fire beforeinstallprompt as soon as it decides the app is
+// installable, which can happen before the DOMContentLoaded handler's
+// long chain of awaited setup (loadConfig, loadUserData, etc.)
+// finishes running. A listener registered only at the end of that
+// chain can miss the event entirely — it fires into an empty room.
+// Registering immediately, before any of that async work starts,
+// means it's never missed.
+let deferredInstallPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById("menu-install-btn");
+  if (btn) btn.style.display = "flex";
+});
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  const btn = document.getElementById("menu-install-btn");
+  if (btn) btn.style.display = "none";
+  if (typeof showToast === "function") showToast("App installed!");
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
 
   let currentUserId = null;
@@ -842,8 +865,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const installBtn = document.getElementById("menu-install-btn");
     if (!installBtn) return;
 
-    let deferredPrompt = null;
-
     function isRunningStandalone() {
       return (
         window.matchMedia("(display-mode: standalone)").matches ||
@@ -862,39 +883,32 @@ document.addEventListener("DOMContentLoaded", async () => {
       // with manual instructions, since that's the only install path
       // Apple allows.
       installBtn.style.display = "flex";
-    }
-    // Everyone else waits for the real event below before showing
-    // anything, since we can only offer a working install button, not
-    // a guessed one.
-
-    window.addEventListener("beforeinstallprompt", (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
+    } else if (deferredInstallPrompt) {
+      // The event already fired before this function ran (it's
+      // captured at the top of the file specifically so this can
+      // happen) — show the button immediately instead of waiting for
+      // an event that already came and went.
       installBtn.style.display = "flex";
-    });
-
-    window.addEventListener("appinstalled", () => {
-      deferredPrompt = null;
-      installBtn.style.display = "none";
-      showToast("App installed!");
-    });
+    }
+    // Otherwise: wait for the top-level beforeinstallprompt listener
+    // to fire and flip this button's display itself.
 
     installBtn.addEventListener("click", async () => {
       document.getElementById("menu-panel")?.classList.remove("open");
 
-      if (isIos() && !deferredPrompt) {
+      if (isIos() && !deferredInstallPrompt) {
         showIosInstallInstructions();
         return;
       }
 
-      if (!deferredPrompt) {
+      if (!deferredInstallPrompt) {
         showToast("Use your browser's menu to add this app to your home screen.", "error", 5000);
         return;
       }
 
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
       if (outcome !== "accepted") {
         installBtn.style.display = "flex"; // they can still try again later
       }
