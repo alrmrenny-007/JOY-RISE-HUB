@@ -830,6 +830,108 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Wires the permanent "Install App" item in the hamburger menu — a
+  // backup for the browser's own one-time install pop-up, which is
+  // easy to miss or dismiss. Re-triggers the same native install
+  // prompt on Android/desktop Chrome/Edge. On iOS Safari, which has
+  // no programmatic install API at all (an Apple platform limitation,
+  // not a bug), shows manual "Add to Home Screen" instructions instead
+  // — that's the only install path that exists there. Hides itself if
+  // the app is already installed or the platform can't install PWAs.
+  function wireInstallButton() {
+    const installBtn = document.getElementById("menu-install-btn");
+    if (!installBtn) return;
+
+    let deferredPrompt = null;
+
+    function isRunningStandalone() {
+      return (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        window.navigator.standalone === true // iOS Safari's own flag
+      );
+    }
+
+    function isIos() {
+      return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+    }
+
+    if (isRunningStandalone()) {
+      installBtn.style.display = "none";
+    } else if (isIos()) {
+      // iOS never fires beforeinstallprompt — show the button anyway
+      // with manual instructions, since that's the only install path
+      // Apple allows.
+      installBtn.style.display = "flex";
+    }
+    // Everyone else waits for the real event below before showing
+    // anything, since we can only offer a working install button, not
+    // a guessed one.
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = "flex";
+    });
+
+    window.addEventListener("appinstalled", () => {
+      deferredPrompt = null;
+      installBtn.style.display = "none";
+      showToast("App installed!");
+    });
+
+    installBtn.addEventListener("click", async () => {
+      document.getElementById("menu-panel")?.classList.remove("open");
+
+      if (isIos() && !deferredPrompt) {
+        showIosInstallInstructions();
+        return;
+      }
+
+      if (!deferredPrompt) {
+        showToast("Use your browser's menu to add this app to your home screen.", "error", 5000);
+        return;
+      }
+
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (outcome !== "accepted") {
+        installBtn.style.display = "flex"; // they can still try again later
+      }
+    });
+
+    function showIosInstallInstructions() {
+      // Reuses the same modal styling already defined for the
+      // deposit/withdraw modal, so it looks native to the app instead
+      // of a jarring alert().
+      const overlay = document.createElement("div");
+      overlay.className = "modal-overlay";
+      overlay.style.display = "flex";
+      overlay.innerHTML = `
+        <div class="modal-card">
+          <div class="modal-header">
+            <div class="modal-icon-circle"><i class="fa-solid fa-arrow-up-from-bracket"></i></div>
+            <div><h3>Install Joy-Rise Hub</h3></div>
+            <button class="modal-close-btn" id="ios-install-close-btn"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size:14px; line-height:1.6;">
+              1. Tap the <strong>Share</strong> icon
+              <i class="fa-solid fa-arrow-up-from-bracket"></i> in Safari's toolbar.<br/><br/>
+              2. Scroll down and tap <strong>"Add to Home Screen"</strong>.<br/><br/>
+              3. Tap <strong>Add</strong> — Joy-Rise Hub will appear as an app icon on your home screen.
+            </p>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      document.getElementById("ios-install-close-btn").addEventListener("click", () => overlay.remove());
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) overlay.remove();
+      });
+    }
+  }
+
   // Wires the manual "Turn On Notifications" button inside the bell
   // dropdown. This exists alongside the auto-popup banner in auth.js
   // as a reliable fallback — if the banner was dismissed, or the
@@ -917,6 +1019,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadDashboardDrawBanner();
   setInterval(loadDashboardDrawBanner, 20000);
   wireEnablePushButton();
+  wireInstallButton();
 
   // Check admin status separately (doesn't block the main dashboard load)
   if (supabaseClient) {
