@@ -42,10 +42,38 @@
     .entries-pill {
       display: inline-flex; align-items: center; gap: 6px; margin-top: 14px;
       background: rgba(255,255,255,0.15); padding: 7px 14px; border-radius: 20px; font-size: 12px;
+      animation: entriesPillPulse 2.4s ease-in-out infinite;
     }
     .entries-pill strong { font-size: 13px; }
+    @keyframes entriesPillPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.25); }
+      50%      { box-shadow: 0 0 0 6px rgba(255,255,255,0); }
+    }
     .draw-hero.drawn { background: linear-gradient(135deg, #00b894, #55efc4); }
     .draw-hero .trophy-burst { font-size: 40px; margin-bottom: 4px; }
+
+    /* Ambient glow drifting behind the hero card, like the room lights
+       dimming for a draw — purely decorative, sits behind all content. */
+    .draw-hero { isolation: isolate; }
+    .draw-hero::before {
+      content: '';
+      position: absolute; inset: -40%;
+      background: radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 60%);
+      animation: heroGlowDrift 6s ease-in-out infinite;
+      z-index: -1;
+      pointer-events: none;
+    }
+    @keyframes heroGlowDrift {
+      0%, 100% { transform: translate(-10%, -10%) scale(1); }
+      50%      { transform: translate(10%, 10%) scale(1.15); }
+    }
+
+    .telegram-secondary { transition: transform 150ms ease, box-shadow 150ms ease; }
+    .telegram-secondary:active { transform: scale(0.98); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .entries-pill, .draw-hero::before { animation: none; }
+    }
 
     .confetti-piece {
       position: absolute; top: 10%; width: 7px; height: 12px; border-radius: 2px;
@@ -336,7 +364,7 @@
       </div>
     </header>
 
-    <main class="main-content">
+    <main class="main-content entrance-stagger">
 
       <div class="draw-hero" id="draw-hero">
         <span class="live-tag"><span class="green-dot"></span> <span id="hero-tag">LIVE DRAW</span></span>

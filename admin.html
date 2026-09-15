@@ -165,6 +165,47 @@
     }
     .admin-shell .admin-section-title i { color: var(--brand-glow); font-size: 13px; }
 
+    /* ---------- Push notification composer ---------- */
+    .admin-shell .notif-composer-head {
+      display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;
+    }
+    .admin-shell .notif-composer-icon {
+      width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--brand), #5B4BD6);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 15px;
+      box-shadow: 0 6px 16px rgba(108,92,231,0.35);
+    }
+    .admin-shell .notif-composer-sub {
+      font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.45;
+    }
+    .admin-shell .notif-target-group { display: flex; gap: 8px; margin-bottom: 14px; }
+    .admin-shell .notif-target-option {
+      position: relative; flex: 1; display: flex; align-items: center; justify-content: center;
+      gap: 6px; padding: 10px 8px; border-radius: 11px; border: 1px solid var(--line);
+      background: var(--surface-2); color: var(--muted); font-size: 12.5px; font-weight: 600;
+      cursor: pointer;
+      transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 100ms ease;
+    }
+    .admin-shell .notif-target-option input { position: absolute; opacity: 0; pointer-events: none; }
+    .admin-shell .notif-target-option:active { transform: scale(0.97); }
+    .admin-shell .notif-target-option:has(input:checked) {
+      background: linear-gradient(135deg, var(--brand), #5B4BD6);
+      color: #fff; border-color: transparent;
+      box-shadow: 0 4px 14px rgba(108,92,231,0.35);
+    }
+    .admin-shell .notif-target-option i { font-size: 11px; }
+    .admin-shell .notif-field-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+    .admin-shell .notif-send-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .admin-shell .notif-result {
+      margin-top: 10px; font-size: 12.5px; font-weight: 600; min-height: 16px;
+    }
+    .admin-shell .notif-result:not(:empty) {
+      animation: fadeUpIn 0.3s ease both;
+    }
+
     .support-banner {
       display: flex; align-items: center; gap: 10px;
       background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
@@ -771,61 +812,62 @@
           <div id="config-list" class="config-list"></div>
         </section>
 
-        <section class="admin-section">
-          <h3 class="admin-section-title"><i class="fa-solid fa-paper-plane"></i> Send Test Notification</h3>
-          <p style="font-size:12px; color:#636e72; margin:6px 0 12px;">
-            Send a real push notification to one user, or to everyone subscribed.
-          </p>
+        <section class="admin-section notif-composer">
+          <div class="notif-composer-head">
+            <div class="notif-composer-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
+            <div>
+              <h3 class="admin-section-title" style="margin:0;">Push Composer</h3>
+              <p class="notif-composer-sub">Send a live push to one user, or reach everyone subscribed instantly.</p>
+            </div>
+          </div>
 
-          <label style="font-size:12px; color:#636e72; display:block; margin-bottom:4px;">Target</label>
-          <div style="display:flex; gap:8px; margin-bottom:12px;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+          <div class="notif-target-group">
+            <label class="notif-target-option">
               <input type="radio" name="push-target-mode" value="user" checked id="push-target-user-radio" />
-              Specific user
+              <i class="fa-solid fa-user"></i> Specific user
             </label>
-            <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+            <label class="notif-target-option">
               <input type="radio" name="push-target-mode" value="broadcast" id="push-target-broadcast-radio" />
-              Broadcast to everyone
+              <i class="fa-solid fa-satellite-dish"></i> Broadcast
             </label>
           </div>
 
-          <input
-            type="text"
-            class="auth-input"
-            id="push-test-user-id"
-            placeholder="User ID (paste from Users tab)"
-            style="margin-bottom:10px;"
-          />
+          <div class="notif-field-group">
+            <input
+              type="text"
+              class="auth-input"
+              id="push-test-user-id"
+              placeholder="User ID (paste from Users tab)"
+            />
 
-          <input
-            type="text"
-            class="auth-input"
-            id="push-test-title"
-            placeholder="Title (e.g. 🎉 Test Notification)"
-            style="margin-bottom:10px;"
-          />
+            <input
+              type="text"
+              class="auth-input"
+              id="push-test-title"
+              placeholder="Title (e.g. 🎉 Big News)"
+            />
 
-          <textarea
-            class="auth-input"
-            id="push-test-body"
-            placeholder="Body text"
-            rows="2"
-            style="margin-bottom:10px; resize:vertical;"
-          ></textarea>
+            <textarea
+              class="auth-input"
+              id="push-test-body"
+              placeholder="Body text"
+              rows="2"
+              style="resize:vertical;"
+            ></textarea>
 
-          <input
-            type="text"
-            class="auth-input"
-            id="push-test-url"
-            placeholder="Link when tapped (default: index.html)"
-            style="margin-bottom:12px;"
-          />
+            <input
+              type="text"
+              class="auth-input"
+              id="push-test-url"
+              placeholder="Link when tapped (default: index.html)"
+            />
+          </div>
 
-          <button class="btn-auth-primary" id="push-test-send-btn" style="width:100%;">
-            <i class="fa-solid fa-paper-plane"></i> <span id="push-test-send-label">Send</span>
+          <button class="btn-auth-primary notif-send-btn" id="push-test-send-btn">
+            <i class="fa-solid fa-paper-plane"></i> <span id="push-test-send-label">Send Push</span>
           </button>
 
-          <div id="push-test-result" style="margin-top:10px; font-size:13px;"></div>
+          <div id="push-test-result" class="notif-result"></div>
         </section>
       </div>
 

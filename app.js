@@ -1021,13 +1021,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   navItems.forEach(item => {
     item.addEventListener("click", function () {
       const target = this.dataset.target;
-      if (this.id === "nav-wallets") {
-        document.querySelector(".wallets-grid")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        navItems.forEach(n => n.classList.remove("active"));
-        this.classList.add("active");
-        movePillToActiveNav();
-        return;
-      }
       if (target && target !== 'index.html') {
         window.location.href = target;
         return;
