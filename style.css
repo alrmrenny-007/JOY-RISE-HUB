@@ -2470,6 +2470,7 @@ html[data-theme="dark"] .balance-summary strong,
 html[data-theme="dark"] .referral-stat-box strong,
 html[data-theme="dark"] .ticket-price-row strong,
 html[data-theme="dark"] .dropdown-panel-title,
+html[data-theme="dark"] .dropdown-panel-item:not(.dropdown-panel-danger),
 html[data-theme="dark"] .tier-admin-header strong {
   color: #F3F0FF !important;
 }
