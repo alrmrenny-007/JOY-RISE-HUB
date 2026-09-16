@@ -56,6 +56,10 @@
       <label class="auth-label">Password</label>
       <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" required minlength="6" />
 
+      <label class="auth-label">Referral / Promo Code <span style="font-weight:400; color:#9089b0;">(optional)</span></label>
+      <input type="text" class="auth-input" id="signup-promo-code" placeholder="e.g. FUNNY" style="text-transform:uppercase;" autocapitalize="characters" />
+      <small id="promo-code-hint" style="display:block; margin:-10px 0 14px; font-size:11px; font-weight:700;"></small>
+
       <div class="auth-error" id="signup-error"></div>
 
       <button type="submit" class="btn-auth-primary" id="signup-submit-btn">
@@ -76,13 +80,39 @@
       const params = new URLSearchParams(window.location.search);
       const ref = params.get('ref');
       const loginLink = document.getElementById('login-link');
+      const promoInput = document.getElementById('signup-promo-code');
+      const promoHint = document.getElementById('promo-code-hint');
 
       if (ref) {
         document.getElementById('referral-banner').style.display = 'flex';
         document.getElementById('referral-banner-code').textContent = ref.toUpperCase();
         // carry the ref code through to the login page too, in case they already have an account
         loginLink.href = `login.html?ref=${encodeURIComponent(ref)}`;
+        promoInput.value = ref.toUpperCase();
       }
+
+      promoInput.addEventListener('input', () => {
+        promoInput.value = promoInput.value.toUpperCase();
+        promoHint.textContent = '';
+      });
+
+      promoInput.addEventListener('blur', async () => {
+        const code = promoInput.value.trim();
+        if (!code) { promoHint.textContent = ''; return; }
+        try {
+          const client = window.getSupabaseClient();
+          const { data: isValid } = await client.rpc('validate_referral_code', { p_code: code });
+          if (isValid) {
+            promoHint.style.color = '#00b894';
+            promoHint.textContent = '✓ Valid code applied';
+          } else {
+            promoHint.style.color = '#ff7675';
+            promoHint.textContent = "This code wasn't found — you can still sign up without it.";
+          }
+        } catch (e) {
+          // Validation is a nice-to-have; never block signup over it.
+        }
+      });
 
       document.getElementById('signup-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -94,6 +124,7 @@
         const phone = document.getElementById('signup-phone').value.trim();
         const email = document.getElementById('signup-email').value.trim();
         const password = document.getElementById('signup-password').value;
+        const promoCode = promoInput.value.trim() || null;
 
         if (!name || !phone || !email || password.length < 6) {
           errorEl.textContent = 'Please fill in every field correctly.';
@@ -112,7 +143,7 @@
               data: {
                 full_name: name,
                 phone_number: phone,
-                referral_code_used: ref || null
+                referral_code_used: promoCode
               }
             }
           });

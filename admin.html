@@ -703,6 +703,9 @@
       <button type="button" class="admin-tab-btn" data-tab="withdrawals">
         <i class="fa-solid fa-money-bill-transfer"></i> Withdrawals <span class="tab-dot" id="tab-dot-withdrawals"></span>
       </button>
+      <button type="button" class="admin-tab-btn" data-tab="milestones">
+        <i class="fa-solid fa-crown"></i> Milestones <span class="tab-dot" id="tab-dot-milestones"></span>
+      </button>
       <button type="button" class="admin-tab-btn" data-tab="settings">
         <i class="fa-solid fa-sliders"></i> Settings
       </button>
@@ -801,6 +804,31 @@
           <div id="withdrawal-history-list" class="winners-list" style="margin-top:8px;"></div>
           <div id="withdrawal-history-empty" class="empty-state" style="display:none;">
             <i class="fa-solid fa-inbox"></i>No withdrawal history yet.
+          </div>
+        </section>
+      </div>
+
+      <!-- CREATOR MILESTONE CLAIMS -->
+      <div class="admin-tab-page" data-tab="milestones">
+        <section class="admin-section">
+          <h3 class="admin-section-title">
+            <i class="fa-solid fa-crown"></i> Pending Milestone Claims
+            <span id="milestone-count-badge" class="count-badge" style="display:none;"></span>
+          </h3>
+          <p style="font-size:11px; color:var(--faint); margin:2px 0 10px;">
+            Each claim represents a creator crossing another 1,000 active referrals in their current 30-day cycle.
+          </p>
+          <div id="milestones-list" class="withdrawals-list"></div>
+          <div id="milestones-empty" class="empty-state" style="display:none;">
+            <i class="fa-solid fa-champagne-glasses"></i>No pending milestone claims right now.
+          </div>
+        </section>
+
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Decisions</h3>
+          <div id="milestone-history-list" class="winners-list" style="margin-top:8px;"></div>
+          <div id="milestone-history-empty" class="empty-state" style="display:none;">
+            <i class="fa-solid fa-inbox"></i>No reviewed claims yet.
           </div>
         </section>
       </div>
@@ -996,6 +1024,7 @@
             pages.forEach(p => p.classList.toggle('active', p.dataset.tab === target));
             if (target === 'activity') document.getElementById('tab-dot-activity').style.display = 'none';
             if (target === 'withdrawals') document.getElementById('tab-dot-withdrawals').style.display = 'none';
+            if (target === 'milestones') document.getElementById('tab-dot-milestones').style.display = 'none';
           });
         });
       }
@@ -1076,6 +1105,8 @@
         loadConfig(client);
         loadWithdrawals(client);
         loadWithdrawalHistory(client);
+        loadMilestones(client);
+        loadMilestoneHistory(client);
         loadTiers(client);
         loadUsers(client, '');
         wireDrawModal(client);
@@ -2343,6 +2374,126 @@
               loadWithdrawalHistory(client);
             } catch (err) {
               alert(err.message || 'Failed to reject withdrawal.');
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
+      async function loadMilestoneHistory(client) {
+        const listEl = document.getElementById('milestone-history-list');
+        const emptyEl = document.getElementById('milestone-history-empty');
+        const { data, error } = await client.rpc('admin_list_milestone_claims', { p_status: null });
+
+        if (error || !data) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          return;
+        }
+
+        const reviewed = data.filter(c => c.status !== 'pending');
+        if (reviewed.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          return;
+        }
+        emptyEl.style.display = 'none';
+
+        listEl.innerHTML = reviewed.map(c => `
+          <div class="winner-row">
+            <div class="winner-avatar" style="background:${c.status === 'approved' ? '#00b8941a' : '#ff47571a'}; color:${c.status === 'approved' ? '#00b894' : '#ff4757'};">
+              <i class="fa-solid ${c.status === 'approved' ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
+            </div>
+            <div class="winner-info">
+              <strong>${escapeHtml(c.creator_name)} &middot; Milestone ${c.milestone_tier}</strong>
+              <small>Cycle ${c.cycle_number} &middot; ${new Date(c.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</small>
+            </div>
+            <div class="winner-prize" style="color:${c.status === 'approved' ? '#00b894' : '#ff4757'};">
+              ${c.status === 'approved' ? '+' : ''}₦${Number(c.bonus_amount).toLocaleString('en-NG')}
+            </div>
+          </div>
+        `).join('');
+      }
+
+      async function loadMilestones(client) {
+        const listEl = document.getElementById('milestones-list');
+        listEl.innerHTML = skeletonHTML(2);
+
+        const { data, error } = await client.rpc('admin_list_milestone_claims', { p_status: 'pending' });
+        const emptyEl = document.getElementById('milestones-empty');
+        const badgeEl = document.getElementById('milestone-count-badge');
+        const dotEl = document.getElementById('tab-dot-milestones');
+
+        if (error) {
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          badgeEl.style.display = 'none';
+          dotEl.style.display = 'none';
+          return;
+        }
+
+        emptyEl.style.display = 'none';
+        badgeEl.style.display = 'inline-flex';
+        badgeEl.textContent = data.length;
+        dotEl.style.display = 'inline-block';
+
+        listEl.innerHTML = data.map(c => `
+          <div class="withdrawal-row" data-claim-id="${c.claim_id}">
+            <div class="withdrawal-info">
+              <strong>${escapeHtml(c.creator_name)}</strong>
+              <small>Cycle ${c.cycle_number} &middot; Milestone ${c.milestone_tier} &middot; ${c.active_count_at_claim.toLocaleString('en-NG')} active referrals</small>
+              <small>${new Date(c.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+            </div>
+            <div class="withdrawal-amount">₦${Number(c.bonus_amount).toLocaleString('en-NG')}</div>
+            <div class="withdrawal-actions">
+              <button class="btn-withdrawal-pay" data-action="approve">Approve</button>
+              <button class="btn-withdrawal-reject" data-action="reject">Reject</button>
+            </div>
+          </div>
+        `).join('');
+
+        listEl.querySelectorAll('.withdrawal-row').forEach(row => {
+          const claimId = row.dataset.claimId;
+
+          row.querySelector('[data-action="approve"]').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            if (!confirm("Approve this milestone and credit the bonus to the creator's Main Wallet? This cannot be undone.")) return;
+
+            btn.disabled = true;
+            try {
+              const { error } = await client.rpc('admin_approve_milestone_claim', { p_claim_id: claimId });
+              if (error) throw error;
+              row.remove();
+              loadMilestones(client);
+              loadMilestoneHistory(client);
+            } catch (err) {
+              alert(err.message || 'Failed to approve this claim.');
+              btn.disabled = false;
+            }
+          });
+
+          row.querySelector('[data-action="reject"]').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            const reason = prompt('Reason for rejecting this milestone claim (visible internally only):');
+            if (reason === null) return;
+
+            btn.disabled = true;
+            try {
+              const { error } = await client.rpc('admin_reject_milestone_claim', {
+                p_claim_id: claimId,
+                p_reason: reason.trim() || null,
+              });
+              if (error) throw error;
+              row.remove();
+              loadMilestones(client);
+              loadMilestoneHistory(client);
+            } catch (err) {
+              alert(err.message || 'Failed to reject this claim.');
               btn.disabled = false;
             }
           });

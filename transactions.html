@@ -165,6 +165,7 @@
         signup_bonus:       { icon: 'fa-gift',               color: '#f59f00', label: 'Signup Credit',      sign: '+' },
         withdrawal_reversal:{ icon: 'fa-rotate-left',        color: '#00b894', label: 'Withdrawal Refunded', sign: '+' },
         ticket_refund:      { icon: 'fa-ticket',             color: '#00b894', label: 'Ticket Refunded',    sign: '+' },
+        creator_milestone_bonus: { icon: 'fa-crown',          color: '#f59f00', label: 'Creator Milestone Bonus', sign: '+' },
       };
 
       function escapeHtml(str) {
@@ -268,7 +269,7 @@
           }
 
           const receiptEligible = t.status === 'completed' && (
-            t.type === 'ticket_purchase' || t.type === 'withdrawal' || t.type === 'win_payout'
+            t.type === 'ticket_purchase' || t.type === 'withdrawal' || t.type === 'win_payout' || t.type === 'creator_milestone_bonus'
           );
           const receiptBtn = receiptEligible
             ? `<button class="receipt-btn" data-txn-id="${t.id}" aria-label="View receipt"><i class="fa-solid fa-file-invoice"></i></button>`
