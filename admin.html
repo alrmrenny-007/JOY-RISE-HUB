@@ -827,7 +827,7 @@
             <span id="milestone-count-badge" class="count-badge" style="display:none;"></span>
           </h3>
           <p style="font-size:11px; color:var(--faint); margin:2px 0 10px;">
-            Each claim represents a creator crossing another 1,000 active referrals in their current 30-day cycle.
+            Each claim represents a creator permanently unlocking a new referral-count tier. Approving credits the bonus straight to their Main Wallet.
           </p>
           <div id="milestones-list" class="withdrawals-list"></div>
           <div id="milestones-empty" class="empty-state" style="display:none;">
@@ -2416,8 +2416,8 @@
               <i class="fa-solid ${c.status === 'approved' ? 'fa-circle-check' : 'fa-circle-xmark'}"></i>
             </div>
             <div class="winner-info">
-              <strong>${escapeHtml(c.creator_name)} &middot; Milestone ${c.milestone_tier}</strong>
-              <small>Cycle ${c.cycle_number} &middot; ${new Date(c.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</small>
+              <strong>${escapeHtml(c.creator_name)} &middot; ${c.threshold.toLocaleString('en-NG')} referrals</strong>
+              <small>${new Date(c.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}</small>
             </div>
             <div class="winner-prize" style="color:${c.status === 'approved' ? '#00b894' : '#ff4757'};">
               ${c.status === 'approved' ? '+' : ''}₦${Number(c.bonus_amount).toLocaleString('en-NG')}
@@ -2457,7 +2457,7 @@
           <div class="withdrawal-row" data-claim-id="${c.claim_id}">
             <div class="withdrawal-info">
               <strong>${escapeHtml(c.creator_name)}</strong>
-              <small>Cycle ${c.cycle_number} &middot; Milestone ${c.milestone_tier} &middot; ${c.active_count_at_claim.toLocaleString('en-NG')} active referrals</small>
+              <small>${c.threshold.toLocaleString('en-NG')}-referral tier &middot; had ${c.active_count_at_claim.toLocaleString('en-NG')} active referrals when flagged</small>
               <small>${new Date(c.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
             </div>
             <div class="withdrawal-amount">₦${Number(c.bonus_amount).toLocaleString('en-NG')}</div>

@@ -59,10 +59,6 @@
     }
     .creator-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .creator-card-head h3 { font-size: 14px; font-weight: 800; }
-    .creator-cycle-pill {
-      font-size: 10.5px; font-weight: 700; background: rgba(255,255,255,0.15);
-      padding: 4px 10px; border-radius: 20px;
-    }
     .creator-progress-track {
       width: 100%; height: 10px; background: rgba(255,255,255,0.15);
       border-radius: 20px; overflow: hidden; margin-bottom: 8px;
@@ -72,21 +68,30 @@
       border-radius: 20px; transition: width 0.6s cubic-bezier(0.22,1,0.36,1);
     }
     .creator-progress-label { font-size: 11.5px; opacity: 0.85; margin-bottom: 14px; }
-    .creator-milestone-note {
-      font-size: 11px; opacity: 0.8; line-height: 1.5; background: rgba(255,255,255,0.08);
-      padding: 10px 12px; border-radius: 12px;
+
+    .creator-tier-ladder { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+    .creator-tier-row {
+      display: flex; align-items: center; gap: 10px; font-size: 12px;
+      background: rgba(255,255,255,0.06); padding: 10px 12px; border-radius: 12px;
     }
-    .creator-claims-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-    .creator-claim-row {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 11.5px; background: rgba(255,255,255,0.08); padding: 8px 10px; border-radius: 10px;
+    .creator-tier-row.unlocked { background: rgba(0,184,148,0.15); }
+    .creator-tier-icon {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; font-size: 11px;
+      background: rgba(255,255,255,0.12);
     }
-    .creator-claim-status {
-      font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 20px; text-transform: uppercase;
+    .creator-tier-row.unlocked .creator-tier-icon { background: #00b894; color: #fff; }
+    .creator-tier-row .creator-tier-info { flex: 1; }
+    .creator-tier-row .creator-tier-info strong { display: block; font-size: 12.5px; }
+    .creator-tier-row .creator-tier-info small { opacity: 0.75; font-size: 10.5px; }
+    .creator-tier-status {
+      font-size: 9.5px; font-weight: 800; padding: 3px 9px; border-radius: 20px; text-transform: uppercase;
+      white-space: nowrap;
     }
-    .creator-claim-status.pending  { background: rgba(253,203,110,0.25); color: #fdcb6e; }
-    .creator-claim-status.approved { background: rgba(0,184,148,0.25); color: #55efc4; }
-    .creator-claim-status.rejected { background: rgba(255,118,117,0.25); color: #ff9f9b; }
+    .creator-tier-status.locked    { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); }
+    .creator-tier-status.pending   { background: rgba(253,203,110,0.25); color: #fdcb6e; }
+    .creator-tier-status.approved  { background: rgba(0,184,148,0.3);   color: #55efc4; }
+    .creator-tier-status.rejected  { background: rgba(255,118,117,0.25); color: #ff9f9b; }
 
     .promo-code-box {
       background: #ffffff; border-radius: 16px; padding: 16px; margin-bottom: 16px;
@@ -95,10 +100,15 @@
     .promo-code-box h3 { font-size: 13px; font-weight: 800; margin-bottom: 4px; }
     .promo-code-box p { font-size: 11.5px; color: #9089b0; margin-bottom: 12px; line-height: 1.5; }
     .promo-code-current {
-      display: flex; align-items: center; justify-content: space-between;
-      background: #f3f0ff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      background: #f3f0ff; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;
     }
-    .promo-code-current strong { font-size: 16px; letter-spacing: 0.05em; color: #6c5ce7; }
+    .promo-code-current strong { font-size: 17px; letter-spacing: 0.06em; color: #6c5ce7; }
+    .promo-code-copy-btn {
+      background: #6c5ce7; color: #fff; border: none; width: 34px; height: 34px;
+      border-radius: 10px; flex-shrink: 0; cursor: pointer; font-size: 13px;
+    }
+    .promo-code-copy-btn.copied { background: #00b894; }
     .promo-code-form { display: flex; gap: 8px; }
     .promo-code-form input { flex: 1; text-transform: uppercase; }
     .promo-code-form button { white-space: nowrap; }
@@ -149,24 +159,18 @@
       <div class="creator-card">
         <div class="creator-card-head">
           <h3>🚀 Creator Milestone</h3>
-          <span class="creator-cycle-pill" id="creator-cycle-pill">Cycle —</span>
         </div>
         <div class="creator-progress-track">
           <div class="creator-progress-fill" id="creator-progress-fill" style="width:0%;"></div>
         </div>
         <div class="creator-progress-label" id="creator-progress-label">Loading your progress...</div>
-        <div class="creator-milestone-note">
-          Refer 1,000 active users (signed up this cycle &amp; spent at least ₦500) to earn a
-          ₦100,000 cash bonus — every extra 1,000 in the same cycle earns another ₦100,000.
-          Approved bonuses land in your Main Wallet.
-        </div>
-        <div class="creator-claims-list" id="creator-claims-list"></div>
+        <div class="creator-tier-ladder" id="creator-tier-ladder"></div>
       </div>
 
       <!-- CUSTOM PROMO CODE -->
       <div class="promo-code-box">
         <h3>Your Promo Code</h3>
-        <p>Share a custom code instead of a link — people can type it in at signup.</p>
+        <p>Share a custom code instead of a link — people can type it in at signup. No one else can use the same code.</p>
         <div id="promo-code-current-wrap"></div>
         <div class="promo-code-form">
           <input type="text" class="auth-input" id="promo-code-input" placeholder="e.g. FUNNY" maxlength="15" />
@@ -295,6 +299,7 @@
         loadReferralsList(client);
         loadLeaderboard(client);
         loadCreatorProgress(client);
+        loadPromoCode(client);
       }
 
       function skeletonRows(count) {
@@ -373,28 +378,51 @@
 
         if (error || !row) {
           document.getElementById('creator-progress-label').textContent = "Couldn't load your progress right now.";
-          renderPromoCodeBox(null);
           return;
         }
 
-        document.getElementById('creator-cycle-pill').textContent =
-          `Cycle ${row.cycle_number} · ${row.days_left} day${row.days_left === 1 ? '' : 's'} left`;
-
-        const pct = Math.min(100, Math.round((row.active_count / row.next_milestone) * 100));
+        const tiers = row.tiers || [];
+        const nextThreshold = row.next_threshold;
+        const pct = nextThreshold
+          ? Math.min(100, Math.round((row.active_count / nextThreshold) * 100))
+          : 100;
         document.getElementById('creator-progress-fill').style.width = `${pct}%`;
-        document.getElementById('creator-progress-label').textContent =
-          `${row.active_count.toLocaleString('en-NG')} / ${row.next_milestone.toLocaleString('en-NG')} active referrals this cycle`;
+        document.getElementById('creator-progress-label').textContent = nextThreshold
+          ? `${row.active_count.toLocaleString('en-NG')} / ${nextThreshold.toLocaleString('en-NG')} active referrals toward your next unlock`
+          : `${row.active_count.toLocaleString('en-NG')} active referrals — every tier unlocked! 🎉`;
 
-        const claims = row.claims_this_cycle || [];
-        const claimsEl = document.getElementById('creator-claims-list');
-        claimsEl.innerHTML = claims.length === 0 ? '' : claims.map(c => `
-          <div class="creator-claim-row">
-            <span>Milestone ${c.tier} &middot; ₦${Number(c.bonus_amount).toLocaleString('en-NG')}</span>
-            <span class="creator-claim-status ${c.status}">${c.status}</span>
-          </div>
-        `).join('');
+        const ladderEl = document.getElementById('creator-tier-ladder');
+        ladderEl.innerHTML = tiers.map(t => {
+          const unlocked = t.status !== 'locked';
+          const icon = t.status === 'approved' ? 'fa-check' : t.status === 'locked' ? 'fa-lock' : 'fa-hourglass-half';
+          return `
+            <div class="creator-tier-row ${unlocked ? 'unlocked' : ''}">
+              <div class="creator-tier-icon"><i class="fa-solid ${icon}"></i></div>
+              <div class="creator-tier-info">
+                <strong>${t.threshold.toLocaleString('en-NG')} active referrals</strong>
+                <small>₦${Number(t.bonus_amount).toLocaleString('en-NG')} bonus</small>
+              </div>
+              <span class="creator-tier-status ${t.status}">${t.status}</span>
+            </div>
+          `;
+        }).join('');
 
-        renderPromoCodeBox(row.custom_referral_code);
+        // Promo code display is fetched separately (see loadPromoCode)
+        // so a hiccup in the progress RPC never wipes out the code
+        // someone already saved.
+      }
+
+      async function loadPromoCode(client) {
+        const { data: { user } } = await client.auth.getUser();
+        if (!user) return;
+        const { data, error } = await client
+          .from('profiles')
+          .select('custom_referral_code')
+          .eq('id', user.id)
+          .single();
+
+        if (error) return;
+        renderPromoCodeBox(data?.custom_referral_code || null);
       }
 
       function renderPromoCodeBox(currentCode) {
@@ -404,10 +432,27 @@
           wrap.innerHTML = `
             <div class="promo-code-current">
               <strong>${escapeHtml(currentCode)}</strong>
-              <i class="fa-solid fa-circle-check" style="color:#00b894;"></i>
+              <button class="promo-code-copy-btn" id="promo-code-copy-btn" title="Copy code">
+                <i class="fa-regular fa-copy"></i>
+              </button>
             </div>
           `;
           input.placeholder = 'Change your code...';
+          document.getElementById('promo-code-copy-btn').addEventListener('click', async (e) => {
+            const btn = e.currentTarget;
+            try {
+              await navigator.clipboard.writeText(currentCode);
+            } catch (err) {
+              window.prompt('Copy your promo code:', currentCode);
+              return;
+            }
+            btn.classList.add('copied');
+            btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+            setTimeout(() => {
+              btn.classList.remove('copied');
+              btn.innerHTML = '<i class="fa-regular fa-copy"></i>';
+            }, 1400);
+          });
         } else {
           wrap.innerHTML = '';
           input.placeholder = 'e.g. FUNNY';
@@ -429,6 +474,8 @@
         feedback.style.color = '#9089b0';
         feedback.textContent = 'Saving...';
 
+        // set_custom_referral_code() itself guarantees uniqueness against
+        // every other user's code (auto-generated or custom) before saving.
         const { error } = await client.rpc('set_custom_referral_code', { p_code: code });
 
         if (error) {
@@ -440,7 +487,7 @@
         feedback.style.color = '#00b894';
         feedback.textContent = 'Promo code saved!';
         input.value = '';
-        loadCreatorProgress(client);
+        loadPromoCode(client);
       });
 
       async function loadReferralsList(client) {
