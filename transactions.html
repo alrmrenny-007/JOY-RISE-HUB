@@ -310,6 +310,7 @@
       }
 
       let winDetailsMap = new Map();
+      let myBankDetails = null;
 
       async function loadTransactions() {
         const client = window.getSupabaseClient();
@@ -323,7 +324,7 @@
 
         document.getElementById('txn-list').innerHTML = skeletonRows(6);
 
-        const [txnsResult, winsResult] = await Promise.all([
+        const [txnsResult, winsResult, bankResult] = await Promise.all([
           client
             .from('transactions')
             .select('id, type, wallet, amount, status, created_at, payment_reference, rejection_reason, tickets(ticket_number)')
@@ -331,7 +332,16 @@
             .order('created_at', { ascending: false })
             .limit(100),
           client.rpc('get_my_win_transactions'),
+          client
+            .from('profiles')
+            .select('bank_name, account_number, account_name')
+            .eq('id', user.id)
+            .single(),
         ]);
+
+        if (!bankResult.error && bankResult.data) {
+          myBankDetails = bankResult.data;
+        }
 
         if (txnsResult.error) {
           console.error('Error loading transactions:', txnsResult.error.message);
@@ -360,6 +370,26 @@
         });
       }
 
+      // Keeps the first 3 and last 3 digits visible, masks the rest —
+      // enough to confirm the right account without showing it in full.
+      function maskAccountNumber(num) {
+        const s = String(num || '').replace(/\s+/g, '');
+        if (s.length <= 6) return s;
+        return s.slice(0, 3) + '*'.repeat(s.length - 6) + s.slice(-3);
+      }
+
+      // "JOHN ADEBAYO OKONKWO" -> "John A. Okonkwo"
+      function shortenAccountName(name) {
+        if (!name) return '';
+        const titleCase = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+        const parts = String(name).trim().split(/\s+/).filter(Boolean);
+        if (parts.length <= 2) return parts.map(titleCase).join(' ');
+        const first = titleCase(parts[0]);
+        const last = titleCase(parts[parts.length - 1]);
+        const middle = parts.slice(1, -1).map((p) => p.charAt(0).toUpperCase() + '.').join(' ');
+        return `${first} ${middle} ${last}`;
+      }
+
       function buildReceiptHTML(t) {
         const meta = TYPE_META[t.type] || { label: t.type, sign: '' };
         const amountStr = `${meta.sign}&#8358;${Number(t.amount).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`;
@@ -382,6 +412,11 @@
           title = 'Withdrawal Payout';
           refCode = t.payment_reference || refCode;
           rows.push(['Reference', escapeHtml(refCode)]);
+          if (myBankDetails && myBankDetails.account_number && myBankDetails.bank_name) {
+            rows.push(['Recipient', escapeHtml(shortenAccountName(myBankDetails.account_name))]);
+            rows.push(['Bank', escapeHtml(myBankDetails.bank_name)]);
+            rows.push(['Account number', maskAccountNumber(myBankDetails.account_number)]);
+          }
           rows.push(['Wallet', walletLabel(t.wallet)]);
         } else if (t.type === 'win_payout') {
           title = 'Draw Winnings Payout';
