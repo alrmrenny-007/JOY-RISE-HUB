@@ -24,6 +24,53 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    /* ---------- First-time walkthrough ---------- */
+    #onboarding-overlay {
+      position: fixed; inset: 0; z-index: 3000; opacity: 0;
+      pointer-events: none; transition: opacity 0.25s ease;
+    }
+    #onboarding-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .onboarding-spotlight {
+      position: absolute; border-radius: 18px; pointer-events: none;
+      box-shadow: 0 0 0 9999px rgba(10, 8, 20, 0.72);
+      transition: top 0.35s cubic-bezier(0.22,1,0.36,1), left 0.35s cubic-bezier(0.22,1,0.36,1),
+                  width 0.35s cubic-bezier(0.22,1,0.36,1), height 0.35s cubic-bezier(0.22,1,0.36,1);
+    }
+
+    .onboarding-tooltip {
+      position: absolute; width: 260px; max-width: calc(100vw - 32px);
+      background: #ffffff; border-radius: 16px; padding: 16px;
+      box-shadow: 0 14px 34px rgba(0,0,0,0.28);
+      transition: top 0.35s ease, left 0.35s ease;
+    }
+    .onboarding-tooltip h4 { font-size: 14px; font-weight: 800; color: #1e1e24; margin-bottom: 6px; }
+    .onboarding-tooltip p { font-size: 12px; color: #636e72; line-height: 1.5; margin-bottom: 14px; }
+
+    .onboarding-dots { display: flex; gap: 5px; margin-bottom: 14px; }
+    .onboarding-dot { width: 6px; height: 6px; border-radius: 50%; background: #e4dff5; transition: all 0.2s ease; }
+    .onboarding-dot.active { background: #6c5ce7; width: 16px; border-radius: 4px; }
+
+    .onboarding-actions { display: flex; justify-content: space-between; align-items: center; }
+    .onboarding-skip {
+      font-size: 12px; color: #9089b0; font-weight: 700; background: none;
+      border: none; cursor: pointer; padding: 6px 2px;
+    }
+    .onboarding-next {
+      background: #6c5ce7; color: #fff; border: none; padding: 9px 18px;
+      border-radius: 10px; font-size: 12.5px; font-weight: 800; cursor: pointer;
+    }
+    .onboarding-next:active { transform: scale(0.96); }
+
+    html[data-theme="dark"] .onboarding-tooltip { background: #1A1428; }
+    html[data-theme="dark"] .onboarding-tooltip h4 { color: #F3F0FF; }
+    html[data-theme="dark"] .onboarding-tooltip p { color: #9C93B8; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .onboarding-spotlight, .onboarding-tooltip, #onboarding-overlay { transition: none; }
+    }
+  </style>
 </head>
 <body>
 
@@ -75,6 +122,7 @@
       <a href="transactions.html" class="dropdown-panel-item"><i class="fa-solid fa-receipt"></i> Transactions</a>
       <a href="winners.html" class="dropdown-panel-item"><i class="fa-solid fa-trophy"></i> Winners</a>
       <a href="help.html" class="dropdown-panel-item"><i class="fa-regular fa-circle-question"></i> Help & Support</a>
+      <button class="dropdown-panel-item" id="menu-tour-btn"><i class="fa-solid fa-compass"></i> Take the Tour</button>
       <a href="terms.html" class="dropdown-panel-item"><i class="fa-solid fa-file-contract"></i> Terms & Privacy</a>
       <a href="admin.html" class="dropdown-panel-item" id="menu-admin-link" style="display:none;"><i class="fa-solid fa-user-shield"></i> Admin Panel</a>
       <div class="dropdown-panel-divider"></div>
@@ -341,6 +389,20 @@
   <div class="toast" id="toast">
     <i class="fa-solid fa-circle-check toast-icon" id="toast-icon"></i>
     <span id="toast-message"></span>
+  </div>
+
+  <!-- FIRST-TIME WALKTHROUGH -->
+  <div id="onboarding-overlay">
+    <div class="onboarding-spotlight" id="onboarding-spotlight"></div>
+    <div class="onboarding-tooltip" id="onboarding-tooltip">
+      <h4 id="onboarding-title"></h4>
+      <p id="onboarding-text"></p>
+      <div class="onboarding-dots" id="onboarding-dots"></div>
+      <div class="onboarding-actions">
+        <button class="onboarding-skip" id="onboarding-skip-btn">Skip</button>
+        <button class="onboarding-next" id="onboarding-next-btn">Next</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

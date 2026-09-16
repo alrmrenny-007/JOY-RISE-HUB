@@ -1058,6 +1058,144 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
   }
+
+  // ---------- First-time walkthrough ----------
+  const ONBOARDING_KEY = "joyrise_onboarding_seen";
+  const onboardingSteps = [
+    {
+      selector: ".wallets-grid",
+      title: "Your Wallets",
+      text: "Main Wallet is for buying tickets. Referral Wallet fills up as your invited friends buy tickets.",
+    },
+    {
+      selector: ".referral-progress-card",
+      title: "Track Your Progress",
+      text: "Watch this bar fill up — hit the threshold to unlock withdrawals from your Referral Wallet.",
+    },
+    {
+      selector: ".quick-actions-grid",
+      title: "Quick Actions",
+      text: "Buy tickets, check your referrals, browse winners, and view your transactions — all one tap away.",
+    },
+    {
+      selector: ".telegram-banner",
+      title: "Live Draws",
+      text: "Draws happen right here. Tap in anytime to watch the numbers get picked live.",
+    },
+    {
+      selector: "#fab-deposit",
+      title: "Add Funds Anytime",
+      text: "Tap the + button whenever you want to top up your Main Wallet.",
+    },
+    {
+      selector: ".bottom-navbar",
+      title: "Get Around Fast",
+      text: "Use this bar to jump between Home, Tickets, Wallet, and Help whenever you need to.",
+    },
+  ];
+
+  let onboardingIndex = 0;
+  const onboardingOverlay = document.getElementById("onboarding-overlay");
+  const onboardingSpotlight = document.getElementById("onboarding-spotlight");
+  const onboardingTooltip = document.getElementById("onboarding-tooltip");
+  const onboardingDots = document.getElementById("onboarding-dots");
+  const onboardingTitle = document.getElementById("onboarding-title");
+  const onboardingText = document.getElementById("onboarding-text");
+  const onboardingNextBtn = document.getElementById("onboarding-next-btn");
+  const onboardingSkipBtn = document.getElementById("onboarding-skip-btn");
+  const menuTourBtn = document.getElementById("menu-tour-btn");
+
+  function renderOnboardingDots() {
+    if (!onboardingDots) return;
+    onboardingDots.innerHTML = onboardingSteps
+      .map((_, i) => `<span class="onboarding-dot ${i === onboardingIndex ? "active" : ""}"></span>`)
+      .join("");
+  }
+
+  function positionOnboardingStep() {
+    // Skip past any step whose target isn't on the page for this user
+    // (e.g. layout differences) instead of getting stuck.
+    let step = onboardingSteps[onboardingIndex];
+    let target = step ? document.querySelector(step.selector) : null;
+    while (step && !target && onboardingIndex < onboardingSteps.length - 1) {
+      onboardingIndex++;
+      step = onboardingSteps[onboardingIndex];
+      target = step ? document.querySelector(step.selector) : null;
+    }
+    if (!target) {
+      endOnboarding();
+      return;
+    }
+
+    target.scrollIntoView({ block: "center", behavior: "smooth" });
+
+    // Give the smooth scroll a moment to settle before measuring.
+    setTimeout(() => {
+      const rect = target.getBoundingClientRect();
+      const pad = 8;
+      onboardingSpotlight.style.top = `${rect.top - pad}px`;
+      onboardingSpotlight.style.left = `${rect.left - pad}px`;
+      onboardingSpotlight.style.width = `${rect.width + pad * 2}px`;
+      onboardingSpotlight.style.height = `${rect.height + pad * 2}px`;
+
+      const tooltipWidth = 260;
+      const tooltipEstHeight = 150;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      let top = spaceBelow > tooltipEstHeight + 24
+        ? rect.bottom + pad + 12
+        : rect.top - pad - tooltipEstHeight - 12;
+      top = Math.max(12, Math.min(top, window.innerHeight - tooltipEstHeight - 12));
+
+      let left = rect.left;
+      left = Math.max(12, Math.min(left, window.innerWidth - tooltipWidth - 12));
+
+      onboardingTooltip.style.top = `${top}px`;
+      onboardingTooltip.style.left = `${left}px`;
+
+      onboardingTitle.textContent = step.title;
+      onboardingText.textContent = step.text;
+      onboardingNextBtn.textContent = onboardingIndex === onboardingSteps.length - 1 ? "Let's go!" : "Next";
+      renderOnboardingDots();
+    }, 220);
+  }
+
+  function startOnboarding() {
+    onboardingIndex = 0;
+    onboardingOverlay.classList.add("open");
+    positionOnboardingStep();
+  }
+
+  function endOnboarding() {
+    onboardingOverlay.classList.remove("open");
+    try { localStorage.setItem(ONBOARDING_KEY, "1"); } catch (e) {}
+  }
+
+  onboardingNextBtn?.addEventListener("click", () => {
+    if (onboardingIndex >= onboardingSteps.length - 1) {
+      endOnboarding();
+      return;
+    }
+    onboardingIndex++;
+    positionOnboardingStep();
+  });
+
+  onboardingSkipBtn?.addEventListener("click", endOnboarding);
+
+  window.addEventListener("resize", () => {
+    if (onboardingOverlay.classList.contains("open")) positionOnboardingStep();
+  });
+
+  menuTourBtn?.addEventListener("click", () => {
+    menuPanel?.classList.remove("open");
+    setTimeout(startOnboarding, 200);
+  });
+
+  // Only auto-start for genuinely first-time visitors on this browser.
+  try {
+    if (!localStorage.getItem(ONBOARDING_KEY)) {
+      setTimeout(startOnboarding, 1200);
+    }
+  } catch (e) {}
 });
 
 })();
