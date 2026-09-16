@@ -206,6 +206,17 @@
       animation: fadeUpIn 0.3s ease both;
     }
 
+    .admin-shell .user-id-copy {
+      display: flex; align-items: center; gap: 5px;
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      color: var(--faint); cursor: pointer; margin-top: 2px;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      max-width: 100%; padding: 2px 0;
+    }
+    .admin-shell .user-id-copy:hover { color: var(--brand-glow); }
+    .admin-shell .user-id-copy.copied { color: var(--money, #00b894); }
+    .admin-shell .user-id-copy i { flex-shrink: 0; }
+
     .support-banner {
       display: flex; align-items: center; gap: 10px;
       background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
@@ -2564,6 +2575,9 @@
               <div class="winner-info">
                 <strong>${escapeHtml(u.full_name || 'Unnamed')}</strong>
                 <small>${escapeHtml(u.phone_number || 'No phone')} &middot; ${u.total_referrals} referrals (${u.active_referrals} active)</small>
+                <small class="user-id-copy" data-copy-id="${u.id}" title="Tap to copy full ID">
+                  <i class="fa-regular fa-copy"></i> ${u.id}
+                </small>
               </div>
               <div class="winner-prize">₦${Number(u.winnings_balance).toLocaleString()}</div>
               <i class="fa-solid fa-chevron-down user-row-chevron" style="color:var(--faint); font-size:11px; margin-left:6px;"></i>
@@ -2574,6 +2588,28 @@
 
         listEl.querySelectorAll('.user-row-toggle').forEach(row => {
           row.addEventListener('click', () => toggleUserHistory(client, row.dataset.userId));
+        });
+
+        listEl.querySelectorAll('.user-id-copy').forEach(el => {
+          el.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const id = el.dataset.copyId;
+            try {
+              await navigator.clipboard.writeText(id);
+            } catch (err) {
+              // Clipboard API can fail without a secure context — fall
+              // back to a manual selection prompt so it's still usable.
+              window.prompt('Copy this User ID:', id);
+              return;
+            }
+            const original = el.innerHTML;
+            el.classList.add('copied');
+            el.innerHTML = `<i class="fa-solid fa-check"></i> Copied!`;
+            setTimeout(() => {
+              el.classList.remove('copied');
+              el.innerHTML = original;
+            }, 1400);
+          });
         });
       }
 
