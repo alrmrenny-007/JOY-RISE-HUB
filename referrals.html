@@ -176,6 +176,9 @@
           <input type="text" class="auth-input" id="promo-code-input" placeholder="e.g. FUNNY" maxlength="15" />
           <button class="btn-auth-primary" id="promo-code-save-btn" style="margin-top:0;">Save</button>
         </div>
+        <small style="display:block; margin-top:8px; font-size:10.5px; color:#9089b0;">
+          <i class="fa-solid fa-lock" style="margin-right:3px;"></i>You can only change this once every 30 days, so make sure it's right before saving.
+        </small>
         <div class="promo-code-feedback" id="promo-code-feedback"></div>
       </div>
 
@@ -470,6 +473,11 @@
           feedback.textContent = 'Enter a code first.';
           return;
         }
+
+        const confirmed = window.confirm(
+          `Set "${code}" as your promo code?\n\nYou won't be able to change it again for 30 days.`
+        );
+        if (!confirmed) return;
 
         feedback.style.color = '#9089b0';
         feedback.textContent = 'Saving...';
