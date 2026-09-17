@@ -217,6 +217,50 @@
     .admin-shell .user-id-copy.copied { color: var(--money, #00b894); }
     .admin-shell .user-id-copy i { flex-shrink: 0; }
 
+    /* ---------- Suspension & admin management ---------- */
+    .suspend-badge {
+      display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 20px;
+      background: rgba(255,71,87,0.18); color: #ff4757; margin-top: 3px;
+    }
+    .admin-badge {
+      display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 20px;
+      background: rgba(108,92,231,0.2); color: var(--brand-glow); margin-top: 3px; margin-left: 5px;
+    }
+    .master-badge { background: rgba(253,203,110,0.2); color: #fdcb6e; }
+
+    .admin-shell .user-row-actions {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 12px;
+      border-top: 1px solid var(--line);
+    }
+    .admin-shell .user-row-actions button {
+      font-size: 10.5px; font-weight: 700; padding: 6px 10px; border-radius: 8px;
+      border: none; cursor: pointer;
+    }
+    .btn-suspend { background: rgba(255,71,87,0.15); color: #ff4757; }
+    .btn-unsuspend { background: rgba(0,184,148,0.15); color: #00b894; }
+    .btn-make-admin { background: rgba(108,92,231,0.15); color: var(--brand-glow); }
+    .btn-revoke-admin { background: rgba(255,71,87,0.15); color: #ff4757; }
+
+    .admin-permissions-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .admin-permission-chip {
+      display: flex; align-items: center; gap: 7px; font-size: 11.5px;
+      background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px;
+      padding: 9px 10px; cursor: pointer;
+    }
+    .admin-permission-chip input { width: 15px; height: 15px; accent-color: var(--brand); }
+
+    .admin-card-row {
+      background: var(--surface-2); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px;
+    }
+    .admin-card-row-head {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+    }
+    .admin-card-row-head strong { font-size: 12.5px; }
+
     .support-banner {
       display: flex; align-items: center; gap: 10px;
       background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
@@ -726,6 +770,9 @@
       <button type="button" class="admin-tab-btn" data-tab="users">
         <i class="fa-solid fa-users"></i> Users
       </button>
+      <button type="button" class="admin-tab-btn" data-tab="admins" id="admins-tab-btn" style="display:none;">
+        <i class="fa-solid fa-user-shield"></i> Admins
+      </button>
     </nav>
 
     <main class="admin-main" id="admin-main" style="display:none;">
@@ -927,6 +974,25 @@
         </section>
       </div>
 
+      <!-- ADMIN MANAGEMENT (master admin only) -->
+      <div class="admin-tab-page" data-tab="admins">
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-user-plus"></i> Promote a User to Admin</h3>
+          <p style="font-size:11px; color:var(--faint); margin:2px 0 10px;">
+            Paste a User ID from the Users tab, pick what they can access, then confirm.
+          </p>
+          <input type="text" class="auth-input" id="promote-user-id" placeholder="User ID" style="margin-bottom:10px;" />
+          <div class="admin-permissions-grid" id="promote-permissions-grid"></div>
+          <button class="btn-auth-primary" id="promote-user-btn" style="margin-top:12px;">Make Admin</button>
+          <div id="promote-feedback" style="margin-top:8px; font-size:12px; font-weight:600;"></div>
+        </section>
+
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-shield-halved"></i> Current Admins</h3>
+          <div id="admins-list" class="winners-list" style="margin-top:8px;"></div>
+        </section>
+      </div>
+
     </main>
 
     <div id="admin-denied" style="display:none;">
@@ -1112,6 +1178,7 @@
 
         document.getElementById('admin-main').style.display = 'block';
         wireTabs();
+        loadMyPermissions(client);
         loadAnalytics(client);
         loadConfig(client);
         loadWithdrawals(client);
@@ -1125,12 +1192,47 @@
         wireTodaySlots(client);
         wireUserSearch(client);
         wireActivityFeed(client);
+        wirePromoteForm(client);
       }
 
       // Generic slot-aware draw confirmation modal. Call
       // openDrawModalForSlot(slot) from anywhere (e.g. a "Run Now"
       // button on a specific slot row) to open it scoped to that slot.
       let openDrawModalForSlot = null;
+      let myPermissions = { is_admin: false, is_master_admin: false, admin_permissions: [] };
+
+      const PERMISSION_KEYS = [
+        { key: 'activity',    label: 'Activity Feed' },
+        { key: 'withdrawals', label: 'Withdrawals' },
+        { key: 'milestones',  label: 'Milestones' },
+        { key: 'settings',    label: 'Settings' },
+        { key: 'tickets',     label: 'Tickets' },
+        { key: 'users',       label: 'Users' },
+      ];
+
+      async function loadMyPermissions(client) {
+        const { data, error } = await client.rpc('admin_get_my_permissions');
+        const row = Array.isArray(data) ? data[0] : data;
+        if (error || !row) return;
+
+        myPermissions = row;
+
+        // Master admins see everything; everyone else only sees the
+        // tabs they've been explicitly granted.
+        if (!row.is_master_admin) {
+          document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+            const tab = btn.dataset.tab;
+            if (tab !== 'admins' && !row.admin_permissions.includes(tab)) {
+              btn.style.display = 'none';
+            }
+          });
+        }
+
+        document.getElementById('admins-tab-btn').style.display = row.is_master_admin ? 'flex' : 'none';
+        if (row.is_master_admin) {
+          loadAdmins(client);
+        }
+      }
 
       // ---- Admin-panel ticket reel (same logic as live-draw.html) ----
       const ADMIN_REEL_CONFIG = {
@@ -2555,7 +2657,7 @@
         const listEl = document.getElementById('users-list');
         if (!search) listEl.innerHTML = skeletonHTML(4);
 
-        const { data, error } = await client.rpc('admin_list_users', { p_search: search || null });
+        const { data, error } = await client.rpc('admin_list_users_full', { p_search: search || null });
         if (error) {
           listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
           return;
@@ -2566,7 +2668,14 @@
           return;
         }
 
-        listEl.innerHTML = data.map(u => `
+        listEl.innerHTML = data.map(u => {
+          const badges = [
+            u.is_suspended ? `<span class="suspend-badge"><i class="fa-solid fa-ban"></i> Suspended</span>` : '',
+            u.is_master_admin ? `<span class="admin-badge master-badge"><i class="fa-solid fa-crown"></i> Master Admin</span>`
+              : u.is_admin ? `<span class="admin-badge"><i class="fa-solid fa-user-shield"></i> Admin</span>` : '',
+          ].join('');
+
+          return `
           <div class="user-row-wrap" data-user-id="${u.id}">
             <div class="winner-row user-row-toggle" data-user-id="${u.id}" style="cursor:pointer;">
               <div class="winner-avatar" style="background:rgba(108,92,231,0.15); color:var(--brand-glow);">
@@ -2578,16 +2687,18 @@
                 <small class="user-id-copy" data-copy-id="${u.id}" title="Tap to copy full ID">
                   <i class="fa-regular fa-copy"></i> ${u.id}
                 </small>
+                ${badges ? `<div>${badges}</div>` : ''}
               </div>
               <div class="winner-prize">₦${Number(u.winnings_balance).toLocaleString()}</div>
               <i class="fa-solid fa-chevron-down user-row-chevron" style="color:var(--faint); font-size:11px; margin-left:6px;"></i>
             </div>
-            <div class="user-history-panel" id="user-history-${u.id}" style="display:none;"></div>
+            <div class="user-history-panel" id="user-history-${u.id}" style="display:none;" data-loaded="false"></div>
           </div>
-        `).join('');
+        `;
+        }).join('');
 
         listEl.querySelectorAll('.user-row-toggle').forEach(row => {
-          row.addEventListener('click', () => toggleUserHistory(client, row.dataset.userId));
+          row.addEventListener('click', () => toggleUserHistory(client, row.dataset.userId, data));
         });
 
         listEl.querySelectorAll('.user-id-copy').forEach(el => {
@@ -2613,7 +2724,26 @@
         });
       }
 
-      async function toggleUserHistory(client, userId) {
+      function userActionsRowHTML(u) {
+        const canManageUsers = myPermissions.is_master_admin || myPermissions.admin_permissions.includes('users');
+        if (!canManageUsers && !myPermissions.is_master_admin) return '';
+        if (u.is_master_admin) return ''; // master admins can't be suspended or demoted from here
+
+        const buttons = [];
+        if (canManageUsers) {
+          buttons.push(u.is_suspended
+            ? `<button class="btn-unsuspend" data-action="unsuspend">Unsuspend</button>`
+            : `<button class="btn-suspend" data-action="suspend">Suspend</button>`);
+        }
+        if (myPermissions.is_master_admin) {
+          buttons.push(u.is_admin
+            ? `<button class="btn-revoke-admin" data-action="revoke-admin">Revoke Admin</button>`
+            : `<button class="btn-make-admin" data-action="make-admin">Make Admin</button>`);
+        }
+        return buttons.length ? `<div class="user-row-actions">${buttons.join('')}</div>` : '';
+      }
+
+      async function toggleUserHistory(client, userId, usersData) {
         const panel = document.getElementById(`user-history-${userId}`);
         const chevron = document.querySelector(`.user-row-toggle[data-user-id="${userId}"] .user-row-chevron`);
         const isOpen = panel.style.display !== 'none';
@@ -2626,19 +2756,26 @@
 
         panel.style.display = 'block';
         chevron.style.transform = 'rotate(180deg)';
-        panel.innerHTML = skeletonHTML(2);
+
+        const u = (usersData || []).find(x => x.id === userId);
+        const actionsHTML = u ? userActionsRowHTML(u) : '';
+
+        panel.innerHTML = actionsHTML + skeletonHTML(2);
+        wireUserActionButtons(client, panel, userId);
 
         const { data, error } = await client.rpc('admin_get_user_transactions', { p_user_id: userId, p_limit: 30 });
         if (error || !data) {
-          panel.innerHTML = `<p style="font-size:11.5px;color:var(--alert); padding:8px 4px;">${escapeHtml(error?.message || 'Failed to load history.')}</p>`;
+          panel.innerHTML = actionsHTML + `<p style="font-size:11.5px;color:var(--alert); padding:8px 4px;">${escapeHtml(error?.message || 'Failed to load history.')}</p>`;
+          wireUserActionButtons(client, panel, userId);
           return;
         }
         if (data.length === 0) {
-          panel.innerHTML = `<p style="font-size:11.5px;color:var(--faint); padding:8px 4px;">No transactions yet.</p>`;
+          panel.innerHTML = actionsHTML + `<p style="font-size:11.5px;color:var(--faint); padding:8px 4px;">No transactions yet.</p>`;
+          wireUserActionButtons(client, panel, userId);
           return;
         }
 
-        panel.innerHTML = data.map(t => {
+        panel.innerHTML = actionsHTML + data.map(t => {
           const isCredit = ['deposit', 'withdrawal_reversal', 'referral_bonus', 'signup_bonus', 'win_payout'].includes(t.type);
           const sign = isCredit ? '+' : '−';
           const color = isCredit ? 'var(--money)' : 'var(--alert)';
@@ -2656,6 +2793,58 @@
             </div>
           `;
         }).join('');
+        wireUserActionButtons(client, panel, userId);
+      }
+
+      function wireUserActionButtons(client, panel, userId) {
+        const suspendBtn = panel.querySelector('[data-action="suspend"]');
+        const unsuspendBtn = panel.querySelector('[data-action="unsuspend"]');
+        const makeAdminBtn = panel.querySelector('[data-action="make-admin"]');
+        const revokeAdminBtn = panel.querySelector('[data-action="revoke-admin"]');
+
+        suspendBtn?.addEventListener('click', async () => {
+          const reason = prompt('Reason for suspending this account (they will not see this, only your team):');
+          if (reason === null) return;
+          try {
+            const { error } = await client.rpc('admin_suspend_user', { p_user_id: userId, p_reason: reason.trim() || null });
+            if (error) throw error;
+            loadUsers(client, document.getElementById('user-search').value.trim());
+          } catch (err) {
+            alert(err.message || 'Failed to suspend this user.');
+          }
+        });
+
+        unsuspendBtn?.addEventListener('click', async () => {
+          if (!confirm('Restore this account? They will be able to log in again immediately.')) return;
+          try {
+            const { error } = await client.rpc('admin_unsuspend_user', { p_user_id: userId });
+            if (error) throw error;
+            loadUsers(client, document.getElementById('user-search').value.trim());
+          } catch (err) {
+            alert(err.message || 'Failed to unsuspend this user.');
+          }
+        });
+
+        makeAdminBtn?.addEventListener('click', async () => {
+          openPromotePrefilled(userId);
+        });
+
+        revokeAdminBtn?.addEventListener('click', async () => {
+          if (!confirm('Revoke admin access for this user? They will lose all admin permissions immediately.')) return;
+          try {
+            const { error } = await client.rpc('admin_revoke_admin', { p_user_id: userId });
+            if (error) throw error;
+            loadUsers(client, document.getElementById('user-search').value.trim());
+            loadAdmins(client);
+          } catch (err) {
+            alert(err.message || 'Failed to revoke admin access.');
+          }
+        });
+      }
+
+      function openPromotePrefilled(userId) {
+        document.querySelector('.admin-tab-btn[data-tab="admins"]')?.click();
+        document.getElementById('promote-user-id').value = userId;
       }
 
       function wireUserSearch(client) {
@@ -2663,6 +2852,118 @@
         document.getElementById('user-search').addEventListener('input', (e) => {
           clearTimeout(debounce);
           debounce = setTimeout(() => loadUsers(client, e.target.value.trim()), 300);
+        });
+      }
+
+      function permissionsCheckboxesHTML(idPrefix, checkedKeys) {
+        checkedKeys = checkedKeys || [];
+        return PERMISSION_KEYS.map(p => `
+          <label class="admin-permission-chip">
+            <input type="checkbox" id="${idPrefix}-${p.key}" value="${p.key}" ${checkedKeys.includes(p.key) ? 'checked' : ''} />
+            ${p.label}
+          </label>
+        `).join('');
+      }
+
+      function wirePromoteForm(client) {
+        document.getElementById('promote-permissions-grid').innerHTML = permissionsCheckboxesHTML('promote-perm', []);
+
+        document.getElementById('promote-user-btn').addEventListener('click', async () => {
+          const feedback = document.getElementById('promote-feedback');
+          const userId = document.getElementById('promote-user-id').value.trim();
+          const permissions = PERMISSION_KEYS
+            .map(p => p.key)
+            .filter(key => document.getElementById(`promote-perm-${key}`).checked);
+
+          if (!userId) {
+            feedback.style.color = 'var(--alert)';
+            feedback.textContent = 'Paste a User ID first.';
+            return;
+          }
+          if (permissions.length === 0) {
+            feedback.style.color = 'var(--alert)';
+            feedback.textContent = 'Grant at least one permission.';
+            return;
+          }
+          if (!confirm(`Make this user an admin with access to: ${permissions.join(', ')}?`)) return;
+
+          feedback.style.color = 'var(--faint)';
+          feedback.textContent = 'Saving...';
+
+          try {
+            const { error } = await client.rpc('admin_grant_admin', { p_user_id: userId, p_permissions: permissions });
+            if (error) throw error;
+            feedback.style.color = 'var(--money)';
+            feedback.textContent = 'Admin access granted!';
+            document.getElementById('promote-user-id').value = '';
+            PERMISSION_KEYS.forEach(p => { document.getElementById(`promote-perm-${p.key}`).checked = false; });
+            loadAdmins(client);
+            loadUsers(client, document.getElementById('user-search').value.trim());
+          } catch (err) {
+            feedback.style.color = 'var(--alert)';
+            feedback.textContent = err.message || 'Could not grant admin access.';
+          }
+        });
+      }
+
+      async function loadAdmins(client) {
+        const listEl = document.getElementById('admins-list');
+        listEl.innerHTML = skeletonHTML(3);
+
+        const { data, error } = await client.rpc('admin_list_users_full', { p_search: null });
+        if (error) {
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+
+        const admins = (data || []).filter(u => u.is_admin);
+        if (admins.length === 0) {
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--faint);">No admins yet.</p>`;
+          return;
+        }
+
+        listEl.innerHTML = admins.map(a => `
+          <div class="admin-card-row" data-admin-id="${a.id}">
+            <div class="admin-card-row-head">
+              <strong>${escapeHtml(a.full_name || 'Unnamed')}${a.is_master_admin ? ' <span class="admin-badge master-badge"><i class="fa-solid fa-crown"></i> Master</span>' : ''}</strong>
+              ${a.is_master_admin ? '' : `<button class="btn-revoke-admin" data-action="revoke" style="font-size:10.5px; font-weight:700; padding:5px 10px; border-radius:8px; border:none; cursor:pointer;">Revoke</button>`}
+            </div>
+            ${a.is_master_admin
+              ? `<p style="font-size:11px; color:var(--faint);">Full access to everything, always.</p>`
+              : `
+                <div class="admin-permissions-grid">${permissionsCheckboxesHTML(`admin-${a.id}-perm`, a.admin_permissions)}</div>
+                <button class="btn-make-admin" data-action="save" style="margin-top:10px; font-size:10.5px; font-weight:700; padding:6px 12px; border-radius:8px; border:none; cursor:pointer;">Save Permissions</button>
+              `}
+          </div>
+        `).join('');
+
+        listEl.querySelectorAll('.admin-card-row').forEach(row => {
+          const adminId = row.dataset.adminId;
+
+          row.querySelector('[data-action="save"]')?.addEventListener('click', async () => {
+            const permissions = PERMISSION_KEYS
+              .map(p => p.key)
+              .filter(key => document.getElementById(`admin-${adminId}-perm-${key}`).checked);
+            try {
+              const { error } = await client.rpc('admin_update_admin_permissions', { p_user_id: adminId, p_permissions: permissions });
+              if (error) throw error;
+              alert('Permissions updated.');
+            } catch (err) {
+              alert(err.message || 'Could not update permissions.');
+            }
+          });
+
+          row.querySelector('[data-action="revoke"]')?.addEventListener('click', async () => {
+            if (!confirm('Revoke admin access for this person?')) return;
+            try {
+              const { error } = await client.rpc('admin_revoke_admin', { p_user_id: adminId });
+              if (error) throw error;
+              loadAdmins(client);
+              loadUsers(client, document.getElementById('user-search').value.trim());
+            } catch (err) {
+              alert(err.message || 'Could not revoke admin access.');
+            }
+          });
         });
       }
 
