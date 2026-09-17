@@ -80,6 +80,14 @@
         document.getElementById('signup-link').href = `signup.html?ref=${encodeURIComponent(ref)}`;
       }
 
+      try {
+        const suspendedMsg = sessionStorage.getItem('joyrise_suspended_message');
+        if (suspendedMsg) {
+          document.getElementById('login-error').textContent = suspendedMsg;
+          sessionStorage.removeItem('joyrise_suspended_message');
+        }
+      } catch (e) {}
+
       document.getElementById('login-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const errorEl = document.getElementById('login-error');
@@ -99,8 +107,24 @@
 
         try {
           const client = window.getSupabaseClient();
-          const { error } = await client.auth.signInWithPassword({ email, password });
+          const { data: signInData, error } = await client.auth.signInWithPassword({ email, password });
           if (error) throw error;
+
+          // Check suspension immediately, before ever showing the dashboard.
+          const { data: profile } = await client
+            .from('profiles')
+            .select('is_suspended, suspension_reason')
+            .eq('id', signInData.user.id)
+            .single();
+
+          if (profile && profile.is_suspended) {
+            await client.auth.signOut();
+            const reasonLine = profile.suspension_reason ? ` Reason: ${profile.suspension_reason}` : '';
+            errorEl.textContent = `Your account has been suspended.${reasonLine} Contact support if you believe this is a mistake.`;
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            return;
+          }
 
           // Non-fatal — never let logging failure block the actual login.
           try {

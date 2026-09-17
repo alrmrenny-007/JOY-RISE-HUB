@@ -372,9 +372,50 @@
     setTimeout(setupNotificationPrompt, 4000);
   }
 
+  // ---------- Suspension enforcement ----------
+  // Supabase Auth itself can't be safely disabled per-user from a
+  // static frontend (that requires the service-role key, which must
+  // never ship to a browser). Instead, a suspended flag on the
+  // profile is checked here on every page load, and the session is
+  // force-signed-out the moment it's detected.
+  async function enforceSuspensionCheck() {
+    const client = window.getSupabaseClient();
+    if (!client) return;
+
+    // Avoid a redirect loop on the login page itself.
+    if (window.location.pathname.endsWith('login.html')) return;
+
+    const { data: { user } } = await client.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await client
+      .from('profiles')
+      .select('is_suspended, suspension_reason')
+      .eq('id', user.id)
+      .single();
+
+    if (profile && profile.is_suspended) {
+      await client.auth.signOut();
+      const reasonLine = profile.suspension_reason ? ` Reason: ${profile.suspension_reason}` : '';
+      try {
+        sessionStorage.setItem(
+          'joyrise_suspended_message',
+          `Your account has been suspended.${reasonLine} Contact support if you believe this is a mistake.`
+        );
+      } catch (e) {}
+      window.location.href = 'login.html';
+    }
+  }
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initNotificationPrompt);
   } else {
     initNotificationPrompt();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", enforceSuspensionCheck);
+  } else {
+    enforceSuspensionCheck();
   }
 })();
