@@ -12,6 +12,44 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    .value-prop-strip {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+    }
+    .value-prop-strip span {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #f3f0ff; color: #6c5ce7; font-size: 10.5px; font-weight: 700;
+      padding: 6px 10px; border-radius: 20px;
+    }
+    html[data-theme="dark"] .value-prop-strip span {
+      background: rgba(108,92,231,0.18); color: #9B8CFF;
+    }
+
+    .age-confirm-row {
+      display: flex; align-items: flex-start; gap: 9px;
+      font-size: 11.5px; color: #636e72; line-height: 1.5;
+      margin: -6px 0 16px;
+    }
+    .age-confirm-row input {
+      margin-top: 2px; width: 16px; height: 16px; flex-shrink: 0; accent-color: #6c5ce7;
+    }
+    html[data-theme="dark"] .age-confirm-row { color: #9C93B8; }
+
+    .promo-applied-banner {
+      display: none; align-items: center; gap: 10px;
+      background: #e8f9f1; color: #00895c; border-radius: 14px;
+      padding: 11px 14px; font-size: 12px; font-weight: 600;
+      margin: -8px 0 14px;
+    }
+    .promo-applied-banner.show { display: flex; }
+    html[data-theme="dark"] .promo-applied-banner { background: rgba(0,184,148,0.15); color: #55efc4; }
+
+    .auth-input.field-invalid { border-color: #ff7675; }
+    .field-hint {
+      display: block; margin: -10px 0 14px; font-size: 11px; font-weight: 600; min-height: 14px;
+    }
+    .field-hint.error { color: #ff7675; }
+  </style>
 </head>
 <body>
 
@@ -36,6 +74,11 @@
       </div>
       <h1>Create your account</h1>
       <p>Start earning, referring, and winning</p>
+      <div class="value-prop-strip">
+        <span><i class="fa-solid fa-ticket"></i> Daily draws</span>
+        <span><i class="fa-solid fa-bolt"></i> Instant referral earnings</span>
+        <span><i class="fa-solid fa-shield-halved"></i> Secure payouts</span>
+      </div>
     </div>
 
     <div class="referral-banner" id="referral-banner" style="display:none;">
@@ -45,20 +88,34 @@
 
     <form class="auth-form" id="signup-form">
       <label class="auth-label">Full Name</label>
-      <input type="text" class="auth-input" id="signup-name" placeholder="e.g. Ada Obi" required />
+      <input type="text" class="auth-input" id="signup-name" placeholder="e.g. Ada Obi" autocomplete="name" required />
 
       <label class="auth-label">Phone Number</label>
-      <input type="tel" class="auth-input" id="signup-phone" placeholder="e.g. 08012345678" required />
+      <input type="tel" class="auth-input" id="signup-phone" placeholder="e.g. 08012345678" autocomplete="tel" required />
+      <small class="field-hint" id="phone-hint"></small>
 
       <label class="auth-label">Email</label>
-      <input type="email" class="auth-input" id="signup-email" placeholder="you@example.com" required />
+      <input type="email" class="auth-input" id="signup-email" placeholder="you@example.com" autocomplete="email" required />
+      <small class="field-hint" id="email-hint"></small>
 
       <label class="auth-label">Password</label>
-      <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" required minlength="6" />
+      <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" autocomplete="new-password" required minlength="6" />
 
       <label class="auth-label">Referral / Promo Code <span style="font-weight:400; color:#9089b0;">(optional)</span></label>
       <input type="text" class="auth-input" id="signup-promo-code" placeholder="e.g. FUNNY" style="text-transform:uppercase;" autocapitalize="characters" />
       <small id="promo-code-hint" style="display:block; margin:-10px 0 14px; font-size:11px; font-weight:700;"></small>
+      <div class="promo-applied-banner" id="promo-applied-banner">
+        <i class="fa-solid fa-circle-check"></i>
+        <span>Nice — that code is valid! You're both in line for a referral bonus once you sign up.</span>
+      </div>
+
+      <label class="age-confirm-row">
+        <input type="checkbox" id="signup-age-confirm" required />
+        <span>
+          I confirm I am 18 years or older, and I agree to the
+          <a href="terms.html">Terms</a> &amp; <a href="privacy-policy.html">Privacy Policy</a>.
+        </span>
+      </label>
 
       <div class="auth-error" id="signup-error"></div>
 
@@ -69,7 +126,6 @@
     </form>
 
     <p class="auth-switch">Already have an account? <a href="login.html" id="login-link">Log in</a></p>
-    <p class="auth-switch" style="margin-top:8px; font-size:10px;">By signing up, you agree to our <a href="terms.html">Terms</a> &amp; <a href="privacy-policy.html">Privacy Policy</a></p>
 
   </div>
 
@@ -83,6 +139,55 @@
       const promoInput = document.getElementById('signup-promo-code');
       const promoHint = document.getElementById('promo-code-hint');
 
+      const phoneInput = document.getElementById('signup-phone');
+      const emailInput = document.getElementById('signup-email');
+      const phoneHint = document.getElementById('phone-hint');
+      const emailHint = document.getElementById('email-hint');
+
+      // Accepts common Nigerian formats: 08012345678, +2348012345678, 2348012345678
+      function isValidNgPhone(value) {
+        const digits = value.replace(/[\s-]/g, '');
+        return /^0\d{10}$/.test(digits) || /^(\+?234)\d{10}$/.test(digits);
+      }
+
+      function isValidEmail(value) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+      }
+
+      function validateField(input, hint, isValid, message) {
+        const value = input.value.trim();
+        if (!value) {
+          input.classList.remove('field-invalid');
+          hint.textContent = '';
+          return true;
+        }
+        if (isValid(value)) {
+          input.classList.remove('field-invalid');
+          hint.textContent = '';
+          return true;
+        }
+        input.classList.add('field-invalid');
+        hint.className = 'field-hint error';
+        hint.textContent = message;
+        return false;
+      }
+
+      phoneInput.addEventListener('blur', () => {
+        validateField(phoneInput, phoneHint, isValidNgPhone, "That doesn't look like a valid Nigerian phone number.");
+      });
+      phoneInput.addEventListener('input', () => {
+        phoneInput.classList.remove('field-invalid');
+        phoneHint.textContent = '';
+      });
+
+      emailInput.addEventListener('blur', () => {
+        validateField(emailInput, emailHint, isValidEmail, "That doesn't look like a valid email address.");
+      });
+      emailInput.addEventListener('input', () => {
+        emailInput.classList.remove('field-invalid');
+        emailHint.textContent = '';
+      });
+
       if (ref) {
         document.getElementById('referral-banner').style.display = 'flex';
         document.getElementById('referral-banner-code').textContent = ref.toUpperCase();
@@ -94,20 +199,23 @@
       promoInput.addEventListener('input', () => {
         promoInput.value = promoInput.value.toUpperCase();
         promoHint.textContent = '';
+        document.getElementById('promo-applied-banner').classList.remove('show');
       });
 
       promoInput.addEventListener('blur', async () => {
         const code = promoInput.value.trim();
-        if (!code) { promoHint.textContent = ''; return; }
+        const banner = document.getElementById('promo-applied-banner');
+        if (!code) { promoHint.textContent = ''; banner.classList.remove('show'); return; }
         try {
           const client = window.getSupabaseClient();
           const { data: isValid } = await client.rpc('validate_referral_code', { p_code: code });
           if (isValid) {
-            promoHint.style.color = '#00b894';
-            promoHint.textContent = '✓ Valid code applied';
+            promoHint.textContent = '';
+            banner.classList.add('show');
           } else {
             promoHint.style.color = '#ff7675';
             promoHint.textContent = "This code wasn't found — you can still sign up without it.";
+            banner.classList.remove('show');
           }
         } catch (e) {
           // Validation is a nice-to-have; never block signup over it.
@@ -125,9 +233,25 @@
         const email = document.getElementById('signup-email').value.trim();
         const password = document.getElementById('signup-password').value;
         const promoCode = promoInput.value.trim() || null;
+        const ageConfirmed = document.getElementById('signup-age-confirm').checked;
 
         if (!name || !phone || !email || password.length < 6) {
           errorEl.textContent = 'Please fill in every field correctly.';
+          return;
+        }
+
+        if (!validateField(phoneInput, phoneHint, isValidNgPhone, "That doesn't look like a valid Nigerian phone number.")) {
+          errorEl.textContent = 'Please enter a valid phone number.';
+          return;
+        }
+
+        if (!validateField(emailInput, emailHint, isValidEmail, "That doesn't look like a valid email address.")) {
+          errorEl.textContent = 'Please enter a valid email address.';
+          return;
+        }
+
+        if (!ageConfirmed) {
+          errorEl.textContent = 'Please confirm you are 18 or older to continue.';
           return;
         }
 
