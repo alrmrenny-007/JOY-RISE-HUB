@@ -49,6 +49,47 @@
       display: block; margin: -10px 0 14px; font-size: 11px; font-weight: 600; min-height: 14px;
     }
     .field-hint.error { color: #ff7675; }
+
+    @keyframes fieldShake {
+      0%, 100% { transform: translateX(0); }
+      20%      { transform: translateX(-4px); }
+      40%      { transform: translateX(4px); }
+      60%      { transform: translateX(-3px); }
+      80%      { transform: translateX(3px); }
+    }
+    .auth-input.field-invalid { animation: fieldShake 0.4s ease; }
+
+    .phone-input-group { display: flex; gap: 8px; }
+    .phone-code-select {
+      flex: 0 0 96px; padding-left: 8px; padding-right: 4px;
+      font-weight: 700; cursor: pointer;
+    }
+    .phone-input-group input { flex: 1; min-width: 0; }
+
+    .password-strength-wrap { margin: -10px 0 14px; }
+    .password-strength-track {
+      width: 100%; height: 5px; background: #eceafd; border-radius: 20px; overflow: hidden;
+    }
+    .password-strength-fill {
+      height: 100%; width: 0%; border-radius: 20px;
+      background: #ff7675;
+      transition: width 0.35s cubic-bezier(0.22,1,0.36,1), background-color 0.35s ease;
+    }
+    .password-strength-label {
+      font-size: 10.5px; font-weight: 700; margin-top: 5px; color: #9089b0;
+      transition: color 0.3s ease;
+    }
+    .password-strength-label.pop {
+      animation: strengthPop 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes strengthPop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    html[data-theme="dark"] .password-strength-track { background: rgba(255,255,255,0.1); }
+
+    .promo-applied-banner.show { animation: fadeUpIn 0.35s ease both; }
   </style>
 </head>
 <body>
@@ -91,7 +132,19 @@
       <input type="text" class="auth-input" id="signup-name" placeholder="e.g. Ada Obi" autocomplete="name" required />
 
       <label class="auth-label">Phone Number</label>
-      <input type="tel" class="auth-input" id="signup-phone" placeholder="e.g. 08012345678" autocomplete="tel" required />
+      <div class="phone-input-group">
+        <select class="auth-input phone-code-select" id="signup-phone-code">
+          <option value="+234" selected>🇳🇬 +234</option>
+          <option value="+233">🇬🇭 +233</option>
+          <option value="+254">🇰🇪 +254</option>
+          <option value="+27">🇿🇦 +27</option>
+          <option value="+44">🇬🇧 +44</option>
+          <option value="+1">🇺🇸 +1</option>
+          <option value="+91">🇮🇳 +91</option>
+          <option value="+971">🇦🇪 +971</option>
+        </select>
+        <input type="tel" class="auth-input" id="signup-phone" placeholder="8012345678" autocomplete="tel" required />
+      </div>
       <small class="field-hint" id="phone-hint"></small>
 
       <label class="auth-label">Email</label>
@@ -100,6 +153,12 @@
 
       <label class="auth-label">Password</label>
       <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" autocomplete="new-password" required minlength="6" />
+      <div class="password-strength-wrap">
+        <div class="password-strength-track">
+          <div class="password-strength-fill" id="password-strength-fill"></div>
+        </div>
+        <div class="password-strength-label" id="password-strength-label">&nbsp;</div>
+      </div>
 
       <label class="auth-label">Referral / Promo Code <span style="font-weight:400; color:#9089b0;">(optional)</span></label>
       <input type="text" class="auth-input" id="signup-promo-code" placeholder="e.g. FUNNY" style="text-transform:uppercase;" autocapitalize="characters" />
@@ -139,15 +198,51 @@
       const promoInput = document.getElementById('signup-promo-code');
       const promoHint = document.getElementById('promo-code-hint');
 
+      const phoneCodeSelect = document.getElementById('signup-phone-code');
       const phoneInput = document.getElementById('signup-phone');
       const emailInput = document.getElementById('signup-email');
       const phoneHint = document.getElementById('phone-hint');
       const emailHint = document.getElementById('email-hint');
 
-      // Accepts common Nigerian formats: 08012345678, +2348012345678, 2348012345678
-      function isValidNgPhone(value) {
-        const digits = value.replace(/[\s-]/g, '');
-        return /^0\d{10}$/.test(digits) || /^(\+?234)\d{10}$/.test(digits);
+      // Nigerian local numbers (without the leading 0 or +234) are 10
+      // digits starting 1-9. Everything else just gets a sane length
+      // check, since exact formats vary a lot by country.
+      function isValidPhoneDigits(code, digits) {
+        digits = digits.replace(/\D/g, '');
+        if (code === '+234') return /^[1-9]\d{9}$/.test(digits);
+        return /^\d{6,12}$/.test(digits);
+      }
+
+      // Forgives someone typing the full local number with its leading
+      // 0 (e.g. "08012345678") even though the country code covers that
+      // digit already.
+      function normalizePhoneDigits(code, raw) {
+        let digits = raw.replace(/\D/g, '');
+        if (code === '+234' && digits.length === 11 && digits.startsWith('0')) {
+          digits = digits.slice(1);
+        }
+        return digits;
+      }
+
+      function validatePhone() {
+        const code = phoneCodeSelect.value;
+        const digits = normalizePhoneDigits(code, phoneInput.value);
+        if (!phoneInput.value.trim()) {
+          phoneInput.classList.remove('field-invalid');
+          phoneHint.textContent = '';
+          return true;
+        }
+        if (isValidPhoneDigits(code, digits)) {
+          phoneInput.classList.remove('field-invalid');
+          phoneHint.textContent = '';
+          return true;
+        }
+        phoneInput.classList.add('field-invalid');
+        phoneHint.className = 'field-hint error';
+        phoneHint.textContent = code === '+234'
+          ? 'Enter a valid 10-digit Nigerian number (without the leading 0).'
+          : "That doesn't look like a valid phone number.";
+        return false;
       }
 
       function isValidEmail(value) {
@@ -172,10 +267,12 @@
         return false;
       }
 
-      phoneInput.addEventListener('blur', () => {
-        validateField(phoneInput, phoneHint, isValidNgPhone, "That doesn't look like a valid Nigerian phone number.");
-      });
+      phoneInput.addEventListener('blur', validatePhone);
       phoneInput.addEventListener('input', () => {
+        phoneInput.classList.remove('field-invalid');
+        phoneHint.textContent = '';
+      });
+      phoneCodeSelect.addEventListener('change', () => {
         phoneInput.classList.remove('field-invalid');
         phoneHint.textContent = '';
       });
@@ -186,6 +283,52 @@
       emailInput.addEventListener('input', () => {
         emailInput.classList.remove('field-invalid');
         emailHint.textContent = '';
+      });
+
+      // ---- Password strength meter ----
+      const passwordInput = document.getElementById('signup-password');
+      const strengthFill = document.getElementById('password-strength-fill');
+      const strengthLabel = document.getElementById('password-strength-label');
+
+      function passwordScore(pw) {
+        let score = 0;
+        if (pw.length >= 6) score++;
+        if (pw.length >= 10) score++;
+        if (/[A-Z]/.test(pw)) score++;
+        if (/[0-9]/.test(pw)) score++;
+        if (/[^A-Za-z0-9]/.test(pw)) score++;
+        return score;
+      }
+
+      const STRENGTH_LEVELS = [
+        { min: 0, width: '0%',   color: '#eceafd', label: '' },
+        { min: 1, width: '22%',  color: '#ff7675', label: 'Weak' },
+        { min: 2, width: '48%',  color: '#fdcb6e', label: 'Fair' },
+        { min: 3, width: '74%',  color: '#4a9dff', label: 'Good' },
+        { min: 5, width: '100%', color: '#00b894', label: 'Strong' },
+      ];
+
+      let lastStrengthLabel = '';
+      passwordInput.addEventListener('input', () => {
+        const pw = passwordInput.value;
+        if (!pw) {
+          strengthFill.style.width = '0%';
+          strengthLabel.innerHTML = '&nbsp;';
+          lastStrengthLabel = '';
+          return;
+        }
+        const score = passwordScore(pw);
+        const level = [...STRENGTH_LEVELS].reverse().find(l => score >= l.min);
+        strengthFill.style.width = level.width;
+        strengthFill.style.backgroundColor = level.color;
+        strengthLabel.textContent = level.label;
+        strengthLabel.style.color = level.color;
+        if (level.label !== lastStrengthLabel) {
+          strengthLabel.classList.remove('pop');
+          void strengthLabel.offsetWidth; // restart the animation
+          strengthLabel.classList.add('pop');
+          lastStrengthLabel = level.label;
+        }
       });
 
       if (ref) {
@@ -229,7 +372,8 @@
         errorEl.textContent = '';
 
         const name = document.getElementById('signup-name').value.trim();
-        const phone = document.getElementById('signup-phone').value.trim();
+        const rawPhoneDigits = normalizePhoneDigits(phoneCodeSelect.value, document.getElementById('signup-phone').value);
+        const phone = document.getElementById('signup-phone').value.trim() ? `${phoneCodeSelect.value}${rawPhoneDigits}` : '';
         const email = document.getElementById('signup-email').value.trim();
         const password = document.getElementById('signup-password').value;
         const promoCode = promoInput.value.trim() || null;
@@ -240,7 +384,7 @@
           return;
         }
 
-        if (!validateField(phoneInput, phoneHint, isValidNgPhone, "That doesn't look like a valid Nigerian phone number.")) {
+        if (!validatePhone()) {
           errorEl.textContent = 'Please enter a valid phone number.';
           return;
         }
