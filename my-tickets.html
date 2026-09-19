@@ -24,6 +24,55 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <style>
+    /* ---- Receipt card (deliberately theme-independent — a receipt
+       should look like a printed receipt whether the app is in light
+       or dark mode). ---- */
+    .receipt-btn {
+      width: 32px; height: 32px; border-radius: 50%; border: none;
+      background: #f3f0ff; color: #6c5ce7; font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; cursor: pointer; position: relative; margin-top: 6px;
+    }
+    .receipt-btn::after { content: ''; position: absolute; inset: -6px; }
+
+    #receipt-modal-overlay .modal-card { max-height: 88vh; overflow-y: auto; }
+
+    .receipt-card {
+      background: #ffffff; color: #1e1e24; border-radius: 16px;
+      padding: 22px 20px; position: relative;
+      background-image:
+        radial-gradient(circle at 0 50%, transparent 9px, #fff 9.5px),
+        radial-gradient(circle at 100% 50%, transparent 9px, #fff 9.5px);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+    }
+    .receipt-head { text-align: center; margin-bottom: 14px; }
+    .receipt-logo {
+      width: 40px; height: 40px; border-radius: 12px; margin: 0 auto 8px;
+      background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+      color: #fff; font-weight: 900; font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .receipt-head h3 { font-size: 13px; font-weight: 800; color: #1e1e24; }
+    .receipt-head span { font-size: 10.5px; color: #9089b0; text-transform: uppercase; letter-spacing: 0.08em; }
+
+    .receipt-divider { border: none; border-top: 2px dashed #e4dff5; margin: 14px 0; }
+
+    .receipt-amount { text-align: center; margin-bottom: 4px; }
+    .receipt-amount strong { font-size: 26px; font-weight: 900; display: block; }
+    .receipt-amount span { font-size: 11.5px; color: #9089b0; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    .receipt-rows { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+    .receipt-row { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; }
+    .receipt-row span:first-child { color: #9089b0; }
+    .receipt-row span:last-child { color: #1e1e24; font-weight: 700; text-align: right; }
+
+    .receipt-foot { text-align: center; margin-top: 16px; }
+    .receipt-foot small { font-size: 10px; color: #b2bec3; }
+
+    .receipt-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .receipt-actions button { flex: 1; }
+  </style>
 </head>
 <body>
 
@@ -59,7 +108,38 @@
 
   </div>
 
+  <!-- RECEIPT MODAL -->
+  <div class="modal-overlay" id="receipt-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-circle"><i class="fa-solid fa-file-invoice"></i></div>
+        <div>
+          <h3>Receipt</h3>
+          <p>Download or share this record</p>
+        </div>
+        <button class="modal-close-btn" id="receipt-close-btn" aria-label="Close dialog">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="receipt-card" id="receipt-card"></div>
+
+        <div class="receipt-actions">
+          <button class="btn-modal-cancel" id="receipt-download-btn">
+            <i class="fa-solid fa-download"></i> Download
+          </button>
+          <button class="btn-modal-primary" id="receipt-share-btn">
+            <i class="fa-solid fa-share-nodes"></i> Share
+          </button>
+        </div>
+        <div id="receipt-status" style="margin-top:10px; font-size:12px; text-align:center; color:#636e72;"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="auth.js"></script>
   <script>
     (function () {
@@ -163,13 +243,153 @@
                     style="margin-top:6px; padding:6px 12px; font-size:11px;">
                     Place Draw <i class="fa-brands fa-telegram" style="margin-left:4px;"></i>
                   </button>` : ''}
+                <div>
+                  <button class="receipt-btn" data-ticket-id="${t.id}" aria-label="View receipt"><i class="fa-solid fa-file-invoice"></i></button>
+                </div>
               </div>
             </div>
           `;
         }).join('');
       }
 
+      // ---- RECEIPTS ----
+      function fmtReceiptDate(iso) {
+        return new Date(iso).toLocaleString('en-NG', {
+          day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
+        });
+      }
+
+      function buildReceiptHTML(t) {
+        const tierName = t.ticket_tiers?.name || 'Custom';
+        const ticketCode = 'TK-' + String(t.ticket_number).padStart(4, '0');
+        const meta = STATUS_META[t.status] || STATUS_META.active;
+        const drawLine = drawInfoText(t);
+
+        const rows = [
+          ['Ticket number', `#${ticketCode}`],
+          ['Tier', escapeHtml(tierName)],
+          ['Draw', drawLine ? escapeHtml(drawLine) : 'Not yet scheduled'],
+          ['Purchased', fmtReceiptDate(t.purchased_at)],
+          ['Status', escapeHtml(meta.label)],
+        ];
+
+        if (t.status === 'won') {
+          rows.push(['Prize won', `+₦${fmt(t.prize_amount)}`]);
+        }
+
+        return {
+          refCode: ticketCode,
+          html: `
+            <div class="receipt-head">
+              <div class="receipt-logo">JR</div>
+              <h3>Joy-Rise Hub</h3>
+              <span>Official Receipt</span>
+            </div>
+            <hr class="receipt-divider" />
+            <div class="receipt-amount">
+              <strong style="color:#00b894;">₦${fmt(t.price)}</strong>
+              <span>Ticket Purchase</span>
+            </div>
+            <hr class="receipt-divider" />
+            <div class="receipt-rows">
+              ${rows.map(([label, value]) => `
+                <div class="receipt-row"><span>${label}</span><span>${value}</span></div>
+              `).join('')}
+            </div>
+            <hr class="receipt-divider" />
+            <div class="receipt-foot">
+              <small>Ref: ${ticketCode} &middot; joyrisehub.com</small>
+            </div>
+          `,
+        };
+      }
+
+      let currentReceiptRef = 'receipt';
+
+      function openReceipt(ticketId) {
+        const t = allTickets.find(x => x.id === ticketId);
+        if (!t) return;
+        const { refCode, html } = buildReceiptHTML(t);
+        currentReceiptRef = refCode;
+        document.getElementById('receipt-card').innerHTML = html;
+        document.getElementById('receipt-status').textContent = '';
+        document.getElementById('receipt-modal-overlay').classList.add('open');
+      }
+
+      function closeReceipt() {
+        document.getElementById('receipt-modal-overlay').classList.remove('open');
+      }
+
+      async function renderReceiptToBlob() {
+        const canvas = await html2canvas(document.getElementById('receipt-card'), {
+          backgroundColor: '#ffffff',
+          scale: 2,
+        });
+        return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      }
+
+      document.getElementById('receipt-close-btn').addEventListener('click', closeReceipt);
+      document.getElementById('receipt-modal-overlay').addEventListener('click', (e) => {
+        if (e.target.id === 'receipt-modal-overlay') closeReceipt();
+      });
+
+      document.getElementById('receipt-download-btn').addEventListener('click', async () => {
+        const statusEl = document.getElementById('receipt-status');
+        statusEl.textContent = 'Preparing image...';
+        try {
+          const blob = await renderReceiptToBlob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `JoyRiseHub-Receipt-${currentReceiptRef}.png`;
+          a.click();
+          URL.revokeObjectURL(url);
+          statusEl.textContent = 'Downloaded.';
+        } catch (err) {
+          statusEl.textContent = 'Could not generate the receipt image.';
+        }
+      });
+
+      document.getElementById('receipt-share-btn').addEventListener('click', async () => {
+        const statusEl = document.getElementById('receipt-status');
+        statusEl.textContent = 'Preparing image...';
+        try {
+          const blob = await renderReceiptToBlob();
+          const file = new File([blob], `JoyRiseHub-Receipt-${currentReceiptRef}.png`, { type: 'image/png' });
+
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Joy-Rise Hub Receipt',
+              text: `My Joy-Rise Hub receipt — Ref: ${currentReceiptRef}`,
+            });
+            statusEl.textContent = '';
+          } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `JoyRiseHub-Receipt-${currentReceiptRef}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            statusEl.textContent = "Sharing isn't supported here — downloaded instead.";
+          }
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            statusEl.textContent = 'Could not share the receipt.';
+          } else {
+            statusEl.textContent = '';
+          }
+        }
+      });
+
       document.getElementById('tickets-list').addEventListener('click', async (e) => {
+        const receiptBtn = e.target.closest('.receipt-btn');
+        if (receiptBtn) {
+          e.stopPropagation();
+          openReceipt(receiptBtn.dataset.ticketId);
+          return;
+        }
+
         const btn = e.target.closest('.place-draw-btn');
         if (!btn) return;
         const ticketId = btn.dataset.ticketId;

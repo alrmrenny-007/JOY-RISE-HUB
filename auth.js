@@ -326,7 +326,9 @@
     if (Notification.permission === "denied") {
       return; // they already said no — don't ask again
     }
-    if (localStorage.getItem("joyrise_notif_prompt_dismissed")) return;
+    const dismissedAt = parseInt(localStorage.getItem("joyrise_notif_prompt_dismissed_at") || "0", 10);
+    const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+    if (dismissedAt && Date.now() - dismissedAt < FOURTEEN_DAYS_MS) return;
 
     const navbar = document.querySelector(".bottom-navbar");
     const bottomOffset = navbar ? navbar.offsetHeight : 0;
@@ -349,14 +351,19 @@
       if (permission === "granted") {
         await subscribeToPush();
       } else {
-        localStorage.setItem("joyrise_notif_prompt_dismissed", "1");
+        // They actively said no in the browser's own prompt — that's a
+        // stronger signal than dismissing our banner, so don't re-ask
+        // (Notification.permission === "denied" already short-circuits
+        // this function on future visits anyway).
+        localStorage.setItem("joyrise_notif_prompt_dismissed_at", Date.now().toString());
       }
       banner.classList.remove("show");
       setTimeout(() => banner.remove(), 350);
     });
 
     document.getElementById("notif-dismiss-btn").addEventListener("click", () => {
-      localStorage.setItem("joyrise_notif_prompt_dismissed", "1");
+      // "Not now" — ask again in 14 days rather than never again.
+      localStorage.setItem("joyrise_notif_prompt_dismissed_at", Date.now().toString());
       banner.classList.remove("show");
       setTimeout(() => banner.remove(), 350);
     });
