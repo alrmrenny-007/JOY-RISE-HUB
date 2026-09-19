@@ -419,6 +419,16 @@
           if (error) throw error;
 
           if (data.session) {
+            // Fire-and-forget — never let this block or fail signup.
+            fetch(`${client.supabaseUrl}/functions/v1/log-auth-ip`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${data.session.access_token}`,
+              },
+              body: JSON.stringify({ event_type: 'signup' }),
+            }).catch(() => {});
+
             window.location.href = 'index.html';
           } else {
             errorEl.style.color = '#00b894';

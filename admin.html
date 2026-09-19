@@ -2947,13 +2947,27 @@
         const dotEl = document.getElementById('tab-dot-fraud');
         listEl.innerHTML = skeletonHTML(2);
 
-        const { data, error } = await client.rpc('admin_get_fraud_signals');
-        if (error) {
-          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
+        const [referralResult, ipResult] = await Promise.all([
+          client.rpc('admin_get_fraud_signals'),
+          client.rpc('admin_get_shared_ip_signals'),
+        ]);
+
+        if (referralResult.error && ipResult.error) {
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(referralResult.error.message)}</p>`;
           return;
         }
 
-        if (!data || data.length === 0) {
+        const referralSignals = referralResult.data || [];
+        const ipSignals = (ipResult.data || []).map(row => ({
+          signal_type: 'shared_ip',
+          creator_name: row.account_names.join(', '),
+          detail: `${row.account_count} accounts have signed up or logged in from the same IP address`,
+          severity: row.account_count >= 6 ? 'high' : 'medium',
+        }));
+
+        const data = [...referralSignals, ...ipSignals];
+
+        if (data.length === 0) {
           listEl.innerHTML = '';
           emptyEl.style.display = 'block';
           if (dotEl) dotEl.style.display = 'none';
@@ -2966,6 +2980,7 @@
         const SIGNAL_LABELS = {
           referral_burst: 'Referral Burst',
           fast_active_referral: 'Fast Activation Pattern',
+          shared_ip: 'Shared IP Address',
         };
 
         listEl.innerHTML = data.map(s => `
@@ -2977,7 +2992,7 @@
               <strong>${escapeHtml(s.creator_name)}</strong>
               <small>${escapeHtml(SIGNAL_LABELS[s.signal_type] || s.signal_type)}</small>
               <small>${escapeHtml(s.detail)}</small>
-              <button class="fraud-view-btn" data-creator="${s.creator_name.replace(/"/g, '&quot;')}">View in Users</button>
+              ${s.signal_type === 'shared_ip' ? '' : `<button class="fraud-view-btn" data-creator="${s.creator_name.replace(/"/g, '&quot;')}">View in Users</button>`}
             </div>
             <span class="fraud-severity ${s.severity}">${s.severity}</span>
           </div>
