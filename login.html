@@ -133,6 +133,24 @@
             console.warn('log_user_login failed:', e);
           }
 
+          // TEMPORARY DEBUG VERSION — shows the actual result instead of
+          // hiding it, so we can see what's happening from your phone.
+          // Revert to fire-and-forget once this is confirmed working.
+          try {
+            const debugRes = await fetch(`${client.supabaseUrl}/functions/v1/log-auth-ip`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${signInData.session.access_token}`,
+              },
+              body: JSON.stringify({ event_type: 'login' }),
+            });
+            const debugData = await debugRes.json().catch(() => ({}));
+            alert('log-auth-ip status: ' + debugRes.status + '\n' + JSON.stringify(debugData));
+          } catch (debugErr) {
+            alert('log-auth-ip fetch threw: ' + debugErr.message);
+          }
+
           window.location.href = 'index.html';
         } catch (err) {
           console.error('Login error (full object):', err);
