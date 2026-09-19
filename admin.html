@@ -230,6 +230,19 @@
     }
     .master-badge { background: rgba(253,203,110,0.2); color: #fdcb6e; }
 
+    .fraud-severity {
+      display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 20px; flex-shrink: 0;
+    }
+    .fraud-severity.high   { background: rgba(255,71,87,0.18); color: #ff4757; }
+    .fraud-severity.medium { background: rgba(253,203,110,0.2); color: #fdcb6e; }
+    .fraud-severity.low    { background: rgba(108,92,231,0.18); color: var(--brand-glow); }
+    .fraud-view-btn {
+      font-size: 10.5px; font-weight: 700; padding: 6px 10px; border-radius: 8px;
+      border: none; cursor: pointer; background: rgba(108,92,231,0.15); color: var(--brand-glow);
+      margin-top: 6px;
+    }
+
     .admin-shell .user-row-actions {
       display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 12px;
       border-top: 1px solid var(--line);
@@ -770,6 +783,9 @@
       <button type="button" class="admin-tab-btn" data-tab="users">
         <i class="fa-solid fa-users"></i> Users
       </button>
+      <button type="button" class="admin-tab-btn" data-tab="fraud">
+        <i class="fa-solid fa-triangle-exclamation"></i> Fraud <span class="tab-dot" id="tab-dot-fraud"></span>
+      </button>
       <button type="button" class="admin-tab-btn" data-tab="admins" id="admins-tab-btn" style="display:none;">
         <i class="fa-solid fa-user-shield"></i> Admins
       </button>
@@ -974,6 +990,21 @@
         </section>
       </div>
 
+      <!-- FRAUD SIGNALS -->
+      <div class="admin-tab-page" data-tab="fraud">
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-triangle-exclamation"></i> Referral Fraud Signals</h3>
+          <p style="font-size:11px; color:var(--faint); margin:2px 0 10px; line-height:1.5;">
+            These are signals worth a look, not proof of wrongdoing — a genuine viral moment can
+            also trigger a burst. Use judgement before suspending anyone based on this alone.
+          </p>
+          <div id="fraud-list" class="winners-list"></div>
+          <div id="fraud-empty" class="empty-state" style="display:none;">
+            <i class="fa-solid fa-shield-halved"></i>Nothing flagged right now.
+          </div>
+        </section>
+      </div>
+
       <!-- ADMIN MANAGEMENT (master admin only) -->
       <div class="admin-tab-page" data-tab="admins">
         <section class="admin-section">
@@ -1102,6 +1133,7 @@
             if (target === 'activity') document.getElementById('tab-dot-activity').style.display = 'none';
             if (target === 'withdrawals') document.getElementById('tab-dot-withdrawals').style.display = 'none';
             if (target === 'milestones') document.getElementById('tab-dot-milestones').style.display = 'none';
+            if (target === 'fraud') { const d = document.getElementById('tab-dot-fraud'); if (d) d.style.display = 'none'; }
           });
         });
       }
@@ -1187,6 +1219,7 @@
         loadMilestoneHistory(client);
         loadTiers(client);
         loadUsers(client, '');
+        loadFraudSignals(client);
         wireDrawModal(client);
         wireScheduleManager(client);
         wireTodaySlots(client);
@@ -1209,6 +1242,7 @@
         { key: 'settings',    label: 'Settings' },
         { key: 'tickets',     label: 'Tickets' },
         { key: 'users',       label: 'Users' },
+        { key: 'fraud',       label: 'Fraud Signals' },
       ];
 
       async function loadMyPermissions(client) {
@@ -2904,6 +2938,58 @@
             feedback.style.color = 'var(--alert)';
             feedback.textContent = err.message || 'Could not grant admin access.';
           }
+        });
+      }
+
+      async function loadFraudSignals(client) {
+        const listEl = document.getElementById('fraud-list');
+        const emptyEl = document.getElementById('fraud-empty');
+        const dotEl = document.getElementById('tab-dot-fraud');
+        listEl.innerHTML = skeletonHTML(2);
+
+        const { data, error } = await client.rpc('admin_get_fraud_signals');
+        if (error) {
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          if (dotEl) dotEl.style.display = 'none';
+          return;
+        }
+
+        emptyEl.style.display = 'none';
+        if (dotEl) dotEl.style.display = data.some(s => s.severity === 'high') ? 'inline-block' : 'none';
+
+        const SIGNAL_LABELS = {
+          referral_burst: 'Referral Burst',
+          fast_active_referral: 'Fast Activation Pattern',
+        };
+
+        listEl.innerHTML = data.map(s => `
+          <div class="winner-row" style="align-items:flex-start; flex-wrap:wrap;">
+            <div class="winner-avatar" style="background:rgba(255,71,87,0.12); color:#ff4757;">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="winner-info" style="flex-basis:0;">
+              <strong>${escapeHtml(s.creator_name)}</strong>
+              <small>${escapeHtml(SIGNAL_LABELS[s.signal_type] || s.signal_type)}</small>
+              <small>${escapeHtml(s.detail)}</small>
+              <button class="fraud-view-btn" data-creator="${s.creator_name.replace(/"/g, '&quot;')}">View in Users</button>
+            </div>
+            <span class="fraud-severity ${s.severity}">${s.severity}</span>
+          </div>
+        `).join('');
+
+        listEl.querySelectorAll('.fraud-view-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelector('.admin-tab-btn[data-tab="users"]')?.click();
+            const searchInput = document.getElementById('user-search');
+            searchInput.value = btn.dataset.creator;
+            searchInput.dispatchEvent(new Event('input'));
+          });
         });
       }
 
