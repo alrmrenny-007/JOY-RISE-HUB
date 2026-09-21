@@ -1263,7 +1263,10 @@ body {
   border-radius: 20px;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
 }
+
+.txn-filter-chip:active { transform: scale(0.94); }
 
 .txn-filter-chip.active {
   background: #6c5ce7;

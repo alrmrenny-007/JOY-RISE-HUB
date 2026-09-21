@@ -85,6 +85,25 @@
       background: #f59f00; color: #fff;
       display: flex; align-items: center; justify-content: center;
       font-size: 9px; border: 2px solid #fff;
+      animation: trophyBadgePulse 2s ease-in-out infinite;
+    }
+    @keyframes trophyBadgePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 159, 0, 0.5); }
+      50%      { box-shadow: 0 0 0 5px rgba(245, 159, 0, 0); }
+    }
+    .draw-summary-card:first-of-type {
+      border: 2px solid #fdcb6e;
+      position: relative;
+    }
+    .draw-summary-card:first-of-type::before {
+      content: '🔥 Latest Draw';
+      position: absolute; top: -10px; left: 14px;
+      background: #fdcb6e; color: #7a4b00; font-size: 9.5px; font-weight: 800;
+      padding: 3px 10px; border-radius: 20px; text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .draw-winner-avatar .trophy-badge { animation: none; }
     }
     .draw-winner-info { flex: 1; min-width: 0; }
     .draw-winner-info strong { font-size: 12.5px; display: block; }
@@ -106,7 +125,7 @@
       </div>
     </header>
 
-    <main class="main-content">
+    <main class="main-content entrance-stagger">
       <div class="telegram-banner" style="background: linear-gradient(135deg, #e17055, #fdcb6e);">
         <div class="banner-content">
           <span class="live-tag"><span class="green-dot"></span> DAILY DRAW</span>
@@ -121,7 +140,7 @@
         </div>
       </div>
 
-      <div id="winners-list" class="winners-list"></div>
+      <div id="winners-list" class="winners-list entrance-stagger"></div>
       <div id="winners-empty" class="winners-empty" style="display:none;">
         <i class="fa-solid fa-trophy"></i>
         <p>No draws have been completed yet. Check back soon!</p>
