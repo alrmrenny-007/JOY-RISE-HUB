@@ -84,12 +84,28 @@
     }
 
     .telegram-secondary {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      background: #fff; border: 1px solid #eee; border-radius: 14px; padding: 12px;
-      font-size: 12.5px; color: #636e72; margin: 4px 0 16px; text-decoration: none;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: linear-gradient(135deg, #0088cc, #229ED9);
+      border: none; border-radius: 16px; padding: 15px;
+      font-size: 13.5px; font-weight: 800; color: #fff;
+      margin: 4px 0 6px; text-decoration: none;
+      box-shadow: 0 8px 20px rgba(0,136,204,0.35);
     }
-    .telegram-secondary i { color: #229ED9; }
-    .telegram-secondary strong { color: #2d2d3f; }
+    .telegram-secondary i { color: #fff; font-size: 18px; }
+    .telegram-secondary strong { color: #fff; }
+
+    .live-draw-explainer {
+      text-align: center; font-size: 11px; font-style: italic; color: #9089b0;
+      margin: 0 0 16px; line-height: 1.5; padding: 0 8px;
+    }
+
+    .buy-ticket-secondary {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: #f3f0ff; border: none; border-radius: 16px; padding: 13px;
+      font-size: 13px; font-weight: 800; color: #6c5ce7;
+      margin: 0 0 16px; text-decoration: none;
+    }
+    html[data-theme="dark"] .buy-ticket-secondary { background: rgba(108,92,231,0.15); }
 
     /* ---- TICKET REEL ---- */
     #reel-section {
@@ -393,7 +409,14 @@
 
       <a href="https://t.me/+fPu591BuqSRiYTY0" target="_blank" class="telegram-secondary">
         <i class="fa-brands fa-telegram"></i>
-        Also watch it happen live on <strong>Telegram</strong>
+        Join Live Draw on Telegram 🚀
+      </a>
+      <p class="live-draw-explainer">
+        The live random reel and winner announcement happen inside our official Telegram community, right at draw time.
+      </p>
+      <a href="buy-ticket.html" class="buy-ticket-secondary">
+        <i class="fa-solid fa-ticket"></i>
+        Buy a Ticket for Tonight
       </a>
 
       <div id="winners-section" style="display:none;">
@@ -454,21 +477,26 @@
         countdownTimer = setInterval(tick, 1000);
       }
 
+      let isAdminUser = false;
+
       function renderWaiting(slot, entries, participants) {
         document.getElementById('draw-hero').classList.remove('drawn');
         document.getElementById('hero-tag').textContent = 'LIVE DRAW';
         const label = slot.label || 'Next Draw';
         const timeStr = fmtSlotTime(slot.slot_time);
+        const entriesHTML = isAdminUser ? `
+          <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+            <div class="entries-pill"><i class="fa-solid fa-ticket"></i> <strong id="entries-count">${entries}</strong> ticket${entries === 1 ? '' : 's'} entered</div>
+            <div class="entries-pill"><i class="fa-solid fa-users"></i> <strong id="participants-count">${participants}</strong> participant${participants === 1 ? '' : 's'}</div>
+          </div>
+        ` : '';
         document.getElementById('hero-body').innerHTML = `
           <h2>${escapeHtml(label)} is coming up</h2>
           <p>Every ticket bought now is entered into this draw</p>
           <div class="countdown-row">
             <div class="countdown-box"><strong id="countdown-values">--:--:--</strong><span>Until ${timeStr}</span></div>
           </div>
-          <div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-            <div class="entries-pill"><i class="fa-solid fa-ticket"></i> <strong id="entries-count">${entries}</strong> ticket${entries === 1 ? '' : 's'} entered</div>
-            <div class="entries-pill"><i class="fa-solid fa-users"></i> <strong id="participants-count">${participants}</strong> participant${participants === 1 ? '' : 's'}</div>
-          </div>
+          ${entriesHTML}
         `;
         startCountdown(slotTargetDate(slot));
         document.getElementById('winners-section').style.display = 'none';
@@ -1085,6 +1113,17 @@
       async function init() {
         const client = window.getSupabaseClient();
         if (!client) return;
+
+        const { data: { user } } = await client.auth.getUser();
+        if (user) {
+          const { data: profile } = await client
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single();
+          isAdminUser = !!profile?.is_admin;
+        }
+
         await loadDrawStatus(client);
 
         // Poll for the moment any watched draw actually happens — no
