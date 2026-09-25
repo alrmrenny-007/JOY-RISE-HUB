@@ -184,6 +184,8 @@
         `).join('');
       }
 
+      let isAdminUser = false;
+
       function renderDrawCard(d) {
         const dateStr = new Date(d.draw_date + 'T00:00:00').toLocaleDateString('en-NG', {
           day: 'numeric', month: 'short', year: 'numeric',
@@ -210,18 +212,20 @@
             <div class="draw-summary-date">${dateStr} &middot; ${timeStr} WAT</div>
 
             <div class="draw-stats-grid">
-              <div>
-                <div class="draw-stat-label">Eligible Entries</div>
-                <div class="draw-stat-value">${Number(d.total_entries).toLocaleString('en-NG')}</div>
-              </div>
-              <div>
-                <div class="draw-stat-label">Draw Revenue</div>
-                <div class="draw-stat-value">&#8358;${fmt(d.total_revenue)}</div>
-              </div>
-              <div>
-                <div class="draw-stat-label">Prize Pool${pct > 0 ? ` (${pct}%)` : ''}</div>
-                <div class="draw-stat-value">&#8358;${fmt(d.prize_pool)}</div>
-              </div>
+              ${isAdminUser ? `
+                <div>
+                  <div class="draw-stat-label">Eligible Entries</div>
+                  <div class="draw-stat-value">${Number(d.total_entries).toLocaleString('en-NG')}</div>
+                </div>
+                <div>
+                  <div class="draw-stat-label">Draw Revenue</div>
+                  <div class="draw-stat-value">&#8358;${fmt(d.total_revenue)}</div>
+                </div>
+                <div>
+                  <div class="draw-stat-label">Prize Pool${pct > 0 ? ` (${pct}%)` : ''}</div>
+                  <div class="draw-stat-value">&#8358;${fmt(d.prize_pool)}</div>
+                </div>
+              ` : ''}
               <div>
                 <div class="draw-stat-label">Winners</div>
                 <div class="draw-stat-value">${d.winner_count}</div>
@@ -258,6 +262,16 @@
       async function loadDrawHistory() {
         const client = window.getSupabaseClient();
         if (!client) return;
+
+        const { data: { user } } = await client.auth.getUser();
+        if (user) {
+          const { data: profile } = await client
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single();
+          isAdminUser = !!profile?.is_admin;
+        }
 
         const listEl = document.getElementById('winners-list');
         const emptyEl = document.getElementById('winners-empty');
