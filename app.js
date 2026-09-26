@@ -886,12 +886,63 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     installBtn.addEventListener("click", async () => {
       document.getElementById("menu-panel")?.classList.remove("open");
+      await triggerInstallFlow();
+    });
 
+    // ---------- Proactive install banner ----------
+    // Modeled on the notification-permission banner: shows once for
+    // first-time visitors, "Not now" re-asks in 14 days rather than
+    // never again. Delayed slightly later than the notification
+    // banner's own 4s delay so the two don't compete for attention
+    // in the same moment.
+    const INSTALL_DISMISS_KEY = "joyrise_install_prompt_dismissed_at";
+    const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
+
+    function shouldShowInstallBanner() {
+      if (isRunningStandalone()) return false;
+      const dismissedAt = parseInt(localStorage.getItem(INSTALL_DISMISS_KEY) || "0", 10);
+      if (dismissedAt && Date.now() - dismissedAt < FOURTEEN_DAYS_MS) return false;
+      return true;
+    }
+
+    function showInstallBanner() {
+      if (!shouldShowInstallBanner()) return;
+
+      const navbar = document.querySelector(".bottom-navbar");
+      const bottomOffset = navbar ? navbar.offsetHeight : 0;
+
+      const banner = document.createElement("div");
+      banner.className = "cookie-banner";
+      banner.style.bottom = bottomOffset + "px";
+      banner.innerHTML = `
+        <p><i class="fa-solid fa-download" style="margin-right:6px;"></i>Install Joy-Rise Hub for faster access — no app store, no extra storage used.</p>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button type="button" id="install-banner-yes-btn">Install</button>
+          <button type="button" id="install-banner-dismiss-btn" style="background:transparent; color:#999;">Not now</button>
+        </div>
+      `;
+      document.body.appendChild(banner);
+      requestAnimationFrame(() => banner.classList.add("show"));
+
+      function dismiss() {
+        localStorage.setItem(INSTALL_DISMISS_KEY, Date.now().toString());
+        banner.classList.remove("show");
+        setTimeout(() => banner.remove(), 350);
+      }
+
+      document.getElementById("install-banner-yes-btn").addEventListener("click", async () => {
+        await triggerInstallFlow();
+        dismiss();
+      });
+      document.getElementById("install-banner-dismiss-btn").addEventListener("click", dismiss);
+    }
+
+    async function triggerInstallFlow() {
       if (deferredInstallPrompt) {
         deferredInstallPrompt.prompt();
         const { outcome } = await deferredInstallPrompt.userChoice;
         deferredInstallPrompt = null;
-        return;
+        return outcome;
       }
 
       if (isIos()) {
@@ -899,7 +950,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         showManualInstallInstructions();
       }
-    });
+    }
+
+    // Give the notification-permission banner (auth.js, 4s delay) a
+    // head start so the two never appear on top of each other.
+    setTimeout(showInstallBanner, 9000);
 
     function showManualInstallInstructions() {
       const overlay = document.createElement("div");
