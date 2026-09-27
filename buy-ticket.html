@@ -143,7 +143,7 @@
           <strong id="confirm-total-price">&#8358;0.00</strong>
         </div>
 
-        <div class="modal-error" id="confirm-error"></div>
+        <div class="modal-error" id="confirm-error" role="alert" aria-live="polite"></div>
       </div>
 
       <style>
@@ -258,6 +258,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="ui-helpers.js"></script>
   <script>
     (function () {
       document.getElementById('back-btn').addEventListener('click', () => {
@@ -645,7 +646,8 @@
             openPlaceDrawModal();
             init(); // refresh balances + results
           } catch (err) {
-            errorEl.textContent = err.message || 'Purchase failed.';
+            console.error('Ticket purchase error:', err);
+            errorEl.textContent = JoyRiseUI.friendlyError(err, "Couldn't complete your purchase. Please try again.");
           } finally {
             btn.disabled = false;
             btn.classList.remove('loading');

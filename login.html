@@ -117,14 +117,16 @@
     </div>
 
     <form class="auth-form" id="login-form">
-      <label class="auth-label">Email</label>
+      <label class="auth-label" for="login-email">Email</label>
       <input type="email" class="auth-input" id="login-email" placeholder="you@example.com" autocomplete="email" required />
 
-      <label class="auth-label">Password</label>
+      <label class="auth-label" for="login-password">Password</label>
       <input type="password" class="auth-input" id="login-password" placeholder="Your password" autocomplete="current-password" required />
       <a href="forgot-password.html" style="font-size:11px; color:#6c5ce7; font-weight:700; text-decoration:none; margin-top:8px; align-self:flex-end;">Forgot password?</a>
 
-      <div class="auth-error" id="login-error"></div>
+      <div id="login-captcha" style="margin-top:12px; display:none;"></div>
+
+      <div class="auth-error" id="login-error" role="alert" aria-live="polite"></div>
 
       <button type="submit" class="btn-auth-primary" id="login-submit-btn">
         <span id="login-submit-label">Log In</span>
@@ -157,6 +159,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="ui-helpers.js"></script>
   <script>
     (function () {
       const params = new URLSearchParams(window.location.search);
@@ -164,6 +167,9 @@
       if (ref) {
         document.getElementById('signup-link').href = `signup.html?ref=${encodeURIComponent(ref)}`;
       }
+
+      let captchaToken = null;
+      JoyRiseUI.renderCaptcha('login-captcha', (token) => { captchaToken = token; });
 
       function showSuspendedPanel(reason) {
         document.getElementById('login-form').style.display = 'none';
@@ -210,13 +216,24 @@
           return;
         }
 
+        const rateLimitKey = 'login:' + email.toLowerCase();
+        const rl = JoyRiseUI.checkRateLimit(rateLimitKey);
+        if (rl.blocked) {
+          errorEl.textContent = JoyRiseUI.formatLockMessage(rl.secondsLeft);
+          return;
+        }
+
         btn.disabled = true;
         btn.classList.add('loading');
 
         try {
           const client = window.getSupabaseClient();
-          const { data: signInData, error } = await client.auth.signInWithPassword({ email, password });
+          const signInOptions = { email, password };
+          if (captchaToken) signInOptions.options = { captchaToken };
+          const { data: signInData, error } = await client.auth.signInWithPassword(signInOptions);
           if (error) throw error;
+
+          JoyRiseUI.clearAttempts(rateLimitKey);
 
           // Check suspension immediately, before ever showing the dashboard.
           const { data: profile } = await client
@@ -253,8 +270,10 @@
           window.location.href = 'index.html';
         } catch (err) {
           console.error('Login error (full object):', err);
-          errorEl.textContent = err?.message || err?.error_description || err?.msg
-            || 'Login failed. Open the browser console for details.';
+          const lockSeconds = JoyRiseUI.recordFailedAttempt(rateLimitKey);
+          errorEl.textContent = lockSeconds
+            ? JoyRiseUI.formatLockMessage(lockSeconds)
+            : JoyRiseUI.friendlyError(err, 'Login failed. Please try again.');
 
           btn.disabled = false;
           btn.classList.remove('loading');

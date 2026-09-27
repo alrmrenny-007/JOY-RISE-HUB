@@ -47,20 +47,20 @@
           This is where your withdrawals will be sent. We verify the account name before saving — always double-check it matches you.
         </p>
 
-        <label class="auth-label">Bank</label>
+        <label class="auth-label" for="bank-select">Bank</label>
         <select class="auth-input" id="bank-select" style="margin-bottom:14px;">
           <option value="">Select your bank...</option>
         </select>
 
-        <label class="auth-label">Account Number</label>
+        <label class="auth-label" for="account-number-input">Account Number</label>
         <input type="text" class="auth-input" id="account-number-input" placeholder="10-digit account number" inputmode="numeric" maxlength="10" style="margin-bottom:14px;" />
 
-        <div id="verify-result" style="display:none; background:#f3f0ff; border-radius:12px; padding:12px 14px; margin-bottom:14px;">
+        <div id="verify-result" style="display:none; background:#f3f0ff; border-radius:12px; padding:12px 14px; margin-bottom:14px;" role="status" aria-live="polite">
           <div style="font-size:10px; color:#636e72; font-weight:700; text-transform:uppercase;">Account Name</div>
           <div id="verified-name" style="font-size:15px; font-weight:800; color:#1e1e24; margin-top:2px;"></div>
         </div>
 
-        <div class="modal-error" id="bank-error"></div>
+        <div class="modal-error" id="bank-error" role="alert" aria-live="polite"></div>
 
         <button class="btn-auth-primary" id="verify-btn" style="margin-top:6px;">
           <span id="verify-label">Verify Account</span>
@@ -90,6 +90,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="ui-helpers.js"></script>
   <script>
     (function () {
       document.getElementById('back-btn').addEventListener('click', () => {
@@ -139,7 +140,8 @@
           const result = await res.json();
 
           if (!result.success || !result.banks) {
-            select.innerHTML = `<option value="">Error: ${(result.error || 'unknown').slice(0, 60)}</option>`;
+            console.error('list-flutterwave-banks error:', result.error);
+            select.innerHTML = `<option value="">Couldn't load banks — please try again</option>`;
             return;
           }
 
@@ -152,7 +154,7 @@
           });
         } catch (err) {
           console.error('Bank list error:', err);
-          select.innerHTML = `<option value="">JS error: ${String(err.message || err).slice(0, 60)}</option>`;
+          select.innerHTML = `<option value="">Couldn't load banks — please try again</option>`;
         }
       }
 

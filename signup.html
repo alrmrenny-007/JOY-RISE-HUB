@@ -128,12 +128,12 @@
     </div>
 
     <form class="auth-form" id="signup-form">
-      <label class="auth-label">Full Name</label>
+      <label class="auth-label" for="signup-name">Full Name</label>
       <input type="text" class="auth-input" id="signup-name" placeholder="e.g. Ada Obi" autocomplete="name" required />
 
-      <label class="auth-label">Phone Number</label>
+      <label class="auth-label" for="signup-phone">Phone Number</label>
       <div class="phone-input-group">
-        <select class="auth-input phone-code-select" id="signup-phone-code">
+        <select class="auth-input phone-code-select" id="signup-phone-code" aria-label="Country code">
           <option value="+234" selected>🇳🇬 +234</option>
           <option value="+233">🇬🇭 +233</option>
           <option value="+254">🇰🇪 +254</option>
@@ -143,16 +143,16 @@
           <option value="+91">🇮🇳 +91</option>
           <option value="+971">🇦🇪 +971</option>
         </select>
-        <input type="tel" class="auth-input" id="signup-phone" placeholder="8012345678" autocomplete="tel" required />
+        <input type="tel" class="auth-input" id="signup-phone" placeholder="8012345678" autocomplete="tel" required aria-describedby="phone-hint" />
       </div>
       <small class="field-hint" id="phone-hint"></small>
 
-      <label class="auth-label">Email</label>
-      <input type="email" class="auth-input" id="signup-email" placeholder="you@example.com" autocomplete="email" required />
+      <label class="auth-label" for="signup-email">Email</label>
+      <input type="email" class="auth-input" id="signup-email" placeholder="you@example.com" autocomplete="email" required aria-describedby="email-hint" />
       <small class="field-hint" id="email-hint"></small>
 
-      <label class="auth-label">Password</label>
-      <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" autocomplete="new-password" required minlength="6" />
+      <label class="auth-label" for="signup-password">Password</label>
+      <input type="password" class="auth-input" id="signup-password" placeholder="At least 6 characters" autocomplete="new-password" required minlength="6" aria-describedby="password-strength-label" />
       <div class="password-strength-wrap">
         <div class="password-strength-track">
           <div class="password-strength-fill" id="password-strength-fill"></div>
@@ -160,8 +160,8 @@
         <div class="password-strength-label" id="password-strength-label">&nbsp;</div>
       </div>
 
-      <label class="auth-label">Referral / Promo Code <span style="font-weight:400; color:#9089b0;">(optional)</span></label>
-      <input type="text" class="auth-input" id="signup-promo-code" placeholder="e.g. FUNNY" style="text-transform:uppercase;" autocapitalize="characters" />
+      <label class="auth-label" for="signup-promo-code">Referral / Promo Code <span style="font-weight:400; color:#9089b0;">(optional)</span></label>
+      <input type="text" class="auth-input" id="signup-promo-code" placeholder="e.g. FUNNY" style="text-transform:uppercase;" autocapitalize="characters" aria-describedby="promo-code-hint" />
       <small id="promo-code-hint" style="display:block; margin:-10px 0 14px; font-size:11px; font-weight:700;"></small>
       <div class="promo-applied-banner" id="promo-applied-banner">
         <i class="fa-solid fa-circle-check"></i>
@@ -176,7 +176,9 @@
         </span>
       </label>
 
-      <div class="auth-error" id="signup-error"></div>
+      <div id="signup-captcha" style="margin-top:12px; display:none;"></div>
+
+      <div class="auth-error" id="signup-error" role="alert" aria-live="polite"></div>
 
       <button type="submit" class="btn-auth-primary" id="signup-submit-btn">
         <span id="signup-submit-label">Create Account</span>
@@ -190,6 +192,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="ui-helpers.js"></script>
   <script>
     (function () {
       const params = new URLSearchParams(window.location.search);
@@ -197,6 +200,9 @@
       const loginLink = document.getElementById('login-link');
       const promoInput = document.getElementById('signup-promo-code');
       const promoHint = document.getElementById('promo-code-hint');
+
+      let captchaToken = null;
+      JoyRiseUI.renderCaptcha('signup-captcha', (token) => { captchaToken = token; });
 
       const phoneCodeSelect = document.getElementById('signup-phone-code');
       const phoneInput = document.getElementById('signup-phone');
@@ -399,24 +405,40 @@
           return;
         }
 
+        // Device-level throttle — slows down scripted mass-signups (e.g.
+        // fake referral accounts) from a single browser, independent of
+        // which email/phone is used each time.
+        const rl = JoyRiseUI.checkRateLimit('signup_device');
+        if (rl.blocked) {
+          errorEl.textContent = JoyRiseUI.formatLockMessage(rl.secondsLeft);
+          return;
+        }
+
         btn.disabled = true;
         btn.classList.add('loading');
 
         try {
           const client = window.getSupabaseClient();
+          const signUpOptions = {
+            data: {
+              full_name: name,
+              phone_number: phone,
+              referral_code_used: promoCode
+            }
+          };
+          if (captchaToken) signUpOptions.captchaToken = captchaToken;
           const { data, error } = await client.auth.signUp({
             email,
             password,
-            options: {
-              data: {
-                full_name: name,
-                phone_number: phone,
-                referral_code_used: promoCode
-              }
-            }
+            options: signUpOptions
           });
 
           if (error) throw error;
+
+          // Count this as an attempt regardless of outcome, so a burst of
+          // signups from this device still gets throttled even when each
+          // one individually "succeeds".
+          JoyRiseUI.recordFailedAttempt('signup_device');
 
           if (data.session) {
             // Fire-and-forget — never let this block or fail signup.
@@ -439,8 +461,10 @@
         } catch (err) {
           console.error('Signup error (full object):', err);
           errorEl.style.color = '#ff4757';
-          errorEl.textContent = err?.message || err?.error_description || err?.msg
-            || 'Signup failed. Open the browser console for details.';
+          const lockSeconds = JoyRiseUI.recordFailedAttempt('signup_device');
+          errorEl.textContent = lockSeconds
+            ? JoyRiseUI.formatLockMessage(lockSeconds)
+            : JoyRiseUI.friendlyError(err, 'Signup failed. Please try again.');
           btn.disabled = false;
           btn.classList.remove('loading');
         }

@@ -73,6 +73,26 @@
 
     .receipt-actions { display: flex; gap: 10px; margin-top: 18px; }
     .receipt-actions button { flex: 1; }
+
+    /* ---- Shared mini search bar ---- */
+    .mini-search-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: #f4f5f9; border-radius: 12px; padding: 10px 14px;
+      margin-bottom: 12px;
+    }
+    .mini-search-bar i.fa-magnifying-glass { color: #9089b0; font-size: 13px; }
+    .mini-search-bar input {
+      flex: 1; border: none; background: none; outline: none;
+      font-size: 13px; font-weight: 600; color: #1e1e24; min-width: 0;
+    }
+    .mini-search-bar input::placeholder { color: #b2bec3; font-weight: 500; }
+    .mini-search-bar button {
+      border: none; background: none; color: #9089b0; cursor: pointer;
+      padding: 2px 4px; font-size: 13px;
+    }
+    html[data-theme="dark"] .mini-search-bar { background: #26263a; }
+    html[data-theme="dark"] .mini-search-bar input { color: #f1f2f6; }
+    html[data-theme="dark"] .mini-search-bar input::placeholder { color: #6b6b85; }
   </style>
 </head>
 <body>
@@ -91,6 +111,12 @@
     </header>
 
     <main class="main-content">
+
+      <div class="mini-search-bar">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="ticket-search-input" placeholder="Search by ticket code or tier..." aria-label="Search tickets" />
+        <button type="button" id="ticket-search-clear" aria-label="Clear search" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
 
       <div class="txn-filter-row" id="ticket-filter-row">
         <button class="txn-filter-chip active" data-filter="all">All</button>
@@ -142,6 +168,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="auth.js"></script>
+  <script src="ui-helpers.js"></script>
   <script>
     (function () {
       document.getElementById('back-btn').addEventListener('click', () => {
@@ -204,17 +231,29 @@
         `).join('');
       }
 
-      function render(filter) {
+      function render(filter, searchTerm) {
         const listEl = document.getElementById('tickets-list');
         const emptyEl = document.getElementById('tickets-empty');
 
-        const rows = filter === 'all' ? allTickets : allTickets.filter(t => t.status === filter);
+        let rows = filter === 'all' ? allTickets : allTickets.filter(t => t.status === filter);
+
+        const term = (searchTerm || '').trim().toLowerCase();
+        if (term) {
+          rows = rows.filter(t => {
+            const ticketCode = ('TK-' + String(t.ticket_number).padStart(4, '0')).toLowerCase();
+            const tierName = (t.ticket_tiers?.name || 'Custom').toLowerCase();
+            const drawLabel = drawInfoText(t).toLowerCase();
+            return ticketCode.includes(term) || tierName.includes(term) || drawLabel.includes(term);
+          });
+        }
 
         if (rows.length === 0) {
           listEl.innerHTML = '';
           emptyEl.style.display = 'flex';
           if (allTickets.length > 0) {
-            emptyEl.querySelector('p').textContent = 'No tickets match this filter.';
+            emptyEl.querySelector('p').textContent = term
+              ? `No tickets match "${searchTerm}".`
+              : 'No tickets match this filter.';
           }
           return;
         }
@@ -446,15 +485,34 @@
         }
 
         allTickets = data || [];
-        render('all');
+        render(currentFilter, currentSearch);
       }
+
+      let currentFilter = 'all';
+      let currentSearch = '';
 
       document.getElementById('ticket-filter-row').addEventListener('click', (e) => {
         const chip = e.target.closest('.txn-filter-chip');
         if (!chip) return;
         document.querySelectorAll('#ticket-filter-row .txn-filter-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
-        render(chip.dataset.filter);
+        currentFilter = chip.dataset.filter;
+        render(currentFilter, currentSearch);
+      });
+
+      const ticketSearchInput = document.getElementById('ticket-search-input');
+      const ticketSearchClear = document.getElementById('ticket-search-clear');
+      ticketSearchInput.addEventListener('input', () => {
+        currentSearch = ticketSearchInput.value;
+        ticketSearchClear.style.display = currentSearch ? '' : 'none';
+        render(currentFilter, currentSearch);
+      });
+      ticketSearchClear.addEventListener('click', () => {
+        ticketSearchInput.value = '';
+        currentSearch = '';
+        ticketSearchClear.style.display = 'none';
+        render(currentFilter, currentSearch);
+        ticketSearchInput.focus();
       });
 
       loadTickets();

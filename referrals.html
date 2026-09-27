@@ -176,13 +176,13 @@
         <p>Share a custom code instead of a link — people can type it in at signup. No one else can use the same code.</p>
         <div id="promo-code-current-wrap"></div>
         <div class="promo-code-form">
-          <input type="text" class="auth-input" id="promo-code-input" placeholder="e.g. FUNNY" maxlength="15" />
+          <input type="text" class="auth-input" id="promo-code-input" placeholder="e.g. FUNNY" maxlength="15" aria-label="Custom promo code" />
           <button class="btn-auth-primary" id="promo-code-save-btn" style="margin-top:0;">Save</button>
         </div>
         <small style="display:block; margin-top:8px; font-size:10.5px; color:#9089b0;">
           <i class="fa-solid fa-lock" style="margin-right:3px;"></i>You can only change this once every 30 days, so make sure it's right before saving.
         </small>
-        <div class="promo-code-feedback" id="promo-code-feedback"></div>
+        <div class="promo-code-feedback" id="promo-code-feedback" role="status" aria-live="polite"></div>
       </div>
 
       <!-- STATS -->
@@ -234,6 +234,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="ui-helpers.js"></script>
   <script>
     (function () {
       document.getElementById('back-btn').addEventListener('click', () => {
@@ -491,7 +492,7 @@
 
         if (error) {
           feedback.style.color = '#ff7675';
-          feedback.textContent = error.message || 'Could not save that code.';
+          feedback.textContent = JoyRiseUI.friendlyError(error, 'Could not save that code. Please try again.');
           return;
         }
 
@@ -509,7 +510,8 @@
         const { data, error } = await client.rpc('get_my_referrals');
 
         if (error) {
-          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(error.message)}</p>`;
+          console.error('get_my_referrals error:', error);
+          listEl.innerHTML = `<p style="font-size:12px;color:#ff4757;">${escapeHtml(JoyRiseUI.friendlyError(error, "Couldn't load your referrals. Please try again."))}</p>`;
           return;
         }
 

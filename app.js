@@ -440,7 +440,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       closeModal();
     } catch (err) {
-      modalError.textContent = err.message || "Something went wrong.";
+      console.error("Withdrawal error:", err);
+      modalError.textContent = window.JoyRiseUI
+        ? window.JoyRiseUI.friendlyError(err, "Couldn't process that withdrawal. Please try again.")
+        : "Couldn't process that withdrawal. Please try again.";
     } finally {
       setModalLoading(false);
     }
@@ -467,7 +470,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       'create_pending_flutterwave_payment', { p_amount: amount }
     );
     if (refError) {
-      showToast(refError.message || "Couldn't start payment.", "error");
+      console.error('create_pending_flutterwave_payment error:', refError);
+      showToast(window.JoyRiseUI ? window.JoyRiseUI.friendlyError(refError, "Couldn't start payment. Please try again.") : "Couldn't start payment. Please try again.", "error");
       return;
     }
 
@@ -504,6 +508,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             showToast(`Successfully deposited ₦${amount.toLocaleString()}!`);
             loadUserData();
           } else {
+            // This message comes from our own verify-flutterwave-payment
+            // function (already curated for users), so it's shown as-is.
             showToast(result.error || "Payment verification failed.", "error");
           }
         } catch (err) {

@@ -385,7 +385,8 @@
       <div class="draw-hero" id="draw-hero">
         <span class="live-tag"><span class="green-dot"></span> <span id="hero-tag">LIVE DRAW</span></span>
         <div id="hero-body">
-          <h2>Loading tonight's draw...</h2>
+          <div class="skeleton" style="width:70%; height:20px; margin:0 auto 10px; border-radius:6px;"></div>
+          <div class="skeleton" style="width:45%; height:12px; margin:0 auto; border-radius:6px;"></div>
         </div>
       </div>
 
@@ -433,6 +434,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="ui-helpers.js"></script>
   <script>
     (function () {
       document.getElementById('back-btn').addEventListener('click', () => {
@@ -1053,6 +1055,7 @@
         const { data: pendingRows, error: pendingErr } = await client.rpc('get_next_pending_slot');
 
         if (pendingErr || !pendingRows || pendingRows.length === 0) {
+          if (pendingErr) console.error('get_next_pending_slot error:', pendingErr);
           if (countdownTimer) clearInterval(countdownTimer);
           document.getElementById('draw-hero').classList.remove('drawn');
           document.getElementById('hero-tag').textContent = 'LIVE DRAW';
@@ -1114,21 +1117,37 @@
         const client = window.getSupabaseClient();
         if (!client) return;
 
-        const { data: { user } } = await client.auth.getUser();
-        if (user) {
-          const { data: profile } = await client
-            .from('profiles')
-            .select('is_admin')
-            .eq('id', user.id)
-            .single();
-          isAdminUser = !!profile?.is_admin;
+        try {
+          const { data: { user } } = await client.auth.getUser();
+          if (user) {
+            const { data: profile } = await client
+              .from('profiles')
+              .select('is_admin')
+              .eq('id', user.id)
+              .single();
+            isAdminUser = !!profile?.is_admin;
+          }
+
+          await loadDrawStatus(client);
+
+          // Poll for the moment any watched draw actually happens — no
+          // manual refresh needed.
+          setInterval(() => loadDrawStatus(client), 20000);
+        } catch (err) {
+          console.error('Live draw init error:', err);
+          document.getElementById('hero-body').innerHTML = `
+            <h2>Couldn't load the draw</h2>
+            <p>${JoyRiseUI ? JoyRiseUI.friendlyError(err, 'Please check your connection and try again.') : 'Please check your connection and try again.'}</p>
+            <button class="btn-auth-primary" id="draw-retry-btn" style="margin-top:12px;">Retry</button>
+          `;
+          document.getElementById('draw-retry-btn').addEventListener('click', () => {
+            document.getElementById('hero-body').innerHTML = `
+              <div class="skeleton" style="width:70%; height:20px; margin:0 auto 10px; border-radius:6px;"></div>
+              <div class="skeleton" style="width:45%; height:12px; margin:0 auto; border-radius:6px;"></div>
+            `;
+            init();
+          });
         }
-
-        await loadDrawStatus(client);
-
-        // Poll for the moment any watched draw actually happens — no
-        // manual refresh needed.
-        setInterval(() => loadDrawStatus(client), 20000);
       }
 
       init();
