@@ -2688,22 +2688,37 @@
         });
       }
 
-      async function loadUsers(client, search) {
-        const listEl = document.getElementById('users-list');
-        if (!search) listEl.innerHTML = skeletonHTML(4);
+      let usersOffset = 0;
+      let usersCurrentSearch = '';
+      let allLoadedUsers = [];
 
-        const { data, error } = await client.rpc('admin_list_users_full', { p_search: search || null });
+      async function loadUsers(client, search, append) {
+        const listEl = document.getElementById('users-list');
+
+        if (!append) {
+          usersOffset = 0;
+          usersCurrentSearch = search || '';
+          allLoadedUsers = [];
+          if (!search) listEl.innerHTML = skeletonHTML(4);
+        }
+
+        const { data, error } = await client.rpc('admin_list_users_full', {
+          p_search: usersCurrentSearch || null,
+          p_offset: usersOffset,
+        });
+
         if (error) {
           listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
           return;
         }
 
-        if (!data || data.length === 0) {
+        if (!append && (!data || data.length === 0)) {
           listEl.innerHTML = `<p style="font-size:12px;color:var(--faint);">No users found.</p>`;
           return;
         }
 
-        listEl.innerHTML = data.map(u => {
+        allLoadedUsers = append ? allLoadedUsers.concat(data || []) : (data || []);
+        const rowsHTML = (data || []).map(u => {
           const badges = [
             u.is_suspended ? `<span class="suspend-badge"><i class="fa-solid fa-ban"></i> Suspended</span>` : '',
             u.is_master_admin ? `<span class="admin-badge master-badge"><i class="fa-solid fa-crown"></i> Master Admin</span>`
@@ -2732,8 +2747,30 @@
         `;
         }).join('');
 
+        if (append) {
+          document.getElementById('users-load-more-wrap')?.remove();
+          listEl.insertAdjacentHTML('beforeend', rowsHTML);
+        } else {
+          listEl.innerHTML = rowsHTML;
+        }
+
+        // A full page (100 rows) means there could well be more behind it —
+        // this is what stops older users from being permanently invisible
+        // once you pass 100 total accounts.
+        if ((data || []).length === 100) {
+          listEl.insertAdjacentHTML('beforeend', `
+            <div id="users-load-more-wrap" style="text-align:center; margin-top:10px;">
+              <button id="users-load-more-btn" class="btn-modal-cancel" style="padding:9px 20px;">Load More Users</button>
+            </div>
+          `);
+          document.getElementById('users-load-more-btn').addEventListener('click', () => {
+            usersOffset += 100;
+            loadUsers(client, usersCurrentSearch, true);
+          });
+        }
+
         listEl.querySelectorAll('.user-row-toggle').forEach(row => {
-          row.addEventListener('click', () => toggleUserHistory(client, row.dataset.userId, data));
+          row.addEventListener('click', () => toggleUserHistory(client, row.dataset.userId, allLoadedUsers));
         });
 
         listEl.querySelectorAll('.user-id-copy').forEach(el => {
@@ -3012,13 +3049,13 @@
         const listEl = document.getElementById('admins-list');
         listEl.innerHTML = skeletonHTML(3);
 
-        const { data, error } = await client.rpc('admin_list_users_full', { p_search: null });
+        const { data, error } = await client.rpc('admin_list_all_admins');
         if (error) {
           listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
           return;
         }
 
-        const admins = (data || []).filter(u => u.is_admin);
+        const admins = data || [];
         if (admins.length === 0) {
           listEl.innerHTML = `<p style="font-size:12px;color:var(--faint);">No admins yet.</p>`;
           return;
