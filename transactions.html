@@ -398,6 +398,7 @@
         const rows = [];
         let title = meta.label;
         let refCode = t.id.slice(0, 8).toUpperCase();
+        let skipGenericDate = false;
 
         if (t.type === 'ticket_purchase') {
           title = 'Ticket Purchase';
@@ -428,11 +429,17 @@
             rows.push(['Draw', `#${String(win.draw_number).padStart(3, '0')}`]);
             rows.push(['Winning ticket', `#${fmtTicketCode(win.ticket_number)}`]);
             rows.push(['Draw time', fmtReceiptDate(win.draw_datetime)]);
+            // The payout timestamp and draw time are effectively the
+            // same moment — showing both as separate rows read as two
+            // conflicting dates rather than one.
+            skipGenericDate = true;
           }
           rows.push(['Credited to', walletLabel(t.wallet) + ' wallet']);
         }
 
-        rows.push(['Date', fmtReceiptDate(t.created_at)]);
+        if (!skipGenericDate) {
+          rows.push(['Date', fmtReceiptDate(t.created_at)]);
+        }
         rows.push(['Status', t.status === 'completed' ? 'Completed ✅' : escapeHtml(t.status)]);
 
         return {
