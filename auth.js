@@ -403,12 +403,11 @@
 
     if (profile && profile.is_suspended) {
       await client.auth.signOut();
-      const reasonLine = profile.suspension_reason ? ` Reason: ${profile.suspension_reason}` : '';
       try {
-        sessionStorage.setItem(
-          'joyrise_suspended_message',
-          `Your account has been suspended.${reasonLine} Contact support if you believe this is a mistake.`
-        );
+        sessionStorage.setItem('joyrise_suspended_flag', '1');
+        if (profile.suspension_reason) {
+          sessionStorage.setItem('joyrise_suspended_reason', profile.suspension_reason);
+        }
       } catch (e) {}
       window.location.href = 'login.html';
     }

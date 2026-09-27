@@ -223,6 +223,10 @@
       text-transform: uppercase; padding: 3px 8px; border-radius: 20px;
       background: rgba(255,71,87,0.18); color: #ff4757; margin-top: 3px;
     }
+    .suspend-reason {
+      display: block; font-size: 10.5px; font-weight: 500; font-style: italic;
+      color: #ff9aa2; margin-top: 4px; text-transform: none;
+    }
     .admin-badge {
       display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 800;
       text-transform: uppercase; padding: 3px 8px; border-radius: 20px;
@@ -2724,6 +2728,9 @@
             u.is_master_admin ? `<span class="admin-badge master-badge"><i class="fa-solid fa-crown"></i> Master Admin</span>`
               : u.is_admin ? `<span class="admin-badge"><i class="fa-solid fa-user-shield"></i> Admin</span>` : '',
           ].join('');
+          const suspendReasonHTML = (u.is_suspended && u.suspension_reason)
+            ? `<small class="suspend-reason"><i class="fa-solid fa-quote-left" style="font-size:8px;"></i> ${escapeHtml(u.suspension_reason)}</small>`
+            : '';
 
           return `
           <div class="user-row-wrap" data-user-id="${u.id}">
@@ -2738,6 +2745,7 @@
                   <i class="fa-regular fa-copy"></i> ${u.id}
                 </small>
                 ${badges ? `<div>${badges}</div>` : ''}
+                ${suspendReasonHTML}
               </div>
               <div class="winner-prize">₦${Number(u.winnings_balance).toLocaleString()}</div>
               <i class="fa-solid fa-chevron-down user-row-chevron" style="color:var(--faint); font-size:11px; margin-left:6px;"></i>
