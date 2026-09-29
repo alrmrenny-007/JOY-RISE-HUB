@@ -1098,8 +1098,136 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("resize", movePillToActiveNav);
   setTimeout(movePillToActiveNav, 50);
 
+  // ---------- DAILY CHECK-IN ----------
+  const CHECKIN_REWARDS = [5, 10, 10, 15, 15, 20, 25];
+  const checkinModalOverlay = document.getElementById("checkin-modal-overlay");
+  const checkinBannerSubtext = document.getElementById("checkin-banner-subtext");
+  const checkinClaimBtn = document.getElementById("checkin-claim-btn");
+  const checkinClaimLabel = document.getElementById("checkin-claim-label");
+  const checkinModalClaimBtn = document.getElementById("checkin-modal-claim-btn");
+  const checkinModalClaimLabel = document.getElementById("checkin-modal-claim-label");
+  const checkinModalCloseBtn = document.getElementById("checkin-modal-close-btn");
+  const checkinGrid = document.getElementById("checkin-grid");
+  const checkinCashbackBalanceEl = document.getElementById("checkin-cashback-balance");
+  const checkinErrorEl = document.getElementById("checkin-error");
+
+  let lastCheckinStatus = null;
+
+  function fmtN(n) {
+    return Number(n || 0).toLocaleString("en-NG", { minimumFractionDigits: 2 });
+  }
+
+  function renderCheckinGrid(status) {
+    if (!checkinGrid) return;
+    const currentDay = status.claimed_today ? status.streak_day : 0;
+    let html = "";
+    for (let day = 1; day <= 7; day++) {
+      const isDone = day <= currentDay;
+      const isToday = !status.claimed_today && day === status.next_reward_day;
+      const isDay7 = day === 7;
+      const cls = ["checkin-day"];
+      if (isDone) cls.push("is-done");
+      if (isToday) cls.push("is-today");
+      if (isDay7) cls.push("is-day7");
+      html += `
+        <div class="${cls.join(' ')}">
+          ${isDone ? '<i class="fa-solid fa-circle-check day-check"></i>' : ''}
+          <span class="checkin-day-label">Day ${day}</span>
+          <span class="checkin-day-amount">&#8358;${CHECKIN_REWARDS[day - 1]}</span>
+          ${isDay7 ? '<span style="font-size:9px; font-weight:700; color:#e17055;"><i class="fa-solid fa-ticket"></i> +1 Free Ticket</span>' : ''}
+        </div>`;
+    }
+    checkinGrid.innerHTML = html;
+  }
+
+  function updateCheckinUI(status) {
+    lastCheckinStatus = status;
+    if (checkinCashbackBalanceEl) checkinCashbackBalanceEl.textContent = fmtN(status.cashback_balance);
+    renderCheckinGrid(status);
+
+    const claimed = status.claimed_today;
+    [checkinClaimBtn, checkinModalClaimBtn].forEach(btn => {
+      if (!btn) return;
+      btn.disabled = claimed;
+      btn.style.opacity = claimed ? "0.6" : "1";
+    });
+    const label = claimed ? "Claimed — come back tomorrow!" : `Claim Today's Reward (₦${CHECKIN_REWARDS[status.next_reward_day - 1]})`;
+    if (checkinClaimLabel) checkinClaimLabel.textContent = claimed ? "Come back tomorrow" : "Claim Today's Reward";
+    if (checkinModalClaimLabel) checkinModalClaimLabel.textContent = label;
+    if (checkinBannerSubtext) {
+      checkinBannerSubtext.textContent = claimed
+        ? `Streak: Day ${status.streak_day}/7 — you're all set for today. Come back tomorrow to keep it going!`
+        : `You're on Day ${status.next_reward_day}/7 — claim ₦${CHECKIN_REWARDS[status.next_reward_day - 1]} cashback now.`;
+    }
+  }
+
+  async function loadCheckinStatus() {
+    if (!supabaseClient) return;
+    try {
+      const { data, error } = await supabaseClient.rpc("get_checkin_status");
+      if (error) throw error;
+      const status = Array.isArray(data) ? data[0] : data;
+      if (status) updateCheckinUI(status);
+    } catch (err) {
+      console.error("get_checkin_status error:", err);
+    }
+  }
+
+  async function claimDailyCheckin() {
+    if (!supabaseClient || (lastCheckinStatus && lastCheckinStatus.claimed_today)) return;
+    [checkinClaimBtn, checkinModalClaimBtn].forEach(btn => btn && (btn.disabled = true));
+    if (checkinErrorEl) checkinErrorEl.textContent = "";
+
+    try {
+      const deviceHash = await JoyRiseUI.getDeviceFingerprint();
+      const { data, error } = await supabaseClient.rpc("claim_daily_checkin", { p_device_hash: deviceHash });
+      if (error) throw error;
+
+      const result = Array.isArray(data) ? data[0] : data;
+      const oldBalance = lastCheckinStatus ? Number(lastCheckinStatus.cashback_balance) : 0;
+
+      showToast(
+        result.free_ticket_granted
+          ? `Day ${result.streak_day} complete! +₦${fmtN(result.bonus_amount)} cashback + 1 free ticket 🎟️`
+          : `Day ${result.streak_day} check-in! +₦${fmtN(result.bonus_amount)} cashback`,
+      );
+
+      if (checkinCashbackBalanceEl) {
+        animateNumber(checkinCashbackBalanceEl, oldBalance, Number(result.new_cashback_balance));
+      }
+
+      await loadCheckinStatus();
+    } catch (err) {
+      console.error("claim_daily_checkin error:", err);
+      const msg = JoyRiseUI.friendlyError(err, "Couldn't claim today's reward. Please try again.");
+      if (checkinErrorEl) checkinErrorEl.textContent = msg;
+      else showToast(msg, "error");
+      await loadCheckinStatus();
+    }
+  }
+
+  function openCheckinModal() {
+    if (checkinErrorEl) checkinErrorEl.textContent = "";
+    checkinModalOverlay?.classList.add("open");
+  }
+  function closeCheckinModal() {
+    checkinModalOverlay?.classList.remove("open");
+  }
+
+  checkinClaimBtn?.addEventListener("click", () => {
+    if (lastCheckinStatus && lastCheckinStatus.claimed_today) { openCheckinModal(); return; }
+    claimDailyCheckin();
+    openCheckinModal();
+  });
+  checkinModalClaimBtn?.addEventListener("click", claimDailyCheckin);
+  checkinModalCloseBtn?.addEventListener("click", closeCheckinModal);
+  checkinModalOverlay?.addEventListener("click", (e) => {
+    if (e.target === checkinModalOverlay) closeCheckinModal();
+  });
+
   await loadConfig();
   loadUserData();
+  loadCheckinStatus();
   loadDashboardDrawBanner();
   setInterval(loadDashboardDrawBanner, 20000);
   wireEnablePushButton();

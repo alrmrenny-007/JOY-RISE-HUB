@@ -201,6 +201,57 @@
     return !!TURNSTILE_SITE_KEY;
   }
 
+  // ============================================================
+  // 4. DEVICE FINGERPRINT (for daily check-in anti-abuse)
+  // ============================================================
+  // Produces a stable hash for "this browser on this device" without
+  // storing anything — so clearing localStorage/cookies or signing into
+  // a different account on the same phone still produces the same hash.
+  // This is a deterrent, not a guarantee: a different browser, incognito
+  // mode with fingerprint protection, or a fresh device will still get a
+  // fresh hash. Combine with device_checkin_log (server-side) as the
+  // actual enforcement.
+  let fingerprintPromise = null;
+
+  function getDeviceFingerprint() {
+    if (fingerprintPromise) return fingerprintPromise;
+    fingerprintPromise = (async () => {
+      const parts = [
+        navigator.userAgent || '',
+        navigator.language || '',
+        String(navigator.hardwareConcurrency || ''),
+        String(screen.width) + 'x' + String(screen.height) + 'x' + String(screen.colorDepth),
+        String(new Date().getTimezoneOffset()),
+      ];
+
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillText('JoyRiseHub-fingerprint-🎟️', 2, 2);
+        parts.push(canvas.toDataURL());
+      } catch (e) { /* canvas blocked — fall back to the other signals */ }
+
+      const raw = parts.join('||');
+
+      try {
+        const enc = new TextEncoder().encode(raw);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', enc);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      } catch (e) {
+        // Very old browser without SubtleCrypto — weak fallback hash.
+        let hash = 0;
+        for (let i = 0; i < raw.length; i++) {
+          hash = ((hash << 5) - hash + raw.charCodeAt(i)) | 0;
+        }
+        return 'fallback_' + Math.abs(hash).toString(16);
+      }
+    })();
+    return fingerprintPromise;
+  }
+
   window.JoyRiseUI = {
     friendlyError: friendlyError,
     checkRateLimit: checkRateLimit,
@@ -209,5 +260,6 @@
     formatLockMessage: formatLockMessage,
     renderCaptcha: renderCaptcha,
     isCaptchaConfigured: isCaptchaConfigured,
+    getDeviceFingerprint: getDeviceFingerprint,
   };
 })(window);

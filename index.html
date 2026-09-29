@@ -70,6 +70,36 @@
     @media (prefers-reduced-motion: reduce) {
       .onboarding-spotlight, .onboarding-tooltip, #onboarding-overlay { transition: none; }
     }
+    /* ---- Daily check-in ---- */
+    .checkin-banner { margin-bottom: 16px; }
+    .checkin-cashback-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff3e0; color: #b8631a; font-size: 12px; font-weight: 700;
+      padding: 10px 14px; border-radius: 12px; margin: 14px 0;
+    }
+    .checkin-cashback-pill i { font-size: 14px; }
+    .checkin-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+    .checkin-day {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; padding: 10px 4px; border-radius: 12px; background: #f4f5f9;
+      border: 2px solid transparent; position: relative;
+    }
+    .checkin-day.is-today { border-color: #6c5ce7; background: #f3f0ff; }
+    .checkin-day.is-done { background: #eafaf1; }
+    .checkin-day.is-done i.day-check { color: #00b894; }
+    .checkin-day.is-day7 { grid-column: span 2; }
+    .checkin-day-label { font-size: 9.5px; font-weight: 800; color: #9089b0; text-transform: uppercase; }
+    .checkin-day-amount { font-size: 12.5px; font-weight: 800; color: #1e1e24; }
+    .checkin-day i.day-check {
+      position: absolute; top: 4px; right: 6px; font-size: 10px; color: #b2bec3;
+    }
+    html[data-theme="dark"] .checkin-cashback-pill { background: #3a2c1a; color: #ffb86b; }
+    html[data-theme="dark"] .checkin-day { background: #26263a; }
+    html[data-theme="dark"] .checkin-day.is-today { background: #33294f; border-color: #8a7cff; }
+    html[data-theme="dark"] .checkin-day.is-done { background: #1c3a2e; }
+    html[data-theme="dark"] .checkin-day-amount { color: #f1f2f6; }
   </style>
 </head>
 <body>
@@ -145,6 +175,22 @@
           <h1>Alrm <span class="wave">👋</span></h1>
           <p>Let's rise together 🚀</p>
         </div>
+      </div>
+
+      <!-- DAILY CHECK-IN BANNER -->
+      <div class="card checkin-banner" id="checkin-banner">
+        <div class="card-header-flex">
+          <div class="gift-icon-box" style="background:#fff3e0; color:#e17055;">
+            <i class="fa-solid fa-calendar-check"></i>
+          </div>
+          <div class="referral-text">
+            <h3>Daily Check-In</h3>
+            <p id="checkin-banner-subtext">Check in daily for bonus cashback — miss a day and your streak resets.</p>
+          </div>
+        </div>
+        <button class="btn-auth-primary" id="checkin-claim-btn" style="margin-top:10px;">
+          <span id="checkin-claim-label">Claim Today's Reward</span>
+        </button>
       </div>
 
       <!-- WALLETS GRID -->
@@ -402,6 +448,37 @@
         <button class="onboarding-skip" id="onboarding-skip-btn">Skip</button>
         <button class="onboarding-next" id="onboarding-next-btn">Next</button>
       </div>
+    </div>
+  </div>
+
+  <!-- DAILY CHECK-IN MODAL -->
+  <div class="modal-overlay" id="checkin-modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-icon-circle" style="background:#fff3e0; color:#e17055;">
+          <i class="fa-solid fa-calendar-check"></i>
+        </div>
+        <div>
+          <h3>7-Day Check-In</h3>
+          <p>Come back daily to build your cashback streak</p>
+        </div>
+        <button class="modal-close-btn" id="checkin-modal-close-btn" aria-label="Close dialog">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="checkin-cashback-pill">
+        <i class="fa-solid fa-piggy-bank"></i>
+        <span>Cashback balance: <strong>&#8358;<span id="checkin-cashback-balance">0.00</span></strong></span>
+      </div>
+
+      <div class="checkin-grid" id="checkin-grid"></div>
+
+      <div class="modal-error" id="checkin-error" role="alert" aria-live="polite"></div>
+
+      <button class="btn-auth-primary" id="checkin-modal-claim-btn" style="margin-top:14px;">
+        <span id="checkin-modal-claim-label">Claim Today's Reward</span>
+      </button>
     </div>
   </div>
 
