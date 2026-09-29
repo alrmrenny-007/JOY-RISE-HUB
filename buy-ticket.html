@@ -138,9 +138,29 @@
           </div>
         </div>
 
+        <div class="cashback-toggle-row" id="free-ticket-toggle-row" style="display:none; background:#fff3e0;">
+          <span><i class="fa-solid fa-ticket" style="color:#e17055;"></i> Redeem 1 Free Ticket (no charge)</span>
+          <label class="cashback-switch">
+            <input type="checkbox" id="free-ticket-toggle-input" />
+            <span class="cashback-switch-track"></span>
+          </label>
+        </div>
+
+        <div class="cashback-toggle-row" id="cashback-toggle-row" style="display:none;">
+          <span>Use Cashback (<strong id="cashback-available-amount">&#8358;0.00</strong>)</span>
+          <label class="cashback-switch">
+            <input type="checkbox" id="cashback-toggle-input" />
+            <span class="cashback-switch-track"></span>
+          </label>
+        </div>
+
         <div class="ticket-price-row" style="margin-top:10px;">
           <span>Total</span>
           <strong id="confirm-total-price">&#8358;0.00</strong>
+        </div>
+        <div class="ticket-price-row" id="cashback-applied-row" style="display:none; font-size:11px; color:#00b894;">
+          <span><i class="fa-solid fa-piggy-bank"></i> Cashback applied</span>
+          <strong id="cashback-applied-amount">-&#8358;0.00</strong>
         </div>
 
         <div class="modal-error" id="confirm-error" role="alert" aria-live="polite"></div>
@@ -155,6 +175,26 @@
         }
         .qty-btn:active { background: #e4ddff; }
         .qty-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .cashback-toggle-row {
+          display: flex; align-items: center; justify-content: space-between;
+          background: #f3fbf6; border-radius: 10px; padding: 10px 12px;
+          font-size: 12.5px; font-weight: 600; color: #1e1e24; margin-top: 10px;
+        }
+        .cashback-switch { position: relative; width: 40px; height: 22px; display: inline-block; }
+        .cashback-switch input { opacity: 0; width: 0; height: 0; }
+        .cashback-switch-track {
+          position: absolute; inset: 0; background: #d3d6de; border-radius: 22px;
+          transition: background 0.2s ease; cursor: pointer;
+        }
+        .cashback-switch-track::before {
+          content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px;
+          background: #fff; border-radius: 50%; transition: transform 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .cashback-switch input:checked + .cashback-switch-track { background: #00b894; }
+        .cashback-switch input:checked + .cashback-switch-track::before { transform: translateX(18px); }
+        html[data-theme="dark"] .cashback-toggle-row { background: #1c3a2e; color: #f1f2f6; }
 
         .wallet-choice-btn {
           flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
@@ -271,6 +311,10 @@
       let selectedTier = null; // { id, name, price, isCustom }
       let ticketQuantity = 1;
       let selectedWallet = 'winnings';
+      let cashbackBalance = 0;
+      let freeTicketCredits = 0;
+      let useCashback = false;
+      let useFreeTicket = false;
       let prizeMultiplier = 10;
       let customMin = 100;
       let customMax = 10000;
@@ -344,13 +388,15 @@
 
         const { data: profile } = await client
           .from('profiles')
-          .select('winnings_balance, referral_balance')
+          .select('winnings_balance, referral_balance, cashback_balance, free_ticket_credits')
           .eq('id', currentUserId)
           .single();
 
         if (profile) {
           winningsBalance = Number(profile.winnings_balance || 0);
           referralBalance = Number(profile.referral_balance || 0);
+          cashbackBalance = Number(profile.cashback_balance || 0);
+          freeTicketCredits = Number(profile.free_ticket_credits || 0);
           document.getElementById('available-total').textContent =
             `₦${fmt(winningsBalance + referralBalance)}`;
         }
@@ -530,8 +576,37 @@
         selectedWallet = winningsBalance > 0 ? 'winnings' : 'referral';
         renderWalletChoices();
 
+        useCashback = false;
+        const cashbackRow = document.getElementById('cashback-toggle-row');
+        const cashbackToggleInput = document.getElementById('cashback-toggle-input');
+        cashbackToggleInput.checked = false;
+        cashbackRow.style.display = cashbackBalance > 0 ? 'flex' : 'none';
+
+        useFreeTicket = false;
+        const freeTicketRow = document.getElementById('free-ticket-toggle-row');
+        const freeTicketInput = document.getElementById('free-ticket-toggle-input');
+        freeTicketInput.checked = false;
+        freeTicketRow.style.display = (freeTicketCredits > 0 && !selectedTier.isCustom) ? 'flex' : 'none';
+        setFreeTicketMode(false);
+
         updateConfirmTotal();
         document.getElementById('confirm-modal-overlay').classList.add('open');
+      }
+
+      function setFreeTicketMode(on) {
+        useFreeTicket = on;
+        // Redeeming a free ticket is always exactly 1 ticket, no wallet/cashback involved
+        document.getElementById('qty-increment').disabled = on;
+        document.getElementById('qty-decrement').disabled = on || ticketQuantity <= 1;
+        document.getElementById('cashback-toggle-input').disabled = on;
+        document.querySelectorAll('.wallet-choice-btn').forEach(b => b.style.pointerEvents = on ? 'none' : '');
+        if (on) {
+          ticketQuantity = 1;
+          document.getElementById('qty-value').textContent = '1';
+          useCashback = false;
+          document.getElementById('cashback-toggle-input').checked = false;
+        }
+        updateConfirmTotal();
       }
 
       function renderWalletChoices() {
@@ -539,13 +614,14 @@
         document.getElementById('wallet-choice-referral-balance').textContent = `₦${fmt(referralBalance)}`;
 
         const total = unitPrice() * ticketQuantity;
+        const payable = total - cashbackToApply();
         const winBtn = document.getElementById('wallet-choice-winnings');
         const refBtn = document.getElementById('wallet-choice-referral');
 
         winBtn.classList.toggle('selected', selectedWallet === 'winnings');
         refBtn.classList.toggle('selected', selectedWallet === 'referral');
-        winBtn.classList.toggle('insufficient', total > 0 && winningsBalance < total);
-        refBtn.classList.toggle('insufficient', total > 0 && referralBalance < total);
+        winBtn.classList.toggle('insufficient', payable > 0 && winningsBalance < payable);
+        refBtn.classList.toggle('insufficient', payable > 0 && referralBalance < payable);
       }
 
       function unitPrice() {
@@ -555,11 +631,30 @@
         return selectedTier?.price || 0;
       }
 
-      function updateConfirmTotal() {
+      function cashbackToApply() {
+        if (!useCashback) return 0;
         const total = unitPrice() * ticketQuantity;
-        document.getElementById('confirm-total-price').textContent = `₦${fmt(total)}`;
-        const entries = ticketUnitPrice > 0 ? Math.round(total / ticketUnitPrice) : 0;
-        document.getElementById('confirm-entries').textContent = entries > 0 ? entries : '—';
+        return Math.min(cashbackBalance, total);
+      }
+
+      function updateConfirmTotal() {
+        const total = useFreeTicket ? 0 : unitPrice() * ticketQuantity;
+        const applied = useFreeTicket ? 0 : cashbackToApply();
+        const payable = total - applied;
+
+        document.getElementById('confirm-total-price').textContent = `₦${fmt(payable)}`;
+        document.getElementById('cashback-available-amount').textContent = `₦${fmt(Math.min(cashbackBalance, unitPrice() * ticketQuantity))}`;
+
+        const appliedRow = document.getElementById('cashback-applied-row');
+        if (applied > 0) {
+          appliedRow.style.display = 'flex';
+          document.getElementById('cashback-applied-amount').textContent = `-₦${fmt(applied)}`;
+        } else {
+          appliedRow.style.display = 'none';
+        }
+
+        const entries = ticketUnitPrice > 0 ? Math.round((unitPrice() * ticketQuantity) / ticketUnitPrice) : 0;
+        document.getElementById('confirm-entries').textContent = useFreeTicket ? 1 : (entries > 0 ? entries : '—');
         renderWalletChoices();
       }
 
@@ -590,6 +685,15 @@
         });
         document.getElementById('custom-amount-input').addEventListener('input', updateConfirmTotal);
 
+        document.getElementById('cashback-toggle-input').addEventListener('change', (e) => {
+          useCashback = e.target.checked;
+          updateConfirmTotal();
+        });
+
+        document.getElementById('free-ticket-toggle-input').addEventListener('change', (e) => {
+          setFreeTicketMode(e.target.checked);
+        });
+
         document.querySelectorAll('.wallet-choice-btn').forEach(btn => {
           btn.addEventListener('click', () => {
             selectedWallet = btn.dataset.wallet;
@@ -602,6 +706,28 @@
           const btn = document.getElementById('confirm-buy-btn');
 
           if (!selectedTier) return;
+
+          if (useFreeTicket) {
+            btn.disabled = true;
+            btn.classList.add('loading');
+            try {
+              const { data, error } = await client.rpc('redeem_free_ticket_credit', { p_tier_id: selectedTier.id });
+              if (error) throw error;
+              lastPurchasedTicketId = data?.[0]?.ticket_id || null;
+              freeTicketCredits = data?.[0]?.remaining_free_tickets ?? Math.max(0, freeTicketCredits - 1);
+              showToast(`Free ticket redeemed 🎟️ Good luck!`);
+              closeConfirmModal();
+              openPlaceDrawModal();
+              init();
+            } catch (err) {
+              console.error('redeem_free_ticket_credit error:', err);
+              errorEl.textContent = JoyRiseUI.friendlyError(err, "Couldn't redeem your free ticket. Please try again.");
+            } finally {
+              btn.disabled = false;
+              btn.classList.remove('loading');
+            }
+            return;
+          }
 
           let purchaseAmount = selectedTier.price;
 
@@ -618,8 +744,10 @@
           }
 
           const totalNeeded = purchaseAmount * ticketQuantity;
+          const cashbackApplied = cashbackToApply();
+          const payableNeeded = totalNeeded - cashbackApplied;
           const chosenBalance = selectedWallet === 'winnings' ? winningsBalance : referralBalance;
-          if (chosenBalance < totalNeeded) {
+          if (chosenBalance < payableNeeded) {
             const walletLabel = selectedWallet === 'winnings' ? 'Main' : 'Referral';
             errorEl.textContent = `Insufficient ${walletLabel} Wallet balance for ${ticketQuantity} ticket${ticketQuantity > 1 ? 's' : ''}.`;
             return;
@@ -630,8 +758,8 @@
 
           try {
             const rpcParams = selectedTier.isCustom
-              ? { p_tier_id: null, p_custom_amount: purchaseAmount, p_quantity: ticketQuantity, p_wallet: selectedWallet }
-              : { p_tier_id: selectedTier.id, p_custom_amount: null, p_quantity: ticketQuantity, p_wallet: selectedWallet };
+              ? { p_tier_id: null, p_custom_amount: purchaseAmount, p_quantity: ticketQuantity, p_wallet: selectedWallet, p_cashback_used: cashbackApplied }
+              : { p_tier_id: selectedTier.id, p_custom_amount: null, p_quantity: ticketQuantity, p_wallet: selectedWallet, p_cashback_used: cashbackApplied };
 
             const { data, error } = await client.rpc('buy_ticket', rpcParams);
             if (error) throw error;
@@ -639,9 +767,13 @@
             const ticketIds = data?.[0]?.ticket_ids || [];
             lastPurchasedTicketId = ticketIds[0] || null;
             const totalSpent = data?.[0]?.total_spent ?? (purchaseAmount * ticketQuantity);
+            if (data?.[0]?.cashback_balance !== undefined) {
+              cashbackBalance = Number(data[0].cashback_balance);
+            }
 
             const label = ticketQuantity > 1 ? `${ticketQuantity} tickets` : 'Ticket';
-            showToast(`${label} purchased for ₦${fmt(totalSpent)}! Good luck 🎟️`);
+            const cashbackNote = cashbackApplied > 0 ? ` (₦${fmt(cashbackApplied)} cashback applied)` : '';
+            showToast(`${label} purchased for ₦${fmt(totalSpent - cashbackApplied)}${cashbackNote}! Good luck 🎟️`);
             closeConfirmModal();
             openPlaceDrawModal();
             init(); // refresh balances + results
