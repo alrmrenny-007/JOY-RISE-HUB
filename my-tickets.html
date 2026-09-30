@@ -107,7 +107,7 @@
           <span class="brand-sub">Your Purchase History</span>
         </div>
       </div>
-      <a href="buy-ticket.html" class="icon-btn" style="text-decoration:none;" aria-label="Buy a ticket"><i class="fa-solid fa-plus"></i></a>
+      <a href="buy-ticket.html" class="icon-btn" style="text-decoration:none; flex-shrink:0;" aria-label="Buy a ticket"><i class="fa-solid fa-plus"></i></a>
     </header>
 
     <main class="main-content entrance-stagger">
@@ -215,7 +215,11 @@
         }
 
         const label = slot.label || fmtSlotTime(slot.slot_time);
-        return dateStr ? `${escapeHtml(label)} draw · ${dateStr}` : `${escapeHtml(label)} draw`;
+        // Some slot labels already say "Draw" (e.g. "Evening Draw"),
+        // others are just a time ("9:00 PM") — only append the word
+        // ourselves when the label doesn't already include it.
+        const suffix = /\bdraw\b/i.test(label) ? '' : ' draw';
+        return dateStr ? `${escapeHtml(label)}${suffix} · ${dateStr}` : `${escapeHtml(label)}${suffix}`;
       }
 
       function skeletonRows(count) {
