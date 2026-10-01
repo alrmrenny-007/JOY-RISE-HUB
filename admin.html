@@ -781,6 +781,9 @@
       <button type="button" class="admin-tab-btn" data-tab="settings">
         <i class="fa-solid fa-sliders"></i> Settings
       </button>
+      <button type="button" class="admin-tab-btn" data-tab="winners">
+        <i class="fa-solid fa-trophy"></i> Winners
+      </button>
       <button type="button" class="admin-tab-btn" data-tab="tickets">
         <i class="fa-solid fa-ticket"></i> Tickets
       </button>
@@ -978,6 +981,20 @@
       </div>
 
       <!-- TICKETS -->
+      <div class="admin-tab-page" data-tab="winners">
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Winners</h3>
+          <p style="font-size:12px; color:var(--muted,#9089b0); margin:6px 0 12px;">
+            Every winning ticket across all draws, with the real account name and phone for payout/support — not the masked public name shown on the live Winners page.
+          </p>
+          <input type="text" class="auth-input" id="winners-search" placeholder="Search by name, phone, or ticket code..." style="margin-bottom:12px;" />
+          <div id="winners-admin-list" class="winners-list"></div>
+          <div id="winners-admin-empty" style="display:none; text-align:center; padding:24px 0; color:var(--muted,#9089b0); font-size:13px;">
+            No winners found.
+          </div>
+        </section>
+      </div>
+
       <div class="admin-tab-page" data-tab="tickets">
         <section class="admin-section">
           <h3 class="admin-section-title"><i class="fa-solid fa-ticket"></i> Ticket Tiers</h3>
@@ -1223,6 +1240,8 @@
         loadMilestoneHistory(client);
         loadTiers(client);
         loadUsers(client, '');
+        loadWinnersAdmin(client, '');
+        wireWinnersSearch(client);
         loadFraudSignals(client);
         wireDrawModal(client);
         wireScheduleManager(client);
@@ -2689,6 +2708,58 @@
               saveBtn.disabled = false;
             }
           });
+        });
+      }
+
+      async function loadWinnersAdmin(client, search) {
+        const listEl = document.getElementById('winners-admin-list');
+        const emptyEl = document.getElementById('winners-admin-empty');
+        emptyEl.style.display = 'none';
+        if (!search) listEl.innerHTML = skeletonHTML(4);
+
+        const { data, error } = await client.rpc('admin_list_winners', {
+          p_search: search || null,
+          p_limit: 100,
+        });
+
+        if (error) {
+          console.error('admin_list_winners error:', error);
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          return;
+        }
+
+        listEl.innerHTML = data.map(w => {
+          const wonAt = w.won_at ? new Date(w.won_at).toLocaleString('en-NG', {
+            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos',
+          }) : '—';
+          const ticketCode = 'TK-' + String(w.ticket_number).padStart(4, '0');
+          return `
+          <div class="winner-row">
+            <div class="winner-avatar" style="background:rgba(245,185,66,0.18); color:#f5b942;">
+              <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div class="winner-info">
+              <strong>${escapeHtml(w.full_name || 'Unnamed')}</strong>
+              <small>${escapeHtml(w.phone_number || 'No phone')} &middot; ${escapeHtml(ticketCode)} &middot; ${escapeHtml(wonAt)}</small>
+            </div>
+            <div style="text-align:right; font-weight:800; color:var(--money,#00b894); font-size:13px;">
+              &#8358;${Number(w.prize_amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}
+            </div>
+          </div>`;
+        }).join('');
+      }
+
+      function wireWinnersSearch(client) {
+        let debounce;
+        document.getElementById('winners-search').addEventListener('input', (e) => {
+          clearTimeout(debounce);
+          debounce = setTimeout(() => loadWinnersAdmin(client, e.target.value.trim()), 300);
         });
       }
 

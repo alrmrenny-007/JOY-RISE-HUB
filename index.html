@@ -70,6 +70,85 @@
     @media (prefers-reduced-motion: reduce) {
       .onboarding-spotlight, .onboarding-tooltip, #onboarding-overlay { transition: none; }
     }
+    /* ---- Splash / entrance animation (plays once per browser session) ---- */
+    #splash-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 35%, #8a7cff 0%, #6c5ce7 45%, #4834b0 100%);
+      overflow: hidden;
+    }
+    #splash-overlay.fade-out { animation: splashFadeOut 0.6s ease forwards; }
+    @keyframes splashFadeOut {
+      to { opacity: 0; transform: scale(1.08); pointer-events: none; }
+    }
+    .splash-ring {
+      position: absolute; border: 2px solid rgba(255,255,255,0.35); border-radius: 50%;
+      width: 60px; height: 60px; animation: splashRing 1.8s ease-out infinite;
+    }
+    .splash-ring:nth-child(2) { animation-delay: 0.4s; }
+    .splash-ring:nth-child(3) { animation-delay: 0.8s; }
+    @keyframes splashRing {
+      0% { width: 60px; height: 60px; opacity: 0.8; }
+      100% { width: 340px; height: 340px; opacity: 0; }
+    }
+    .splash-logo-badge {
+      position: relative; z-index: 2;
+      background: #fff; color: #6c5ce7; font-weight: 900; font-size: 30px;
+      width: 78px; height: 78px; border-radius: 22px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+      animation: splashLogoPop 0.7s cubic-bezier(.17,.89,.32,1.49) both;
+    }
+    @keyframes splashLogoPop {
+      0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+      60% { transform: scale(1.15) rotate(6deg); opacity: 1; }
+      100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    }
+    .splash-wordmark {
+      position: relative; z-index: 2; margin-top: 18px;
+      color: #fff; font-weight: 900; font-size: 20px; letter-spacing: 3px;
+      opacity: 0; animation: splashTextUp 0.6s ease 0.5s both;
+    }
+    .splash-tagline {
+      position: relative; z-index: 2; margin-top: 6px;
+      color: rgba(255,255,255,0.85); font-weight: 600; font-size: 12px;
+      opacity: 0; animation: splashTextUp 0.6s ease 0.75s both;
+    }
+    @keyframes splashTextUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .splash-particle {
+      position: absolute; border-radius: 50%; background: #fff;
+      opacity: 0; animation: splashParticle 1.4s ease-out both;
+    }
+    @keyframes splashParticle {
+      0% { opacity: 0; transform: translate(0,0) scale(0.4); }
+      15% { opacity: 1; }
+      100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #splash-overlay { display: none !important; }
+    }
+
+    /* ---- Welcome-back notification (shown only right after login) ---- */
+    #welcome-back-toast {
+      position: fixed; left: 16px; right: 16px; top: -120px;
+      z-index: 500; display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(135deg, #6c5ce7, #8a7cff);
+      color: #fff; padding: 14px 16px; border-radius: 16px;
+      box-shadow: 0 14px 30px rgba(108,92,231,0.35);
+      transition: top 0.5s cubic-bezier(.17,.89,.32,1.29);
+    }
+    #welcome-back-toast.show { top: 16px; }
+    #welcome-back-toast .wb-emoji { font-size: 26px; }
+    #welcome-back-toast .wb-text strong { display: block; font-size: 13.5px; }
+    #welcome-back-toast .wb-text span { font-size: 11.5px; opacity: 0.9; }
+    #welcome-back-toast .wb-close {
+      margin-left: auto; background: rgba(255,255,255,0.2); border: none;
+      color: #fff; width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+    }
+
     /* ---- Daily check-in ---- */
     .checkin-banner { margin-bottom: 16px; }
     .checkin-cashback-pill {
@@ -103,6 +182,26 @@
   </style>
 </head>
 <body>
+
+  <!-- ENTRANCE SPLASH (plays once per browser session) -->
+  <div id="splash-overlay">
+    <div class="splash-ring"></div>
+    <div class="splash-ring"></div>
+    <div class="splash-ring"></div>
+    <div class="splash-logo-badge">JR</div>
+    <div class="splash-wordmark">JOY-RISE HUB</div>
+    <div class="splash-tagline">Let's rise together 🚀</div>
+  </div>
+
+  <!-- WELCOME BACK NOTIFICATION (shown once, right after logging in) -->
+  <div id="welcome-back-toast">
+    <span class="wb-emoji">👋</span>
+    <div class="wb-text">
+      <strong id="welcome-back-name">Welcome back!</strong>
+      <span>Good to see you again.</span>
+    </div>
+    <button class="wb-close" id="welcome-back-close" aria-label="Dismiss"><i class="fa-solid fa-xmark"></i></button>
+  </div>
 
   <div class="mobile-container">
 

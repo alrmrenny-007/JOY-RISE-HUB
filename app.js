@@ -33,6 +33,42 @@ window.addEventListener("appinstalled", () => {
 
 document.addEventListener("DOMContentLoaded", async () => {
 
+  // ---------- ENTRANCE SPLASH (once per browser session) ----------
+  (function runSplash() {
+    const splash = document.getElementById("splash-overlay");
+    if (!splash) return;
+    let alreadySeen = false;
+    try { alreadySeen = sessionStorage.getItem("joyrise_splash_seen") === "1"; } catch (e) {}
+
+    if (alreadySeen) {
+      splash.remove();
+      return;
+    }
+    try { sessionStorage.setItem("joyrise_splash_seen", "1"); } catch (e) {}
+
+    // Scatter a burst of little particles outward from center
+    for (let i = 0; i < 18; i++) {
+      const p = document.createElement("div");
+      p.className = "splash-particle";
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 90 + Math.random() * 160;
+      p.style.setProperty("--px", `${Math.cos(angle) * distance}px`);
+      p.style.setProperty("--py", `${Math.sin(angle) * distance}px`);
+      p.style.left = "50%";
+      p.style.top = "42%";
+      const size = 4 + Math.random() * 6;
+      p.style.width = `${size}px`;
+      p.style.height = `${size}px`;
+      p.style.animationDelay = `${0.15 + Math.random() * 0.5}s`;
+      splash.appendChild(p);
+    }
+
+    setTimeout(() => {
+      splash.classList.add("fade-out");
+      setTimeout(() => splash.remove(), 650);
+    }, 1900);
+  })();
+
   let currentUserId = null;
 
   // DOM Elements
@@ -216,6 +252,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (userDisplayName && profile.full_name) {
           userDisplayName.innerHTML = `${profile.full_name} <span class="wave">👋</span>`;
         }
+
+        // Welcome-back notification — only right after a fresh login
+        // (flag set by login.html), shown once, then cleared.
+        try {
+          if (sessionStorage.getItem("joyrise_just_logged_in")) {
+            sessionStorage.removeItem("joyrise_just_logged_in");
+            const firstName = (profile.full_name || "there").split(" ")[0];
+            const wbToast = document.getElementById("welcome-back-toast");
+            const wbName = document.getElementById("welcome-back-name");
+            if (wbToast && wbName) {
+              wbName.textContent = `Welcome back, ${firstName}!`;
+              setTimeout(() => wbToast.classList.add("show"), 600);
+              const hideWb = () => wbToast.classList.remove("show");
+              setTimeout(hideWb, 5000);
+              document.getElementById("welcome-back-close")?.addEventListener("click", hideWb);
+            }
+          }
+        } catch (e) {}
 
         if (userAvatarImg && profile.avatar_url) {
           userAvatarImg.src = profile.avatar_url;

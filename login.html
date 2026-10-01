@@ -267,6 +267,7 @@
             body: JSON.stringify({ event_type: 'login' }),
           }).catch(() => {});
 
+          try { sessionStorage.setItem('joyrise_just_logged_in', '1'); } catch (e) {}
           window.location.href = 'index.html';
         } catch (err) {
           console.error('Login error (full object):', err);
