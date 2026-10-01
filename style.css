@@ -147,6 +147,9 @@ body {
 }
 
 .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: #f4f5f9;
   border: none;
   width: 44px;
