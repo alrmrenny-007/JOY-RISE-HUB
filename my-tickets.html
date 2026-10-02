@@ -94,28 +94,16 @@
     html[data-theme="dark"] .mini-search-bar input { color: #f1f2f6; }
     html[data-theme="dark"] .mini-search-bar input::placeholder { color: #6b6b85; }
 
-    /* ---- First-visit hint on the "Buy Ticket" shortcut ---- */
-    #buy-ticket-shortcut { position: relative; }
-    #buy-ticket-shortcut.hint-pulse::after {
-      content: ""; position: absolute; inset: 0; border-radius: 50%;
-      border: 2px solid #6c5ce7; animation: buyHintPulse 1.4s ease-out 3;
+    /* ---- "Buy Ticket" shortcut: a labeled pill, not a bare icon,
+       so what it does is obvious without needing the hint below ---- */
+    #buy-ticket-shortcut {
+      position: relative;
+      width: auto; height: auto; border-radius: 22px;
+      padding: 10px 16px; gap: 6px;
+      background: #6c5ce7; color: #fff; font-size: 12.5px; font-weight: 800;
     }
-    @keyframes buyHintPulse {
-      0% { transform: scale(1); opacity: 0.9; }
-      100% { transform: scale(1.8); opacity: 0; }
-    }
-    #buy-ticket-tooltip {
-      position: absolute; top: 52px; right: 0; z-index: 20;
-      background: #1e1e24; color: #fff; font-size: 11px; font-weight: 700;
-      padding: 7px 12px; border-radius: 10px; white-space: nowrap;
-      opacity: 0; transform: translateY(-6px); pointer-events: none;
-      transition: opacity 0.3s ease, transform 0.3s ease;
-    }
-    #buy-ticket-tooltip.show { opacity: 1; transform: translateY(0); }
-    #buy-ticket-tooltip::before {
-      content: ""; position: absolute; top: -4px; right: 16px;
-      width: 8px; height: 8px; background: #1e1e24; transform: rotate(45deg);
-    }
+    #buy-ticket-shortcut:active { background: #5a4bd1; }
+    html[data-theme="dark"] #buy-ticket-shortcut { background: #8a7cff; color: #1e1e24; }
   </style>
 </head>
 <body>
@@ -132,7 +120,7 @@
       </div>
       <a href="buy-ticket.html" class="icon-btn" id="buy-ticket-shortcut" style="text-decoration:none; flex-shrink:0;" aria-label="Buy a ticket">
         <i class="fa-solid fa-plus"></i>
-        <span id="buy-ticket-tooltip">Buy more tickets</span>
+        <span>Buy Ticket</span>
       </a>
     </header>
 
@@ -546,25 +534,6 @@
       });
 
       loadTickets();
-
-      // One-time hint pointing at the Buy Ticket shortcut, so it's
-      // obvious what that "+" does the first time someone lands here.
-      try {
-        if (!sessionStorage.getItem('joyrise_buy_hint_seen')) {
-          sessionStorage.setItem('joyrise_buy_hint_seen', '1');
-          setTimeout(() => {
-            const shortcut = document.getElementById('buy-ticket-shortcut');
-            const tooltip = document.getElementById('buy-ticket-tooltip');
-            if (!shortcut || !tooltip) return;
-            shortcut.classList.add('hint-pulse');
-            tooltip.classList.add('show');
-            setTimeout(() => {
-              tooltip.classList.remove('show');
-              shortcut.classList.remove('hint-pulse');
-            }, 3000);
-          }, 900);
-        }
-      } catch (e) {}
     })();
   </script>
 </body>
