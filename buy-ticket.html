@@ -37,8 +37,20 @@
           <span class="brand-sub">Pick a Tier</span>
         </div>
       </div>
-      <a href="my-tickets.html" class="icon-btn" style="text-decoration:none;" aria-label="View my tickets"><i class="fa-solid fa-receipt"></i></a>
+      <a href="my-tickets.html" class="icon-btn" id="my-tickets-shortcut" style="text-decoration:none; flex-shrink:0;" aria-label="View my tickets">
+        <i class="fa-solid fa-receipt"></i>
+        <span>My Tickets</span>
+      </a>
     </header>
+
+    <style>
+      #my-tickets-shortcut {
+        width: auto; height: auto; border-radius: 22px;
+        padding: 10px 16px; gap: 6px;
+        background: #6c5ce7; color: #fff; font-size: 12.5px; font-weight: 800;
+      }
+      #my-tickets-shortcut:active { background: #5a4bd1; }
+    </style>
 
     <main class="main-content entrance-stagger">
 
