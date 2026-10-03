@@ -1783,7 +1783,7 @@ body {
 .faq-item[open] { background: #f3f0ff; }
 
 .faq-item summary {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   color: #1e1e24;
   cursor: pointer;
@@ -1809,7 +1809,7 @@ body {
 }
 
 .faq-item p {
-  font-size: 11px;
+  font-size: 13px;
   color: #636e72;
   margin-top: 8px;
   line-height: 1.5;
@@ -2543,6 +2543,8 @@ html[data-theme="dark"] .act-blue { background: #12222b !important; }
 html[data-theme="dark"] .auth-input { color: #F3F0FF; }
 html[data-theme="dark"] .auth-input::placeholder { color: #6B6389; }
 html[data-theme="dark"] .icon-btn { color: #F3F0FF; }
+html[data-theme="dark"] .txn-filter-chip { color: #F3F0FF; }
+html[data-theme="dark"] .txn-filter-chip.active { color: #fff; }
 
 /* ---------- Headings / primary text ---------- */
 html[data-theme="dark"] .brand-name,
