@@ -1782,6 +1782,20 @@ body {
 
 .faq-item[open] { background: #f3f0ff; }
 
+.app-footer {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #b2bec3;
+  padding: 18px 0 12px;
+  opacity: 0;
+  animation: fadeUpIn 0.6s ease 0.15s forwards;
+}
+html[data-theme="dark"] .app-footer { color: #5a5a72; }
+@media (prefers-reduced-motion: reduce) {
+  .app-footer { animation: none; opacity: 1; }
+}
+
 .faq-item summary {
   font-size: 14px;
   font-weight: 700;
