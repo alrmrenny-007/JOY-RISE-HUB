@@ -82,6 +82,52 @@
       </button>
 
       <div class="admin-section" style="margin-top:20px;">
+        <h3 class="admin-section-title"><i class="fa-solid fa-globe"></i> <span data-i18n="lang.title">Language</span></h3>
+        <select class="auth-input" id="language-select" style="margin-top:10px;" aria-label="Language"></select>
+      </div>
+
+      <div class="admin-section" style="margin-top:20px;">
+        <h3 class="admin-section-title"><i class="fa-solid fa-bell"></i> <span data-i18n="prefs.title">Notification Preferences</span></h3>
+        <table class="pref-table">
+          <thead><tr><th></th><th data-i18n="prefs.push">Push</th><th data-i18n="prefs.inapp">In-app</th></tr></thead>
+          <tbody id="pref-body">
+          <tr>
+            <td data-i18n="prefs.wins">Wins & prizes</td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="wins" data-kind="push" aria-label="Wins & prizes push" /><span></span></label></td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="wins" data-kind="inapp" aria-label="Wins & prizes in-app" /><span></span></label></td>
+          </tr>
+          <tr>
+            <td data-i18n="prefs.payments">Deposits & withdrawals</td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="payments" data-kind="push" aria-label="Deposits & withdrawals push" /><span></span></label></td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="payments" data-kind="inapp" aria-label="Deposits & withdrawals in-app" /><span></span></label></td>
+          </tr>
+          <tr>
+            <td data-i18n="prefs.referrals">Referral earnings</td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="referrals" data-kind="push" aria-label="Referral earnings push" /><span></span></label></td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="referrals" data-kind="inapp" aria-label="Referral earnings in-app" /><span></span></label></td>
+          </tr>
+          <tr>
+            <td data-i18n="prefs.draws">Draw reminders</td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="draws" data-kind="push" aria-label="Draw reminders push" /><span></span></label></td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="draws" data-kind="inapp" aria-label="Draw reminders in-app" /><span></span></label></td>
+          </tr>
+          <tr>
+            <td data-i18n="prefs.promos">Offers & bonuses</td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="promos" data-kind="push" aria-label="Offers & bonuses push" /><span></span></label></td>
+            <td><label class="pref-switch"><input type="checkbox" data-cat="promos" data-kind="inapp" aria-label="Offers & bonuses in-app" /><span></span></label></td>
+          </tr>
+          </tbody>
+        </table>
+        <p class="pref-note" id="pref-push-warning" style="display:none;"><span data-i18n="prefs.pushOff">Push is off on this device. Turn it on to receive push alerts.</span>
+          <button type="button" id="pref-enable-push" class="btn-auth-primary" style="margin-top:8px;"><span data-i18n="prefs.enable">Enable push</span></button></p>
+      </div>
+
+      <div class="admin-section" style="margin-top:20px;">
+        <h3 class="admin-section-title"><i class="fa-solid fa-repeat"></i> <span data-i18n="autobuy.title">Auto-Buy</span></h3>
+        <a href="auto-buy.html" class="btn-auth-primary" style="margin-top:10px; display:block; text-align:center; text-decoration:none;">Manage Auto-Buy</a>
+      </div>
+
+      <div class="admin-section" style="margin-top:20px;">
         <h3 class="admin-section-title"><i class="fa-solid fa-lock"></i> Change Password</h3>
         <input type="password" class="auth-input" id="new-password-input" placeholder="New password (min 6 characters)" style="margin-top:10px;" autocomplete="new-password" aria-label="New password" />
         <input type="password" class="auth-input" id="confirm-password-input" placeholder="Confirm new password" style="margin-top:10px;" autocomplete="new-password" aria-label="Confirm new password" />
@@ -135,6 +181,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="i18n.js"></script>
   <script src="ui-helpers.js"></script>
   <script>
     (function () {
@@ -492,6 +539,62 @@
       });
 
       init();
+    })();
+  </script>
+  <script>
+    // Notification preferences + language (profile page)
+    (function () {
+      const DEFAULTS = { wins:{push:true,inapp:true}, payments:{push:true,inapp:true}, referrals:{push:true,inapp:true}, draws:{push:true,inapp:true}, promos:{push:false,inapp:true} };
+      const client = window.getSupabaseClient();
+      let userId = null, prefs = JSON.parse(JSON.stringify(DEFAULTS)), saveTimer = null;
+
+      window.JoyRiseI18n.mountPicker(document.getElementById('language-select'));
+
+      function paint() {
+        document.querySelectorAll('#pref-body input').forEach((el) => {
+          el.checked = !!(prefs[el.dataset.cat] && prefs[el.dataset.cat][el.dataset.kind]);
+        });
+      }
+
+      function pushIsOn() {
+        return 'Notification' in window && Notification.permission === 'granted';
+      }
+      function refreshPushWarning() {
+        const anyPush = Object.keys(prefs).some((k) => prefs[k].push);
+        document.getElementById('pref-push-warning').style.display = (anyPush && !pushIsOn()) ? 'block' : 'none';
+      }
+
+      async function load() {
+        const { data: { user } } = await client.auth.getUser();
+        if (!user) return;
+        userId = user.id;
+        const { data } = await client.from('profiles').select('notification_prefs').eq('id', userId).single();
+        const saved = (data && data.notification_prefs) || {};
+        Object.keys(DEFAULTS).forEach((k) => { prefs[k] = Object.assign({}, DEFAULTS[k], saved[k] || {}); });
+        paint(); refreshPushWarning();
+      }
+
+      document.getElementById('pref-body').addEventListener('change', (e) => {
+        const el = e.target; if (!el.dataset.cat) return;
+        prefs[el.dataset.cat][el.dataset.kind] = el.checked;
+        refreshPushWarning();
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(async () => {   // debounce: one write per burst of toggles
+          const { error } = await client.from('profiles').update({ notification_prefs: prefs }).eq('id', userId);
+          const toast = document.getElementById('toast');
+          if (toast && !error) {
+            document.getElementById('toast-message').textContent = window.JoyRiseI18n.t('prefs.saved');
+            toast.classList.remove('error'); toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 1800);
+          } else if (error) { console.error('Saving prefs failed:', error); }
+        }, 500);
+      });
+
+      document.getElementById('pref-enable-push').addEventListener('click', async () => {
+        if (window.enablePushNotifications) { await window.enablePushNotifications(); refreshPushWarning(); }
+      });
+
+      load();
     })();
   </script>
 </body>

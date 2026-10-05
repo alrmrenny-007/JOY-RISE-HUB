@@ -53,6 +53,12 @@
     </style>
 
     <main class="main-content entrance-stagger">
+      <a href="auto-buy.html" class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;text-decoration:none;color:inherit;">
+        <i class="fa-solid fa-repeat" style="color:#6c5ce7;font-size:18px;"></i>
+        <span style="flex:1;font-size:13px;font-weight:700;" data-i18n="autobuy.title">Auto-Buy</span>
+        <i class="fa-solid fa-chevron-right" style="color:#9089b0;"></i>
+      </a>
+
 
       <div class="balance-summary" id="balance-summary">
         <span>Available: <strong id="available-total">&#8358;0.00</strong></span>
@@ -312,6 +318,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="i18n.js"></script>
   <script src="ui-helpers.js"></script>
   <script>
     (function () {

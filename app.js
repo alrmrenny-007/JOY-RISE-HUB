@@ -201,6 +201,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       currentUserId = user.id;
       loadNotifications(); // also handles the "withdrawal was just paid" pop-up check
+      loadSocialProof();
 
       const { data: profile, error } = await supabaseClient
         .from('profiles')
@@ -611,6 +612,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (qaWinners) qaWinners.addEventListener("click", () => { window.location.href = 'winners.html'; });
   if (qaTxns) qaTxns.addEventListener("click", () => { window.location.href = 'transactions.html'; });
 
+  // --- SOCIAL PROOF: biggest win this week (from the public draw history) ---
+  async function loadSocialProof() {
+    const card = document.getElementById("proof-card");
+    if (!card || !supabaseClient) return;
+    try {
+      const { data, error } = await supabaseClient.rpc("get_draw_history", { p_limit: 30 });
+      if (error || !data) return;
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      let best = null, winnerCount = 0;
+      data.forEach(d => {
+        if (new Date(d.draw_date + "T00:00:00").getTime() < weekAgo) return;
+        (d.winners || []).forEach(w => {
+          winnerCount++;
+          if (!best || Number(w.prize_amount) > Number(best.prize_amount)) best = { ...w, draw_number: d.draw_number };
+        });
+      });
+      if (!best) return; // nothing to brag about yet — keep the dashboard clean
+      const i18n = window.JoyRiseI18n;
+      document.getElementById("proof-amount").innerHTML = "&#8358;" + Number(best.prize_amount).toLocaleString("en-NG");
+      const who = best.display_name || "A winner"; // already the masked public name
+      document.getElementById("proof-meta").textContent =
+        `${who} · ${i18n ? i18n.t("proof.winners", { n: winnerCount }) : winnerCount + " winners this week"}`;
+      card.style.display = "flex";
+    } catch (e) {
+      console.warn("Social proof unavailable:", e);
+    }
+  }
+
   // --- HEADER: notifications dropdown ---
   const notificationBtn = document.getElementById("notification-btn");
   const notificationPanel = document.getElementById("notification-panel");
@@ -635,14 +664,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     signup_bonus: { icon: "fa-gift", color: "#f59f00", text: (t) => `₦${fmt(t.amount)} signup credit added` },
   };
 
+  // Which preference category each transaction type belongs to.
+  const NOTIF_CATEGORY = {
+    deposit: 'payments', withdrawal: 'payments', ticket_purchase: 'payments',
+    referral_bonus: 'referrals', win_payout: 'wins', signup_bonus: 'promos',
+  };
+
+  // Missing/unset prefs mean "everything on" — same as before this feature existed.
+  async function getInAppAllowed() {
+    try {
+      const { data } = await supabaseClient
+        .from('profiles').select('notification_prefs').eq('id', currentUserId).single();
+      const prefs = (data && data.notification_prefs) || {};
+      return (cat) => !(prefs[cat] && prefs[cat].inapp === false);
+    } catch (e) {
+      return () => true;
+    }
+  }
+
   async function loadNotifications() {
     if (!supabaseClient || !currentUserId) return;
-    const { data, error } = await supabaseClient
+    const inAppAllowed = await getInAppAllowed();
+    const { data: allRows, error } = await supabaseClient
       .from('transactions')
       .select('id, type, amount, status, created_at')
       .eq('user_id', currentUserId)
       .order('created_at', { ascending: false })
-      .limit(8);
+      .limit(20);
+    const data = (allRows || []).filter(t => inAppAllowed(NOTIF_CATEGORY[t.type] || 'payments')).slice(0, 8);
 
     if (error || !data || data.length === 0) {
       notificationEmpty.style.display = "block";

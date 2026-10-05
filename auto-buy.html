@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Auto-Buy — Joy-Rise Hub</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#6c5ce7" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+</head>
+<body>
+  <div class="mobile-container">
+    <header class="app-header">
+      <div class="logo-box">
+        <button class="icon-btn" id="back-btn" aria-label="Go back"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="logo-text" style="margin-left:8px;">
+          <span class="brand-name">AUTO-BUY</span>
+          <span class="brand-sub">Repeat tickets, with limits</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-content entrance-stagger">
+      <div class="card">
+        <div class="autobuy-status off" id="status"><i class="fa-solid fa-circle-pause"></i> <span id="status-text">Loading…</span></div>
+
+        <label class="autobuy-label" for="tier">Ticket</label>
+        <select class="auth-input" id="tier"></select>
+
+        <div class="autobuy-row">
+          <div>
+            <label class="autobuy-label" for="qty">Quantity (max 10)</label>
+            <input class="auth-input" id="qty" type="number" min="1" max="10" value="1" inputmode="numeric" />
+          </div>
+          <div>
+            <label class="autobuy-label" for="every">Repeat</label>
+            <select class="auth-input" id="every">
+              <option value="1">Every day</option>
+              <option value="7">Every week</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="autobuy-row">
+          <div>
+            <label class="autobuy-label" for="hour">Time (WAT)</label>
+            <select class="auth-input" id="hour"></select>
+          </div>
+          <div>
+            <label class="autobuy-label" for="wallet">Pay from</label>
+            <select class="auth-input" id="wallet">
+              <option value="winnings">Main Wallet</option>
+              <option value="referral">Referral Wallet</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="autobuy-label" for="cap">Weekly spending limit (&#8358;)</label>
+        <input class="auth-input" id="cap" type="number" min="100" step="100" inputmode="numeric" placeholder="e.g. 2000" />
+        <div class="modal-error" id="error" role="alert" aria-live="polite"></div>
+
+        <button class="btn-auth-primary" id="save-btn" style="margin-top:14px;"><span data-i18n="autobuy.save">Save Auto-Buy</span></button>
+        <button class="btn-auth-primary" id="cancel-btn" style="margin-top:8px; background:#ff7675; display:none;"><span data-i18n="autobuy.cancel">Turn Off Auto-Buy</span></button>
+
+        <div class="rg-box">
+          <strong>Play responsibly.</strong> Auto-Buy only spends what is in the wallet you choose, never goes over your weekly limit,
+          pauses itself after 3 failed attempts, and switches off automatically after 30 days until you renew it.
+          You can turn it off at any time. Never stake money you can't afford to lose. 18+ only.
+        </div>
+      </div>
+
+      <h3 class="admin-section-title" style="margin:20px 0 6px;"><i class="fa-solid fa-clock-rotate-left"></i> Recent runs</h3>
+      <div class="card" id="runs"><p style="font-size:12px;color:#9089b0;">No auto-buys yet.</p></div>
+    </main>
+    <p class="app-footer">Powered by Joy-Rise Hub &copy; 2026</p>
+  </div>
+
+  <div class="toast" id="toast"><i class="fa-solid fa-circle-check toast-icon" id="toast-icon"></i><span id="toast-message"></span></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="auth.js"></script>
+  <script src="i18n.js"></script>
+  <script src="ui-helpers.js"></script>
+  <script>
+  (function () {
+    const $ = (id) => document.getElementById(id);
+    const client = window.getSupabaseClient();
+    const t = (k) => window.JoyRiseI18n.t(k);
+    const naira = (n) => '\u20A6' + Number(n || 0).toLocaleString('en-NG');
+    let toastTimer;
+    function toast(msg, type) {
+      clearTimeout(toastTimer);
+      $('toast-message').textContent = msg;
+      $('toast').classList.toggle('error', type === 'error');
+      $('toast').classList.add('show');
+      toastTimer = setTimeout(() => $('toast').classList.remove('show'), 3000);
+    }
+    const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+    $('back-btn').addEventListener('click', () => { window.location.href = 'buy-ticket.html'; });
+    for (let h = 0; h < 24; h++) $('hour').insertAdjacentHTML('beforeend', `<option value="${h}">${String(h).padStart(2, '0')}:00</option>`);
+    $('hour').value = 18;
+
+    async function load() {
+      const { data: { user } } = await client.auth.getUser();
+      if (!user) { window.location.href = 'login.html'; return; }
+
+      const { data: tiers } = await client.from('ticket_tiers').select('id, name, price').eq('is_active', true).order('sort_order');
+      $('tier').innerHTML = (tiers || []).map((x) => `<option value="${x.id}">${esc(x.name)} — ${naira(x.price)}</option>`).join('');
+
+      const { data: plan } = await client.rpc('get_my_auto_buy');
+      const p = Array.isArray(plan) ? plan[0] : plan;
+      const on = !!(p && p.active);
+      $('status').className = 'autobuy-status ' + (on ? 'on' : 'off');
+      $('status').firstElementChild.className = 'fa-solid ' + (on ? 'fa-circle-check' : 'fa-circle-pause');
+      let text = 'Auto-Buy is off';
+      if (on) text = 'On \u2014 next run ' + new Date(p.next_run).toLocaleString('en-NG', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) +
+                     ' \u00b7 expires ' + new Date(p.expires_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
+      else if (p && p.paused_reason) text = 'Paused: ' + p.paused_reason;
+      $('status-text').textContent = text;
+      $('cancel-btn').style.display = on ? 'block' : 'none';
+      if (p) {
+        if (p.tier_id) $('tier').value = p.tier_id;
+        $('qty').value = p.quantity; $('every').value = p.every_n_days; $('hour').value = p.run_hour_wat;
+        $('wallet').value = p.wallet; $('cap').value = p.weekly_cap;
+      }
+
+      const { data: runs } = await client.rpc('get_my_auto_buy_runs');
+      if (runs && runs.length) {
+        $('runs').innerHTML = runs.map((r) => `<div class="autobuy-run"><span>${new Date(r.ran_at).toLocaleString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+          <span class="${r.status === 'ok' ? 'ok' : 'skip'}">${r.status === 'ok' ? naira(r.amount) + ' bought' : esc(r.note || 'Skipped')}</span></div>`).join('');
+      }
+    }
+
+    $('save-btn').addEventListener('click', async () => {
+      $('error').textContent = '';
+      const qty = parseInt($('qty').value, 10), cap = parseFloat($('cap').value);
+      if (!$('tier').value) { $('error').textContent = 'Choose a ticket.'; return; }
+      if (!qty || qty < 1 || qty > 10) { $('error').textContent = 'Quantity must be between 1 and 10.'; return; }
+      if (!cap || cap < 100) { $('error').textContent = 'Set a weekly spending limit of at least \u20A6100.'; return; }
+      const btn = $('save-btn'); btn.disabled = true;
+      try {
+        const { error } = await client.rpc('set_auto_buy', {
+          p_tier_id: $('tier').value, p_quantity: qty, p_every_n_days: parseInt($('every').value, 10),
+          p_run_hour_wat: parseInt($('hour').value, 10), p_wallet: $('wallet').value, p_weekly_cap: cap,
+        });
+        if (error) throw error;
+        toast(t('autobuy.saved')); await load();
+      } catch (err) {
+        $('error').textContent = JoyRiseUI.friendlyError(err, "Couldn't save Auto-Buy. Please try again.");
+      } finally { btn.disabled = false; }
+    });
+
+    $('cancel-btn').addEventListener('click', async () => {
+      const { error } = await client.rpc('cancel_auto_buy');
+      if (error) { toast(JoyRiseUI.friendlyError(error), 'error'); return; }
+      toast(t('autobuy.off')); load();
+    });
+
+    load();
+  })();
+  </script>
+</body>
+</html>

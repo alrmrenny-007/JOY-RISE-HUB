@@ -277,6 +277,17 @@
       </div>
 
       <!-- DAILY CHECK-IN BANNER -->
+      <!-- SOCIAL PROOF: biggest win this week -->
+      <a class="card proof-card" id="proof-card" href="winners.html" style="display:none;">
+        <div class="proof-icon"><i class="fa-solid fa-trophy"></i></div>
+        <div class="proof-text">
+          <small data-i18n="proof.biggest">Biggest win this week</small>
+          <strong id="proof-amount">&#8358;0</strong>
+          <span id="proof-meta"></span>
+        </div>
+        <i class="fa-solid fa-chevron-right proof-chev" aria-label="" data-i18n-aria-label="proof.see"></i>
+      </a>
+
       <div class="card checkin-banner" id="checkin-banner">
         <div class="card-header-flex">
           <div class="gift-icon-box" style="background:#fff3e0; color:#e17055;">
@@ -586,6 +597,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://checkout.flutterwave.com/v3.js"></script>
   <script src="auth.js"></script>
+  <script src="i18n.js"></script>
   <script src="ui-helpers.js"></script>
   <script src="app.js"></script>
 </body>

@@ -153,6 +153,12 @@
             <i class="fa-solid fa-share-nodes"></i>
           </button>
         </div>
+
+        <button class="btn-auth-primary" id="share-card-btn" style="margin-top:10px; background:#fff; color:#6c5ce7;">
+          <i class="fa-solid fa-image"></i> <span data-i18n="share.button">Share Card</span>
+        </button>
+        <p style="font-size:11px; opacity:0.85; margin-top:8px; line-height:1.5;" data-i18n="share.hint">A branded image with your code — perfect for WhatsApp Status and Instagram.</p>
+        <img id="share-card-preview" alt="Your referral card" style="display:none; width:100%; border-radius:16px; margin-top:12px;" />
       </div>
 
       <!-- CREATOR PROGRAM -->
@@ -236,7 +242,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="auth.js"></script>
+  <script src="i18n.js"></script>
   <script src="ui-helpers.js"></script>
+  <script src="share-card.js"></script>
   <script>
     (function () {
       document.getElementById('back-btn').addEventListener('click', () => {
@@ -244,6 +252,8 @@
       });
 
       let referralLink = '';
+      let displayCode = '';
+      let cardBlob = null;
       let currentUserId = null;
       let shareText = "Win real cash every day for joining live draws on Joy-Rise Hub! 💸\nPlus, earn up to ₦1000 from every referral and withdraw straight to your bank account.\nTap here to sign up now 👇";
       let toastTimer = null;
@@ -290,12 +300,13 @@
 
         const { data: profile } = await client
           .from('profiles')
-          .select('referral_code, total_referrals, active_referrals')
+          .select('referral_code, custom_referral_code, total_referrals, active_referrals')
           .eq('id', user.id)
           .single();
 
         if (profile) {
           referralLink = `${window.location.origin}${window.location.pathname.replace('referrals.html', '')}signup.html?ref=${profile.referral_code}`;
+          displayCode = profile.custom_referral_code || profile.referral_code || '';
           document.getElementById('referral-link-text').textContent = referralLink;
           document.getElementById('stat-total').textContent = profile.total_referrals || 0;
           document.getElementById('stat-active').textContent = profile.active_referrals || 0;
@@ -580,6 +591,29 @@
           });
         } catch (err) {
           // user cancelled the share sheet — not an error worth showing
+        }
+      });
+
+      document.getElementById('share-card-btn').addEventListener('click', async () => {
+        if (!referralLink || !displayCode) return;
+        const btn = document.getElementById('share-card-btn');
+        const t = (k) => window.JoyRiseI18n.t(k);
+        btn.disabled = true;
+        showToast(t('share.generating'));
+        try {
+          cardBlob = await window.JoyRiseShareCard.render({ code: displayCode, link: referralLink });
+          const prev = document.getElementById('share-card-preview');
+          if (prev.dataset.url) URL.revokeObjectURL(prev.dataset.url);
+          prev.dataset.url = URL.createObjectURL(cardBlob);
+          prev.src = prev.dataset.url;
+          prev.style.display = 'block';
+          const result = await window.JoyRiseShareCard.share(cardBlob, { link: referralLink, text: shareText });
+          if (result === 'downloaded') showToast(t('share.saved'));
+        } catch (err) {
+          console.error('Share card error:', err);
+          showToast(t('share.failed'), 'error');
+        } finally {
+          btn.disabled = false;
         }
       });
 

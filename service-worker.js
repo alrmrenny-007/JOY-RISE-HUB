@@ -1,4 +1,4 @@
-const CACHE_NAME = "joyrise-shell-v10";
+const CACHE_NAME = "joyrise-shell-v11";
 
 const SHELL_FILES = [
   "index.html",
@@ -13,6 +13,7 @@ const SHELL_FILES = [
   "buy-ticket.html",
   "my-tickets.html",
   "referrals.html",
+  "auto-buy.html",
   "profile.html",
   "bank-details.html",
   "help.html",
@@ -24,6 +25,8 @@ const SHELL_FILES = [
   "style.css",
   "app.js",
   "auth.js",
+  "i18n.js",
+  "share-card.js",
   "manifest.json",
   "favicon.webp",
   "favicon-32.png",
