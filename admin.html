@@ -781,6 +781,9 @@
       <button type="button" class="admin-tab-btn" data-tab="settings">
         <i class="fa-solid fa-sliders"></i> Settings
       </button>
+      <button type="button" class="admin-tab-btn" data-tab="audit-log">
+        <i class="fa-solid fa-clipboard-list"></i> Audit Log
+      </button>
       <button type="button" class="admin-tab-btn" data-tab="winners">
         <i class="fa-solid fa-trophy"></i> Winners
       </button>
@@ -981,6 +984,19 @@
       </div>
 
       <!-- TICKETS -->
+      <div class="admin-tab-page" data-tab="audit-log">
+        <section class="admin-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-clipboard-list"></i> Audit Log</h3>
+          <p style="font-size:12px; color:var(--muted,#9089b0); margin:6px 0 12px;">
+            Every admin action, who did it, and why — suspensions, admin grants/revokes, permission changes, withdrawal decisions, config and tier edits, and draws run.
+          </p>
+          <div id="audit-log-list"></div>
+          <div id="audit-log-empty" style="display:none; text-align:center; padding:24px 0; color:var(--muted,#9089b0); font-size:13px;">
+            No admin actions logged yet.
+          </div>
+        </section>
+      </div>
+
       <div class="admin-tab-page" data-tab="winners">
         <section class="admin-section">
           <h3 class="admin-section-title"><i class="fa-solid fa-trophy"></i> Winners</h3>
@@ -1196,6 +1212,18 @@
         }
       }
 
+      // Fire-and-forget admin accountability log — never blocks or fails
+      // the action it's logging.
+      function logAdminAction(client, actionType, targetUserId, details) {
+        client.rpc('log_admin_action', {
+          p_action_type: actionType,
+          p_target_user_id: targetUserId || null,
+          p_details: details || null,
+        }).then(({ error }) => {
+          if (error) console.error('log_admin_action error:', error);
+        });
+      }
+
       function skeletonHTML(count) {
         return Array.from({ length: count }).map(() => `
           <div class="skeleton-row">
@@ -1244,6 +1272,7 @@
         loadUsers(client, '');
         loadWinnersAdmin(client, '');
         wireWinnersSearch(client);
+        loadAuditLog(client);
         loadFraudSignals(client);
         wireDrawModal(client);
         wireScheduleManager(client);
@@ -1865,6 +1894,9 @@
             });
             if (error) throw error;
 
+            logAdminAction(client, 'run_draw', null,
+              `Slot ${currentSlot.id}${overrideCount ? `, ${overrideCount} winner(s)` : ''}${customToggle.checked ? ', custom prizes' : ''}`);
+
             closeModal();
             resultEl.textContent = '';
 
@@ -2021,6 +2053,8 @@
                 p_is_active: activeCheckbox.checked,
               });
               if (error) throw error;
+              logAdminAction(client, 'update_draw_slot', null,
+                `${labelInput.value.trim() || timeInput.value} (${editingSlotId})`);
             } else {
               const { error } = await client.rpc('admin_add_draw_slot', {
                 p_slot_time: timeInput.value,
@@ -2029,6 +2063,8 @@
                 p_planned_winner_count: formWinnerCount,
               });
               if (error) throw error;
+              logAdminAction(client, 'add_draw_slot', null,
+                `${labelInput.value.trim() || timeInput.value}`);
             }
 
             closeModal();
@@ -2089,6 +2125,7 @@
                 try {
                   const { error } = await client.rpc('admin_delete_draw_slot', { p_id: btn.dataset.id });
                   if (error) throw error;
+                  logAdminAction(client, 'delete_draw_slot', null, `${btn.dataset.time} (${btn.dataset.id})`);
                   loadSlotsList();
                   wireTodaySlots(client);
                 } catch (err) {
@@ -2113,6 +2150,7 @@
                       p_force: true,
                     });
                     if (forceError) throw forceError;
+                    logAdminAction(client, 'delete_draw_slot', null, `${btn.dataset.time} (${btn.dataset.id}), forced`);
                     loadSlotsList();
                     wireTodaySlots(client);
                   } catch (forceErr) {
@@ -2231,6 +2269,9 @@
                 p_is_active: activeInput.checked
               });
               if (error) throw error;
+              const tierName = row.querySelector('.tier-admin-header strong')?.textContent || tierId;
+              logAdminAction(client, 'update_tier', null,
+                `${tierName} → ₦${price}, ${activeInput.checked ? 'active' : 'inactive'}`);
               saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:var(--money);"></i>';
               setTimeout(() => { saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>'; }, 1500);
             } catch (err) {
@@ -2516,6 +2557,8 @@
                 p_reference: reference.trim(),
               });
               if (error) throw error;
+              logAdminAction(client, 'complete_withdrawal', null,
+                `Txn ${txnId} · ${row.querySelector('.withdrawal-amount')?.textContent || ''} · Ref: ${reference.trim()}`);
               row.remove();
               loadWithdrawals(client);
               loadWithdrawalHistory(client);
@@ -2541,6 +2584,8 @@
                 p_reason: reason.trim(),
               });
               if (error) throw error;
+              logAdminAction(client, 'reject_withdrawal', null,
+                `Txn ${txnId} · ${row.querySelector('.withdrawal-amount')?.textContent || ''} · Reason: ${reason.trim()}`);
               row.remove();
               loadUsers(client, document.getElementById('user-search').value.trim());
               loadWithdrawals(client);
@@ -2641,6 +2686,8 @@
             try {
               const { error } = await client.rpc('admin_approve_milestone_claim', { p_claim_id: claimId });
               if (error) throw error;
+              logAdminAction(client, 'approve_milestone_claim', null,
+                `Claim ${claimId} · ${row.querySelector('.withdrawal-amount')?.textContent || ''}`);
               row.remove();
               loadMilestones(client);
               loadMilestoneHistory(client);
@@ -2662,6 +2709,8 @@
                 p_reason: reason.trim() || null,
               });
               if (error) throw error;
+              logAdminAction(client, 'reject_milestone_claim', null,
+                `Claim ${claimId} · Reason: ${reason.trim() || 'No reason given'}`);
               row.remove();
               loadMilestones(client);
               loadMilestoneHistory(client);
@@ -2702,6 +2751,7 @@
             try {
               const { error } = await client.rpc('admin_update_config', { p_key: key, p_value: value });
               if (error) throw error;
+              logAdminAction(client, 'update_config', null, `${key} → ${value}`);
               saveBtn.innerHTML = '<i class="fa-solid fa-check" style="color:var(--money);"></i>';
               setTimeout(() => { saveBtn.innerHTML = '<i class="fa-solid fa-check"></i>'; }, 1500);
             } catch (err) {
@@ -2711,6 +2761,64 @@
             }
           });
         });
+      }
+
+      const AUDIT_ACTION_LABELS = {
+        suspend_user: { label: 'Suspended a user', icon: 'fa-ban', color: '#ff4757' },
+        unsuspend_user: { label: 'Restored a user', icon: 'fa-circle-check', color: '#00b894' },
+        grant_admin: { label: 'Granted admin access', icon: 'fa-user-shield', color: '#6c5ce7' },
+        revoke_admin: { label: 'Revoked admin access', icon: 'fa-user-slash', color: '#ff4757' },
+        update_admin_permissions: { label: 'Updated admin permissions', icon: 'fa-sliders', color: '#6c5ce7' },
+        complete_withdrawal: { label: 'Marked withdrawal paid', icon: 'fa-money-check', color: '#00b894' },
+        reject_withdrawal: { label: 'Rejected withdrawal', icon: 'fa-circle-xmark', color: '#ff4757' },
+        approve_milestone_claim: { label: 'Approved milestone claim', icon: 'fa-flag-checkered', color: '#00b894' },
+        reject_milestone_claim: { label: 'Rejected milestone claim', icon: 'fa-flag', color: '#ff4757' },
+        update_config: { label: 'Changed a setting', icon: 'fa-gear', color: '#f5b942' },
+        update_tier: { label: 'Edited a ticket tier', icon: 'fa-ticket', color: '#f5b942' },
+        run_draw: { label: 'Ran a draw', icon: 'fa-dice', color: '#6c5ce7' },
+        add_draw_slot: { label: 'Added a draw time', icon: 'fa-calendar-plus', color: '#00b894' },
+        update_draw_slot: { label: 'Edited a draw time', icon: 'fa-calendar', color: '#f5b942' },
+        delete_draw_slot: { label: 'Deleted a draw time', icon: 'fa-calendar-xmark', color: '#ff4757' },
+      };
+
+      async function loadAuditLog(client) {
+        const listEl = document.getElementById('audit-log-list');
+        const emptyEl = document.getElementById('audit-log-empty');
+        listEl.innerHTML = skeletonHTML(4);
+
+        const { data, error } = await client.rpc('admin_list_audit_log', { p_limit: 100 });
+
+        if (error) {
+          console.error('admin_list_audit_log error:', error);
+          listEl.innerHTML = `<p style="font-size:12px;color:var(--alert);">${escapeHtml(error.message)}</p>`;
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          listEl.innerHTML = '';
+          emptyEl.style.display = 'block';
+          return;
+        }
+        emptyEl.style.display = 'none';
+
+        listEl.innerHTML = data.map(entry => {
+          const meta = AUDIT_ACTION_LABELS[entry.action_type] || { label: entry.action_type, icon: 'fa-bell', color: '#9089b0' };
+          const when = new Date(entry.created_at).toLocaleString('en-NG', {
+            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Lagos',
+          });
+          const targetLine = entry.target_user_name ? ` &middot; Target: ${escapeHtml(entry.target_user_name)}` : '';
+          return `
+          <div class="winner-row">
+            <div class="winner-avatar" style="background:${meta.color}22; color:${meta.color};">
+              <i class="fa-solid ${meta.icon}"></i>
+            </div>
+            <div class="winner-info">
+              <strong>${escapeHtml(meta.label)}</strong>
+              <small>By ${escapeHtml(entry.admin_name || 'Unknown admin')}${targetLine} &middot; ${escapeHtml(when)}</small>
+              ${entry.details ? `<small style="display:block; margin-top:2px; font-style:italic; color:var(--faint,#9089b0);">${escapeHtml(entry.details)}</small>` : ''}
+            </div>
+          </div>`;
+        }).join('');
       }
 
       async function loadWinnersAdmin(client, search) {
@@ -2961,6 +3069,7 @@
           try {
             const { error } = await client.rpc('admin_suspend_user', { p_user_id: userId, p_reason: reason.trim() || null });
             if (error) throw error;
+            logAdminAction(client, 'suspend_user', userId, reason.trim() || 'No reason given');
             loadUsers(client, document.getElementById('user-search').value.trim());
           } catch (err) {
             alert(err.message || 'Failed to suspend this user.');
@@ -2972,6 +3081,7 @@
           try {
             const { error } = await client.rpc('admin_unsuspend_user', { p_user_id: userId });
             if (error) throw error;
+            logAdminAction(client, 'unsuspend_user', userId);
             loadUsers(client, document.getElementById('user-search').value.trim());
           } catch (err) {
             alert(err.message || 'Failed to unsuspend this user.');
@@ -2987,6 +3097,7 @@
           try {
             const { error } = await client.rpc('admin_revoke_admin', { p_user_id: userId });
             if (error) throw error;
+            logAdminAction(client, 'revoke_admin', userId);
             loadUsers(client, document.getElementById('user-search').value.trim());
             loadAdmins(client);
           } catch (err) {
@@ -3046,6 +3157,7 @@
           try {
             const { error } = await client.rpc('admin_grant_admin', { p_user_id: userId, p_permissions: permissions });
             if (error) throw error;
+            logAdminAction(client, 'grant_admin', userId, 'Permissions: ' + permissions.join(', '));
             feedback.style.color = 'var(--money)';
             feedback.textContent = 'Admin access granted!';
             document.getElementById('promote-user-id').value = '';
@@ -3167,6 +3279,7 @@
             try {
               const { error } = await client.rpc('admin_update_admin_permissions', { p_user_id: adminId, p_permissions: permissions });
               if (error) throw error;
+              logAdminAction(client, 'update_admin_permissions', adminId, 'New permissions: ' + (permissions.join(', ') || 'none'));
               alert('Permissions updated.');
             } catch (err) {
               alert(err.message || 'Could not update permissions.');
@@ -3178,6 +3291,7 @@
             try {
               const { error } = await client.rpc('admin_revoke_admin', { p_user_id: adminId });
               if (error) throw error;
+              logAdminAction(client, 'revoke_admin', adminId);
               loadAdmins(client);
               loadUsers(client, document.getElementById('user-search').value.trim());
             } catch (err) {
