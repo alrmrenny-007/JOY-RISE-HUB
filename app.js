@@ -70,6 +70,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   })();
 
   let currentUserId = null;
+  let currentUser = null;
 
   // DOM Elements
   const winningsDisplay = document.getElementById("val-winnings");
@@ -200,6 +201,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       currentUserId = user.id;
+      currentUser = user;
+      maybeAutoStartOnboarding(user);
       loadNotifications(); // also handles the "withdrawal was just paid" pop-up check
       loadSocialProof();
 
@@ -630,11 +633,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
       if (!best) return; // nothing to brag about yet — keep the dashboard clean
       const i18n = window.JoyRiseI18n;
-      document.getElementById("proof-amount").innerHTML = "&#8358;" + Number(best.prize_amount).toLocaleString("en-NG");
+      const amountEl = document.getElementById("proof-amount");
+      const metaEl = document.getElementById("proof-meta");
       const who = best.display_name || "A winner"; // already the masked public name
-      document.getElementById("proof-meta").textContent =
-        `${who} · ${i18n ? i18n.t("proof.winners", { n: winnerCount }) : winnerCount + " winners this week"}`;
+      const prize = Number(best.prize_amount);
+      const fmt = (n) => "&#8358;" + Math.round(n).toLocaleString("en-NG");
+
+      const paintMeta = () => {
+        const won = i18n ? i18n.t("proof.wonBy", { name: who }) : "Won by " + who;
+        const count = i18n ? i18n.t("proof.winners", { n: winnerCount }) : winnerCount + " winners this week";
+        metaEl.textContent = won + " \u00b7 " + count;
+      };
+      paintMeta();
+      document.addEventListener("joyrise:langchange", paintMeta);
+
+      // Count-up from 0 to the prize (skipped when the user prefers reduced motion).
+      const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduce) {
+        amountEl.innerHTML = fmt(prize);
+      } else {
+        const dur = 1100, t0 = performance.now();
+        const tick = (now) => {
+          const p = Math.min((now - t0) / dur, 1);
+          amountEl.innerHTML = fmt(prize * (1 - Math.pow(1 - p, 3))); // ease-out
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        amountEl.innerHTML = fmt(0);
+        requestAnimationFrame(tick);
+      }
       card.style.display = "flex";
+      card.classList.add("proof-in");
     } catch (e) {
       console.warn("Social proof unavailable:", e);
     }
@@ -1009,7 +1037,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function shouldShowInstallBanner() {
       if (isRunningStandalone()) return false;
-      const dismissedAt = parseInt(localStorage.getItem(INSTALL_DISMISS_KEY) || "0", 10);
+      const dismissedAt = parseInt(localStorage.getItem(`${INSTALL_DISMISS_KEY}_${currentUserId}`) || "0", 10);
       if (dismissedAt && Date.now() - dismissedAt < FOURTEEN_DAYS_MS) return false;
       return true;
     }
@@ -1034,7 +1062,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       requestAnimationFrame(() => banner.classList.add("show"));
 
       function dismiss() {
-        localStorage.setItem(INSTALL_DISMISS_KEY, Date.now().toString());
+        localStorage.setItem(`${INSTALL_DISMISS_KEY}_${currentUserId}`, Date.now().toString());
         banner.classList.remove("show");
         setTimeout(() => banner.remove(), 350);
       }
@@ -1063,7 +1091,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Give the notification-permission banner (auth.js, 4s delay) a
     // head start so the two never appear on top of each other.
-    setTimeout(showInstallBanner, 9000);
+    setTimeout(() => window.JoyRiseWhenFree(showInstallBanner), 9000);
 
     function showManualInstallInstructions() {
       const overlay = document.createElement("div");
@@ -1394,6 +1422,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const onboardingTitle = document.getElementById("onboarding-title");
   const onboardingText = document.getElementById("onboarding-text");
   const onboardingNextBtn = document.getElementById("onboarding-next-btn");
+  const onboardingBackBtn = document.getElementById("onboarding-back-btn");
   const onboardingSkipBtn = document.getElementById("onboarding-skip-btn");
   const menuTourBtn = document.getElementById("menu-tour-btn");
 
@@ -1404,77 +1433,125 @@ document.addEventListener("DOMContentLoaded", async () => {
       .join("");
   }
 
-  function positionOnboardingStep() {
-    // Skip past any step whose target isn't on the page for this user
-    // (e.g. layout differences) instead of getting stuck.
-    let step = onboardingSteps[onboardingIndex];
-    let target = step ? document.querySelector(step.selector) : null;
-    while (step && !target && onboardingIndex < onboardingSteps.length - 1) {
-      onboardingIndex++;
-      step = onboardingSteps[onboardingIndex];
-      target = step ? document.querySelector(step.selector) : null;
+  // Finds the nearest step (from `from`, going in direction `dir`) whose target
+  // actually exists on this page. Returns -1 if none.
+  function findValidStep(from, dir) {
+    for (let i = from; i >= 0 && i < onboardingSteps.length; i += dir) {
+      if (document.querySelector(onboardingSteps[i].selector)) return i;
     }
-    if (!target) {
-      endOnboarding();
-      return;
-    }
+    return -1;
+  }
 
-    target.scrollIntoView({ block: "center", behavior: "smooth" });
+  let onboardingRaf = null;
+  let onboardingLastRect = "";
 
-    // Give the smooth scroll a moment to settle before measuring.
-    setTimeout(() => {
-      const rect = target.getBoundingClientRect();
-      const pad = 8;
-      onboardingSpotlight.style.top = `${rect.top - pad}px`;
-      onboardingSpotlight.style.left = `${rect.left - pad}px`;
-      onboardingSpotlight.style.width = `${rect.width + pad * 2}px`;
-      onboardingSpotlight.style.height = `${rect.height + pad * 2}px`;
+  // Places the spotlight on the current step's target and the tooltip next to it.
+  function layoutOnboarding() {
+    const step = onboardingSteps[onboardingIndex];
+    const target = step && document.querySelector(step.selector);
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    const key = [rect.top, rect.left, rect.width, rect.height, window.innerHeight].map(Math.round).join(",");
+    if (key === onboardingLastRect) return; // nothing moved — skip the work
+    onboardingLastRect = key;
 
-      const tooltipWidth = 260;
-      const tooltipEstHeight = 150;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      let top = spaceBelow > tooltipEstHeight + 24
-        ? rect.bottom + pad + 12
-        : rect.top - pad - tooltipEstHeight - 12;
-      top = Math.max(12, Math.min(top, window.innerHeight - tooltipEstHeight - 12));
+    const pad = 8;
+    onboardingSpotlight.style.top = `${rect.top - pad}px`;
+    onboardingSpotlight.style.left = `${rect.left - pad}px`;
+    onboardingSpotlight.style.width = `${rect.width + pad * 2}px`;
+    onboardingSpotlight.style.height = `${rect.height + pad * 2}px`;
 
-      let left = rect.left;
-      left = Math.max(12, Math.min(left, window.innerWidth - tooltipWidth - 12));
+    // Use the tooltip's REAL height (it changes with the text), not a guess.
+    const tipH = onboardingTooltip.offsetHeight || 190;
+    const tipW = Math.min(260, window.innerWidth - 32);
+    const gap = 12, margin = 12;
+    const spaceBelow = window.innerHeight - (rect.bottom + pad) - margin;
+    const spaceAbove = rect.top - pad - margin;
 
-      onboardingTooltip.style.top = `${top}px`;
-      onboardingTooltip.style.left = `${left}px`;
+    let top;
+    if (spaceBelow >= tipH + gap) top = rect.bottom + pad + gap;
+    else if (spaceAbove >= tipH + gap) top = rect.top - pad - tipH - gap;
+    else top = spaceBelow >= spaceAbove ? window.innerHeight - tipH - margin : margin; // tight: use the roomier edge
+    top = Math.max(margin, Math.min(top, window.innerHeight - tipH - margin));
 
-      onboardingTitle.textContent = step.title;
-      onboardingText.textContent = step.text;
-      onboardingNextBtn.textContent = onboardingIndex === onboardingSteps.length - 1 ? "Let's go!" : "Next";
-      renderOnboardingDots();
-    }, 220);
+    let left = rect.left + rect.width / 2 - tipW / 2; // centred on the target
+    left = Math.max(margin, Math.min(left, window.innerWidth - tipW - margin));
+
+    onboardingTooltip.style.top = `${top}px`;
+    onboardingTooltip.style.left = `${left}px`;
+  }
+
+  // While the tour is open, keep re-checking the target's position so late layout
+  // changes (cards loading in, images, animations) can never leave it misaligned.
+  function trackOnboarding() {
+    if (!onboardingOverlay.classList.contains("open")) { onboardingRaf = null; return; }
+    layoutOnboarding();
+    onboardingRaf = requestAnimationFrame(trackOnboarding);
+  }
+
+  function showOnboardingStep() {
+    const step = onboardingSteps[onboardingIndex];
+    const target = document.querySelector(step.selector);
+    if (!target) { endOnboarding(); return; }
+
+    // Fill in the text FIRST so the tooltip has its final height when measured.
+    onboardingTitle.textContent = step.title;
+    onboardingText.textContent = step.text;
+    const isFirst = findValidStep(onboardingIndex - 1, -1) === -1;
+    const isLast = findValidStep(onboardingIndex + 1, 1) === -1;
+    onboardingBackBtn.hidden = isFirst;
+    onboardingNextBtn.textContent = isLast ? "Let's go!" : "Next";
+    renderOnboardingDots();
+
+    // Jump (no smooth scroll) so the position is final immediately — the old
+    // smooth scroll was still moving when the spotlight was measured.
+    target.scrollIntoView({ block: "center", behavior: "instant" });
+    onboardingLastRect = "";
+    layoutOnboarding();
+    if (!onboardingRaf) onboardingRaf = requestAnimationFrame(trackOnboarding);
   }
 
   function startOnboarding() {
-    onboardingIndex = 0;
+    const first = findValidStep(0, 1);
+    if (first === -1) return;
+    onboardingIndex = first;
     onboardingOverlay.classList.add("open");
-    positionOnboardingStep();
+    showOnboardingStep();
   }
 
   function endOnboarding() {
     onboardingOverlay.classList.remove("open");
-    try { localStorage.setItem(ONBOARDING_KEY, "1"); } catch (e) {}
+    markTourSeen();
+  }
+
+  // Remember the tour was seen: per account (so it follows the user across
+  // devices) and per browser as a fallback.
+  function markTourSeen() {
+    if (!currentUser) return;
+    try { localStorage.setItem(`${ONBOARDING_KEY}_${currentUser.id}`, "1"); } catch (e) {}
+    if (!(currentUser.user_metadata && currentUser.user_metadata.tour_seen)) {
+      supabaseClient.auth.updateUser({ data: { tour_seen: true } }).catch(() => {});
+    }
   }
 
   onboardingNextBtn?.addEventListener("click", () => {
-    if (onboardingIndex >= onboardingSteps.length - 1) {
-      endOnboarding();
-      return;
-    }
-    onboardingIndex++;
-    positionOnboardingStep();
+    const next = findValidStep(onboardingIndex + 1, 1);
+    if (next === -1) { endOnboarding(); return; }
+    onboardingIndex = next;
+    showOnboardingStep();
+  });
+
+  onboardingBackBtn?.addEventListener("click", () => {
+    const prev = findValidStep(onboardingIndex - 1, -1);
+    if (prev === -1) return;
+    onboardingIndex = prev;
+    showOnboardingStep();
   });
 
   onboardingSkipBtn?.addEventListener("click", endOnboarding);
 
   window.addEventListener("resize", () => {
-    if (onboardingOverlay.classList.contains("open")) positionOnboardingStep();
+    if (onboardingOverlay.classList.contains("open")) { onboardingLastRect = ""; layoutOnboarding(); }
   });
 
   menuTourBtn?.addEventListener("click", () => {
@@ -1482,12 +1559,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(startOnboarding, 200);
   });
 
-  // Only auto-start for genuinely first-time visitors on this browser.
-  try {
-    if (!localStorage.getItem(ONBOARDING_KEY)) {
-      setTimeout(startOnboarding, 1200);
-    }
-  } catch (e) {}
+  // Auto-start ONLY for accounts created in the last 7 days that haven't seen it.
+  // Older accounts (and anyone who finished/skipped it) get it from the menu only.
+  const NEW_ACCOUNT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+  function maybeAutoStartOnboarding(user) {
+    try {
+      const createdAt = new Date(user.created_at).getTime();
+      const isNewAccount = createdAt && (Date.now() - createdAt) < NEW_ACCOUNT_WINDOW_MS;
+      const seen = (user.user_metadata && user.user_metadata.tour_seen)
+        || localStorage.getItem(`${ONBOARDING_KEY}_${user.id}`)
+        || localStorage.getItem(ONBOARDING_KEY); // old per-browser flag
+      if (isNewAccount && !seen) setTimeout(startOnboarding, 1500);
+    } catch (e) {}
+  }
 });
 
 })();

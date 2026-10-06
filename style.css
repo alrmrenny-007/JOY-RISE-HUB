@@ -2734,3 +2734,37 @@ html[data-theme="dark"] .proof-text span, html[data-theme="dark"] .proof-text sm
 .rg-box { background:#fff3e0; color:#8a4b12; border-radius:12px; padding:12px 14px; font-size:11.5px; line-height:1.55; margin-top:14px; }
 html[data-theme="dark"] .rg-box { background:rgba(225,112,85,0.14); color:#f0b89c; }
 html[data-theme="dark"] .autobuy-status.off { background:rgba(255,255,255,0.08); color:#bbb; }
+
+/* ---- Biggest-win card: unique animation ---- */
+.proof-card { position:relative; overflow:hidden; opacity:0; }
+.proof-card.proof-in { animation: proofIn .6s cubic-bezier(.2,.9,.3,1.2) forwards; }
+@keyframes proofIn { from { opacity:0; transform: translateY(14px) scale(.96); } to { opacity:1; transform:none; } }
+
+/* light sweep across the card every few seconds */
+.proof-card::after { content:""; position:absolute; top:0; bottom:0; left:-60%; width:40%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.65), transparent);
+  transform: skewX(-18deg); animation: proofShine 4.5s ease-in-out 1.2s infinite; pointer-events:none; }
+@keyframes proofShine { 0% { left:-60%; } 35%,100% { left:130%; } }
+
+/* trophy pops, then tilts like it's being lifted */
+.proof-icon { animation: trophyPop 4.5s ease-in-out 1.2s infinite; transform-origin: 50% 80%; }
+@keyframes trophyPop {
+  0%, 40%, 100% { transform: none; }
+  8%  { transform: scale(1.18) rotate(-8deg); }
+  16% { transform: scale(1.12) rotate(7deg); }
+  24% { transform: scale(1.05) rotate(-3deg); }
+}
+
+/* gold sparkles twinkling around the trophy */
+.proof-spark { position:absolute; width:7px; height:7px; background:#f59f00; border-radius:2px; opacity:0;
+  transform: rotate(45deg) scale(0); animation: sparkle 3s ease-in-out infinite; pointer-events:none; }
+.proof-spark.s1 { left:46px; top:10px; animation-delay:1.4s; }
+.proof-spark.s2 { left:8px;  top:34px; animation-delay:2.3s; width:5px; height:5px; }
+.proof-spark.s3 { left:52px; bottom:8px; animation-delay:3.1s; width:6px; height:6px; }
+@keyframes sparkle { 0%,100% { opacity:0; transform: rotate(45deg) scale(0); } 30% { opacity:1; transform: rotate(135deg) scale(1.3); } 60% { opacity:0; transform: rotate(225deg) scale(.4); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .proof-card, .proof-card.proof-in { animation:none; opacity:1; }
+  .proof-card::after, .proof-icon, .proof-spark { animation:none; display:none; }
+  .proof-icon { display:flex; }
+}

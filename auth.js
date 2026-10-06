@@ -310,12 +310,28 @@
     }
   };
 
+  // Shows prompts one at a time: waits while the onboarding tour is open or
+  // another banner is on screen, so a prompt is never buried under the tour or
+  // stacked on top of another banner. Polls every 2s for up to ~4 minutes.
+  window.JoyRiseWhenFree = function (fn, tries) {
+    tries = tries || 0;
+    const tourOpen = document.getElementById("onboarding-overlay")?.classList.contains("open");
+    const bannerUp = document.querySelector(".cookie-banner.show");
+    if ((tourOpen || bannerUp) && tries < 120) {
+      setTimeout(() => window.JoyRiseWhenFree(fn, tries + 1), 2000);
+      return;
+    }
+    fn();
+  };
+
   // Shows a one-time opt-in banner (same visual style as the cookie
   // banner) to logged-in users who haven't decided yet. Never nags
   // someone who already said no, and never auto-prompts without a
   // tap — browsers penalize permission requests that aren't tied to
   // a real user gesture.
-  function setupNotificationPrompt() {
+  function setupNotificationPrompt(userId) {
+    // Dismissals are remembered per ACCOUNT, so a new account on the same phone still gets asked.
+    const dismissKey = "joyrise_notif_prompt_dismissed_at_" + userId;
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) {
       return; // not supported in this browser context (e.g. iOS Safari when not installed to home screen)
     }
@@ -326,7 +342,7 @@
     if (Notification.permission === "denied") {
       return; // they already said no — don't ask again
     }
-    const dismissedAt = parseInt(localStorage.getItem("joyrise_notif_prompt_dismissed_at") || "0", 10);
+    const dismissedAt = parseInt(localStorage.getItem(dismissKey) || "0", 10);
     const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
     if (dismissedAt && Date.now() - dismissedAt < FOURTEEN_DAYS_MS) return;
 
@@ -355,7 +371,7 @@
         // stronger signal than dismissing our banner, so don't re-ask
         // (Notification.permission === "denied" already short-circuits
         // this function on future visits anyway).
-        localStorage.setItem("joyrise_notif_prompt_dismissed_at", Date.now().toString());
+        localStorage.setItem(dismissKey, Date.now().toString());
       }
       banner.classList.remove("show");
       setTimeout(() => banner.remove(), 350);
@@ -363,7 +379,7 @@
 
     document.getElementById("notif-dismiss-btn").addEventListener("click", () => {
       // "Not now" — ask again in 14 days rather than never again.
-      localStorage.setItem("joyrise_notif_prompt_dismissed_at", Date.now().toString());
+      localStorage.setItem(dismissKey, Date.now().toString());
       banner.classList.remove("show");
       setTimeout(() => banner.remove(), 350);
     });
@@ -376,7 +392,7 @@
     if (!client) return;
     const { data: { user } } = await client.auth.getUser();
     if (!user) return;
-    setTimeout(setupNotificationPrompt, 4000);
+    setTimeout(() => window.JoyRiseWhenFree(() => setupNotificationPrompt(user.id)), 4000);
   }
 
   // ---------- Suspension enforcement ----------
