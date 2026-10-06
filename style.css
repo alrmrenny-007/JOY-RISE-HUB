@@ -2768,3 +2768,11 @@ html[data-theme="dark"] .autobuy-status.off { background:rgba(255,255,255,0.08);
   .proof-card::after, .proof-icon, .proof-spark { animation:none; display:none; }
   .proof-icon { display:flex; }
 }
+
+/* ---- Biggest-win card: auto-hide ---- */
+.proof-card.proof-out { animation: proofOut .6s cubic-bezier(.4,0,.2,1) forwards; pointer-events:none; }
+@keyframes proofOut {
+  from { opacity:1; transform:none; max-height:var(--proof-h, 90px); margin-bottom:16px; }
+  to   { opacity:0; transform:translateY(-12px) scale(.97); max-height:0; margin-bottom:0;
+         padding-top:0; padding-bottom:0; border-width:0; }
+}

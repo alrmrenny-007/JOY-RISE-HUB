@@ -632,6 +632,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
       });
       if (!best) return; // nothing to brag about yet — keep the dashboard clean
+      try { if (sessionStorage.getItem("joyrise_proof_hidden")) return; } catch (e) {}
       const i18n = window.JoyRiseI18n;
       const amountEl = document.getElementById("proof-amount");
       const metaEl = document.getElementById("proof-meta");
@@ -663,6 +664,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       card.style.display = "flex";
       card.classList.add("proof-in");
+
+      // Auto-hide after a few seconds: fade up and collapse so nothing below jumps.
+      const SHOW_FOR_MS = 8000;
+      const hideProofCard = () => {
+        try { sessionStorage.setItem("joyrise_proof_hidden", "1"); } catch (e) {}
+        if (reduce) { card.style.display = "none"; return; }
+        card.style.setProperty("--proof-h", card.offsetHeight + "px");
+        card.classList.remove("proof-in");
+        card.classList.add("proof-out");
+        card.addEventListener("animationend", (ev) => {
+          if (ev.animationName === "proofOut") card.style.display = "none";
+        });
+      };
+      setTimeout(hideProofCard, SHOW_FOR_MS);
     } catch (e) {
       console.warn("Social proof unavailable:", e);
     }
