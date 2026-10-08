@@ -1372,7 +1372,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   await loadConfig();
-  loadUserData();
+  // Arriving from the Wallet page with ?action=deposit|withdraw opens that dialog.
+  loadUserData().then(() => {
+    const action = new URLSearchParams(window.location.search).get("action");
+    if (action === "deposit" || action === "withdraw") {
+      history.replaceState(null, "", window.location.pathname);
+      openModal(action);
+    }
+  });
   loadCheckinStatus();
   loadDashboardDrawBanner();
   setInterval(loadDashboardDrawBanner, 20000);
