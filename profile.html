@@ -40,6 +40,7 @@
           <i class="fa-solid fa-lock"></i> <span id="name-cooldown-text"></span>
         </div>
         <input type="text" class="auth-input" id="name-input" placeholder="Your name" style="margin-top:10px;" aria-label="Display name" />
+        <p id="name-30-hint" style="font-size:11.5px; color:#9089b0; margin:6px 2px 0;"><i class="fa-solid fa-circle-info"></i> You can only change this once every 30 days.</p>
         <div class="modal-error" id="name-error" role="alert" aria-live="polite"></div>
       </div>
 
@@ -150,16 +151,16 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
           </div>
           <div>
-            <h3>Confirm Display Name Change</h3>
+            <h3>Confirm Name Change</h3>
           </div>
           <button class="modal-close-btn" id="name-confirm-close-btn" aria-label="Close dialog">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
         <div class="modal-body">
-          <p>
-            You are setting your public name to <strong id="name-confirm-new-name"></strong>.
-            Please confirm the spelling is correct. Once saved, you cannot change this name again for 30 days.
+          <div id="name-confirm-lines"></div>
+          <p style="margin-top:10px;">
+            Please confirm the spelling is correct. Once saved, you cannot change <span id="name-confirm-which">this name</span> again for 30 days.
           </p>
         </div>
         <div class="modal-footer">
@@ -194,6 +195,7 @@
       const isDicebearUrl = (url) => !!url && url.includes('dicebear.com');
 
       let currentUserId = null;
+      let originalFullName = '';
       let originalPublicName = ''; // captured on load, compared at save time to detect an actual edit
       let selectedAvatarSeed = AVATAR_SEEDS[0];
       // 'preset' = using one of the cartoon avatars below.
@@ -294,6 +296,7 @@
 
         document.getElementById('name-input').value = profile.full_name || '';
         document.getElementById('public-name-input').value = profile.public_display_name || '';
+        originalFullName = (profile.full_name || '').trim();
         originalPublicName = profile.public_display_name || '';
         updateMaskExample();
 
@@ -465,10 +468,23 @@
       // name field was actually edited, since a 30-day lock is a real
       // commitment and typos are otherwise easy to save by accident.
       const nameConfirmOverlay = document.getElementById('name-confirm-modal-overlay');
-      const nameConfirmNewNameEl = document.getElementById('name-confirm-new-name');
 
-      function openNameConfirmModal(newName) {
-        nameConfirmNewNameEl.textContent = newName;
+      function openNameConfirmModal(changes) {
+        // changes: [{ label: 'display name', value: '...' }, ...] — built with
+        // textContent (never innerHTML) so a typed name can't inject markup.
+        const box = document.getElementById('name-confirm-lines');
+        box.innerHTML = '';
+        changes.forEach((c) => {
+          const p = document.createElement('p');
+          p.style.margin = '0 0 6px';
+          p.append('You are setting your ' + c.label + ' to ');
+          const b = document.createElement('strong');
+          b.textContent = c.value;
+          p.append(b, '.');
+          box.appendChild(p);
+        });
+        document.getElementById('name-confirm-which').textContent =
+          changes.length > 1 ? 'these names' : (changes[0].label === 'display name' ? 'your display name' : 'your public name');
         nameConfirmOverlay.classList.add('open');
       }
       function closeNameConfirmModal() {
@@ -486,11 +502,18 @@
       });
 
       document.getElementById('save-btn').addEventListener('click', () => {
+        const fullName = document.getElementById('name-input').value.trim();
         const publicName = document.getElementById('public-name-input').value.trim();
-        const publicNameChanged = publicName !== (originalPublicName || '');
+        const fullNameChanged = fullName && fullName !== originalFullName;
+        const publicNameChanged = publicName && publicName !== (originalPublicName || '');
 
-        if (publicNameChanged && publicName) {
-          openNameConfirmModal(publicName);
+        // Either name locks for 30 days once saved, so warn before saving.
+        const changes = [];
+        if (fullNameChanged) changes.push({ label: 'display name', value: fullName });
+        if (publicNameChanged) changes.push({ label: 'public name', value: publicName });
+
+        if (changes.length) {
+          openNameConfirmModal(changes);
         } else {
           performSave();
         }
