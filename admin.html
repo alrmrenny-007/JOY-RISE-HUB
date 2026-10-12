@@ -1750,7 +1750,7 @@
           customRowsEl.innerHTML = customPrizeValues.map((val, i) => `
             <div class="pv-custom-prize-row">
               <label>Winner ${i + 1}</label>
-              <input type="number" step="0.01" min="0" class="pv-custom-prize-input" data-idx="${i}" value="${val}" />
+              <input type="number" step="0.01" min="0.01" class="pv-custom-prize-input" data-idx="${i}" value="${val}" />
             </div>
           `).join('');
 
@@ -1869,6 +1869,18 @@
         confirmBtn.addEventListener('click', async () => {
           errorEl.textContent = '';
 
+          // Every winner needs a prize above zero — a blank or 0 box would
+          // otherwise be sent to the database and rejected with a confusing error.
+          if (customToggle.checked) {
+            const badIdx = customPrizeValues.findIndex((v) => !(Number(v) > 0));
+            if (badIdx !== -1) {
+              errorEl.textContent = `Enter a prize greater than \u20A60 for Winner ${badIdx + 1}.`;
+              const badInput = customRowsEl.querySelector(`.pv-custom-prize-input[data-idx="${badIdx}"]`);
+              if (badInput) badInput.focus();
+              return;
+            }
+          }
+
           // Over-budget is now allowed (jackpots/promos can pay out
           // more than that draw's own pool) — but a native confirm()
           // still catches an accidental typo before real money moves.
@@ -1942,7 +1954,9 @@
             loadUsers(client, document.getElementById('user-search').value.trim());
             wireTodaySlots(client); // refresh the today's-draws list so this slot now shows completed
           } catch (err) {
-            errorEl.textContent = err.message || 'Draw failed.';
+            errorEl.textContent = /transactions_amount_check/.test(err.message || '')
+              ? 'Every winner needs a prize greater than \u20A60. Check the amounts and try again.'
+              : (err.message || 'Draw failed.');
           } finally {
             confirmBtn.disabled = false;
             confirmBtn.classList.remove('loading');
