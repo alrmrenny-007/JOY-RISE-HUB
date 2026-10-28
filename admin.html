@@ -924,6 +924,28 @@
           <div id="config-list" class="config-list"></div>
         </section>
 
+        <section class="admin-section" id="notif-pause-section">
+          <h3 class="admin-section-title"><i class="fa-solid fa-bell-slash"></i> Pause Notifications</h3>
+          <p id="notif-pause-status" style="font-size:13px; font-weight:700; margin:8px 0 4px;">Checking…</p>
+          <p style="font-size:11.5px; color:#9089b0; margin:0 0 10px; line-height:1.5;">
+            Pauses scheduled reminders and morning promo pushes for everyone. Winner, deposit and
+            withdrawal alerts, draws, and messages you send yourself are not affected.
+            Resumes automatically when the time is up.
+          </p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-auth-primary notif-pause-btn" data-minutes="60" style="flex:1; min-width:90px;">1 hour</button>
+            <button type="button" class="btn-auth-primary notif-pause-btn" data-minutes="360" style="flex:1; min-width:90px;">6 hours</button>
+            <button type="button" class="btn-auth-primary notif-pause-btn" data-minutes="1440" style="flex:1; min-width:90px;">24 hours</button>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+            <button type="button" class="btn-auth-primary notif-pause-btn" data-minutes="10080" style="flex:1; min-width:90px;">7 days</button>
+            <button type="button" class="btn-auth-primary notif-pause-btn" data-minutes="43200" style="flex:1; min-width:90px;">30 days</button>
+            <button type="button" class="btn-auth-primary notif-pause-btn" data-minutes="-1" style="flex:1; min-width:90px;">Until I resume</button>
+          </div>
+          <button type="button" id="notif-resume-btn" class="btn-auth-primary" style="margin-top:8px; background:#00b894; display:none;">Resume now</button>
+          <div class="modal-error" id="notif-pause-error" role="alert" aria-live="polite"></div>
+        </section>
+
         <section class="admin-section notif-composer">
           <div class="notif-composer-head">
             <div class="notif-composer-icon"><i class="fa-solid fa-tower-broadcast"></i></div>
@@ -2737,9 +2759,65 @@
         });
       }
 
+      // ---- Pause scheduled notifications ----
+      let notifPauseTimer = null;
+      async function loadNotifPause(client) {
+        const statusEl = document.getElementById('notif-pause-status');
+        const resumeBtn = document.getElementById('notif-resume-btn');
+        if (!statusEl) return;
+        clearInterval(notifPauseTimer);
+        const { data, error } = await client.rpc('admin_get_notification_pause');
+        if (error) { statusEl.textContent = 'Could not check status.'; return; }
+        const forever = typeof data === 'string' && data.toLowerCase().includes('infinity');
+        const until = data && !forever ? new Date(data) : null;
+        const paint = () => {
+          if (forever) {
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-pause" style="color:#f5b942;"></i> Paused until you tap Resume';
+            resumeBtn.style.display = 'block';
+          } else if (until && until > new Date()) {
+            const mins = Math.max(1, Math.round((until - new Date()) / 60000));
+            const left = mins >= 1440 ? `${Math.floor(mins / 1440)}d ${Math.floor((mins % 1440) / 60)}h`
+              : mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`;
+            statusEl.innerHTML = `<i class="fa-solid fa-circle-pause" style="color:#f5b942;"></i> Paused until ${until.toLocaleString('en-NG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })} (${left} left)`;
+            resumeBtn.style.display = 'block';
+          } else {
+            statusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color:#00b894;"></i> Notifications are active';
+            resumeBtn.style.display = 'none';
+            clearInterval(notifPauseTimer);
+          }
+        };
+        paint();
+        if (until && until > new Date()) notifPauseTimer = setInterval(paint, 30000);
+      }
+
+      async function setNotifPause(client, minutes) {
+        const errEl = document.getElementById('notif-pause-error');
+        errEl.textContent = '';
+        document.querySelectorAll('.notif-pause-btn, #notif-resume-btn').forEach((b) => { b.disabled = true; });
+        try {
+          const { error } = await client.rpc('admin_set_notification_pause', { p_minutes: minutes });
+          if (error) throw error;
+          logAdminAction(client, 'update_config', null,
+            minutes === -1 ? 'Paused scheduled notifications until resumed' : minutes > 0 ? `Paused scheduled notifications for ${minutes} minutes` : 'Resumed scheduled notifications');
+          await loadNotifPause(client);
+        } catch (err) {
+          errEl.textContent = err.message || 'Could not change the pause. Please try again.';
+        } finally {
+          document.querySelectorAll('.notif-pause-btn, #notif-resume-btn').forEach((b) => { b.disabled = false; });
+        }
+      }
+
       async function loadConfig(client) {
         const listEl = document.getElementById('config-list');
         listEl.innerHTML = skeletonHTML(3);
+        loadNotifPause(client);
+        if (!window.__notifPauseWired) {
+          window.__notifPauseWired = true;
+          document.querySelectorAll('.notif-pause-btn').forEach((b) => {
+            b.addEventListener('click', () => setNotifPause(client, Number(b.dataset.minutes)));
+          });
+          document.getElementById('notif-resume-btn').addEventListener('click', () => setNotifPause(client, 0));
+        }
 
         const { data, error } = await client.from('app_config').select('key, value').order('key');
         if (error || !data) return;
